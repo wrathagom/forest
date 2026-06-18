@@ -1,0 +1,65 @@
+/* Fixed, self-scrolling layer: the app's global `body { overflow: hidden }`
+   propagates to the viewport, so /m can't rely on page scroll — it owns its
+   own scroll container instead. -webkit-overflow-scrolling keeps iOS momentum. */
+.m-root { position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; background: #161616; color: #e6e6e6;
+  font: 16px/1.45 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%; }
+.m-bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  background: #232323; position: sticky; top: 0; z-index: 2; font-weight: 600; }
+.m-bar a, .m-bar button.m-back { color: #bdbdbd; text-decoration: none; background: none; border: 0;
+  font: inherit; padding: 4px 6px; cursor: pointer; min-height: 44px; }
+.m-brand { letter-spacing: .05em; text-transform: lowercase; }
+.m-brand-mark { color: var(--accent, #6ee7b7); font-style: italic; font-weight: 700; }
+.m-main { padding: 12px 14px 28px; max-width: 640px; margin: 0 auto; }
+.m-section-label { text-transform: uppercase; letter-spacing: .5px; font-size: 11px;
+  color: #8a8a8a; margin: 18px 0 8px; }
+.m-row { display: block; width: 100%; text-align: left; border-radius: 12px; padding: 12px 14px;
+  margin-bottom: 8px; border: 1px solid #2e2e2e; background: #1e1e1e; color: inherit;
+  font: inherit; cursor: pointer; }
+.m-row[data-state="waiting"] { background: #3a2e12; border-color: #6b551c; }
+.m-row[data-state="done"] { opacity: .65; }
+.m-row .m-row-title { font-weight: 600; font-size: 14px; }
+.m-row .m-row-label { font-size: 13px; color: #c8c8c8; margin-top: 2px; }
+.m-row .m-row-snippet { color: #b6b6b6; font-size: 13px; margin-top: 2px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.m-row .m-row-meta { color: #8a8a8a; font-size: 11px; margin-top: 4px; }
+.m-btn { display: block; width: 100%; padding: 13px; border-radius: 12px; border: 0;
+  background: #2d6a4f; color: #fff; font: inherit; font-weight: 600; cursor: pointer; margin-top: 14px; }
+.m-btn:disabled { opacity: .5; cursor: default; }
+.m-btn-top { margin-top: 0; margin-bottom: 6px; }
+.m-btn-secondary { background: #262626; color: #cfcfcf; border: 1px solid #3a3a3a; }
+.m-field-label { font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: .5px;
+  margin: 14px 0 4px; }
+.m-input, .m-textarea, .m-select { width: 100%; box-sizing: border-box; background: #111;
+  border: 1px solid #3a3a3a; border-radius: 8px; color: #e6e6e6; padding: 10px; font: inherit; }
+.m-textarea { min-height: 90px; resize: vertical; }
+.m-seg { display: flex; gap: 6px; }
+.m-seg button { flex: 1; padding: 9px 6px; border-radius: 8px; border: 1px solid #3a3a3a;
+  background: #1e1e1e; color: #cfcfcf; font: inherit; font-size: 13px; cursor: pointer; }
+.m-seg button[aria-pressed="true"] { background: #3a2e12; border-color: #6b551c; color: #fff; }
+.m-transcript { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+/* scroll-margin so scrollIntoView({block:"start"}) clears the sticky .m-bar */
+.m-bubble { border-radius: 10px; padding: 9px 11px; font-size: 14px; scroll-margin-top: 56px; }
+.m-bubble-user { background: #23303a; }
+.m-bubble-claude { background: #222; }
+.m-bubble-role { font-size: 11px; color: #8a8a8a; margin-bottom: 4px; text-transform: lowercase; letter-spacing: .03em; }
+/* parsed message blocks inside a bubble (component + base styles in styles.css) */
+.m-bubble .msg-blocks { gap: 6px; }
+.m-bubble .msg-text { min-width: 0; }
+.m-bubble .markdown-body pre { background: #141414; border-color: #333; }
+.m-bubble .markdown-body code { background: rgba(255,255,255,.1); }
+.m-bubble .msg-tool { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.m-bubble .tool-pill, .m-bubble .tool-result-pill {
+  flex: none; border-radius: 4px; padding: 1px 6px; font-size: 10px;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.m-bubble .tool-pill { background: rgba(110,231,183,.12); color: #6ee7b7; border: 1px solid rgba(110,231,183,.3); }
+.m-bubble .tool-result-pill { background: #1a1a1a; color: #8a8a8a; border: 1px solid #333; }
+.m-bubble .tool-result-pill.is-error { background: rgba(248,113,113,.14); color: #f08c8c; border-color: rgba(248,113,113,.4); }
+.m-bubble .tool-summary { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  color: #9a9a9a; word-break: break-all; overflow-wrap: anywhere; min-width: 0; }
+.m-tools { color: #7a7a7a; font-size: 11px; margin: 0 0 12px; }
+.m-error { background: #3a1f1f; border: 1px solid #6b2c2c; color: #f0c8c8; border-radius: 8px;
+  padding: 9px 11px; font-size: 13px; margin: 10px 0; }
+.m-empty { color: #7a7a7a; text-align: center; padding: 40px 0; }
+.m-hint { color: #7a7a7a; font-size: 11px; margin-top: 8px; }

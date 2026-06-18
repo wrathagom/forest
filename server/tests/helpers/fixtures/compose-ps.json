@@ -1,0 +1,4 @@
+[
+  {"Name": "demo-db-1", "Service": "db", "State": "running"},
+  {"Name": "demo-cache-1", "Service": "cache", "State": "exited"}
+]

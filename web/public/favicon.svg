@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="13" fill="#0e0e10"/>
+  <text x="31" y="31" fill="#6ee7b7"
+        font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+        font-size="42" font-style="italic" font-weight="700"
+        text-anchor="middle" dominant-baseline="central">&#x192;</text>
+</svg>

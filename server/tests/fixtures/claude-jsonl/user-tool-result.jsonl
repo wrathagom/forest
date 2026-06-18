@@ -1,0 +1,1 @@
+{"type":"user","uuid":"01HX0000000000000000000004","timestamp":"2026-05-09T12:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"file1\nfile2\n","is_error":false}]},"sessionId":"sid-test-1","cwd":"/tmp/proj"}

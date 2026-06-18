@@ -1,0 +1,15 @@
+{
+  "name": "@forest/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0"
+  }
+}

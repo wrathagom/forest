@@ -1,0 +1,24 @@
+[
+  {
+    "Service": "db",
+    "Name": "demo-db-1",
+    "State": "running",
+    "Image": "postgres:16",
+    "CreatedAt": "2026-05-08 14:00:00 +0000 UTC",
+    "ExitCode": 0,
+    "Health": "healthy",
+    "Publishers": [
+      {"URL": "0.0.0.0", "TargetPort": 5432, "PublishedPort": 5432, "Protocol": "tcp"}
+    ]
+  },
+  {
+    "Service": "cache",
+    "Name": "demo-cache-1",
+    "State": "exited",
+    "Image": "redis:7-alpine",
+    "CreatedAt": "2026-05-08 13:30:00 +0000 UTC",
+    "ExitCode": 1,
+    "Health": null,
+    "Publishers": []
+  }
+]

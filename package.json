@@ -1,0 +1,13 @@
+{
+  "name": "forest",
+  "private": true,
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "dev:server": "bun --watch run server/src/index.ts",
+    "dev:web": "cd web && bun run dev",
+    "build:web": "cd web && bun run build",
+    "test:server": "cd server && bun test",
+    "test:web": "cd web && bun run test",
+    "service": "scripts/forest-service.sh"
+  }
+}
