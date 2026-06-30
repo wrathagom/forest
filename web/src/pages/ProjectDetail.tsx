@@ -54,12 +54,20 @@ export default function ProjectDetail() {
   const [launchersRes] = createResource(async () => (await fetchConfig()).launchers ?? []);
   const [lastUsedLauncher, setLastUsedLauncher] = persistedSignal<string | null>("launcher.lastUsed", "shell");
 
+  // The project our in-memory tab state currently belongs to. Persistence is
+  // keyed off THIS, not the reactive `params.id`. During a project switch the
+  // persist effects must not fire against the destination project before the
+  // reset effect below has swapped in that project's tabs — otherwise they'd
+  // write the *old* project's tabs into the *new* project's storage key, which
+  // the reset then reads straight back, leaking tabs across projects.
+  let tabsProjectId = params.id;
+
   // Persist open files + active tab as they change
   createEffect(() => {
-    saveOpenFiles(params.id, fileTabs.map((f) => f.path));
+    saveOpenFiles(tabsProjectId, fileTabs.map((f) => f.path));
   });
   createEffect(() => {
-    saveActiveTab(params.id, activeId());
+    saveActiveTab(tabsProjectId, activeId());
   });
 
   // Session IDs we've auto-closed after a clean exit. The server retains exited
@@ -109,15 +117,22 @@ export default function ProjectDetail() {
     untrack(() => void refetchSessions());
   });
 
-  // When the route changes, reload file-tab state for the new project.
-  let lastProjectId = params.id;
+  // When the route changes, reload tab state for the new project. `tabsProjectId`
+  // is updated *before* the store writes so the persist effects above key off the
+  // new project. The transient (non-persisted) tab stores are cleared too — unlike
+  // file/active tabs they have no per-project storage, so without this they'd
+  // simply follow you into the next project.
   createEffect(() => {
     const id = params.id;
-    if (id === lastProjectId) return;
-    lastProjectId = id;
+    if (id === tabsProjectId) return;
+    tabsProjectId = id;
     untrack(() => {
       setFileTabs(reconcile(loadOpenFiles(id).map((path) => ({ path, dirty: false }))));
       setActiveId(loadActiveTab(id));
+      setDiffTabs(reconcile([]));
+      setCommitTabs(reconcile([]));
+      setSessionTabs(reconcile([]));
+      setTaskTabs(reconcile([]));
     });
   });
 
