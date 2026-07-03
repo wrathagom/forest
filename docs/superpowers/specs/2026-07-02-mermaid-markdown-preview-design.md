@@ -1,7 +1,7 @@
 # Mermaid rendering in the markdown preview
 
 **Date:** 2026-07-02
-**Status:** Approved design — pending implementation
+**Status:** Implemented (2026-07-03)
 
 ## Summary
 
