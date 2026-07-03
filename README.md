@@ -104,10 +104,19 @@ Both are off / absent by default; Forest runs fully without them.
   `~/.local/bin/multi-agent-profiles`) and injecting `CLAUDE_CONFIG_DIR` into the
   spawned PTY. If the binary is not on `PATH`, launches fall back to the default
   `~/.claude` — no badge, which is how to spot an unrouted launcher.
-- **Big Beautiful Screens (BBS)** — optionally push a live session HUD to a BBS
-  screen. Enable it under **Settings → Big Beautiful Screens**, where you can set
-  the **server URL** (point it at the hosted service or your own self-hosted BBS
-  instance), the account key, and provision a screen. Disabled by default.
+- **[Big Beautiful Screens (BBS)](https://bigbeautifulscreens.com)** — an
+  API-driven platform for real-time display dashboards and digital signage. Forest
+  can optionally push a live session HUD to a BBS screen. Enable it under
+  **Settings → Big Beautiful Screens**, where you can set the **server URL** (point
+  it at the [hosted service](https://bigbeautifulscreens.com) or your own
+  self-hosted instance), the account key, and provision a screen. Disabled by
+  default. To self-host, see
+  [wrathagom/Big-Beautiful-Screens](https://github.com/wrathagom/Big-Beautiful-Screens)
+  — the quickest path is Docker:
+
+  ```sh
+  docker run -d -p 8000:8000 ghcr.io/wrathagom/big-beautiful-screens
+  ```
 
 ## node-pty / terminals troubleshooting
 
