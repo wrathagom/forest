@@ -445,6 +445,7 @@ export type SessionListRow = {
   cwd: string;
   worktree_label: string | null;
   branch: string | null;
+  profile: string | null;
   cwd_exists: number;
   parent_session_id: string | null;
   started_at: number | null;
@@ -457,13 +458,14 @@ export type SessionListRow = {
   snippet?: string;
 };
 
-export type SessionsSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project";
+export type SessionsSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project" | "profile";
 
 export type SessionsOverviewResponse = { sessions: SessionListRow[]; total: number };
 
 export async function fetchSessionsOverview(opts: {
   q?: string;
   project?: string;
+  profile?: string;
   sort?: SessionsSort;
   dir?: "asc" | "desc";
   limit?: number;
@@ -472,6 +474,7 @@ export async function fetchSessionsOverview(opts: {
   const sp = new URLSearchParams();
   if (opts.q) sp.set("q", opts.q);
   if (opts.project) sp.set("project", opts.project);
+  if (opts.profile) sp.set("profile", opts.profile);
   if (opts.sort) sp.set("sort", opts.sort);
   if (opts.dir) sp.set("dir", opts.dir);
   if (opts.limit !== undefined) sp.set("limit", String(opts.limit));
@@ -480,12 +483,15 @@ export async function fetchSessionsOverview(opts: {
 }
 
 export type TokenBucket = { input: number; output: number; cache: number };
-export type TokensOverTimePoint = TokenBucket & { day: string };
+export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, number> };
 export type TokensByProjectRow = TokenBucket & { projectId: string | null; projectName: string; sessions: number };
+export type TokensByProfileRow = TokenBucket & { profile: string; sessions: number };
 
 export type SessionsStatsResponse = {
   tokensOverTime: TokensOverTimePoint[];
   tokensByProject: TokensByProjectRow[];
+  tokensByProfile: TokensByProfileRow[];
+  profiles: string[];
   totals: TokenBucket & { sessions: number };
 };
 
