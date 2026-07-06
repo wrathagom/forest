@@ -41,6 +41,11 @@ export type TokensByProjectRow = TokenBucket & {
   sessions: number;
 };
 
+export type TokensByProfileRow = TokenBucket & {
+  profile: string;
+  sessions: number;
+};
+
 export type SessionListSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project";
 
 export type SessionListRow = SessionRow & {
@@ -409,6 +414,25 @@ export class Vault {
         cache: r.cache,
         sessions: r.sessions,
       }))
+      .sort((a, b) => b.input + b.output + b.cache - (a.input + a.output + a.cache));
+  }
+
+  tokensByProfile(): TokensByProfileRow[] {
+    const norm = "CASE WHEN s.profile IS NULL THEN 'unassigned' ELSE s.profile END";
+    const rows = this.db
+      .query<{ profile: string; input: number; output: number; cache: number; sessions: number }, []>(
+        `SELECT ${norm} AS profile,
+                COALESCE(SUM(m.input_tokens), 0)  AS input,
+                COALESCE(SUM(m.output_tokens), 0) AS output,
+                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache,
+                COUNT(DISTINCT s.session_id) AS sessions
+           FROM agent_sessions s
+           LEFT JOIN agent_messages m ON m.session_id = s.session_id
+          GROUP BY ${norm}`,
+      )
+      .all();
+    return rows
+      .map((r) => ({ profile: r.profile, input: r.input, output: r.output, cache: r.cache, sessions: r.sessions }))
       .sort((a, b) => b.input + b.output + b.cache - (a.input + a.output + a.cache));
   }
 

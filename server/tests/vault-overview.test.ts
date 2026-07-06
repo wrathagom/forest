@@ -123,6 +123,25 @@ describe("Vault.listAll", () => {
   });
 });
 
+describe("Vault.tokensByProfile", () => {
+  test("aggregates per profile, keeping null (unassigned) and 'default' distinct, sorted by total desc", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    v.upsertSession({ session_id: "sp1", agent: "claude", cwd: "/a", last_activity: 1, profile: "personal", source: "scan" });
+    v.upsertSession({ session_id: "sp2", agent: "claude", cwd: "/b", last_activity: 2, profile: "work", source: "scan" });
+    v.upsertSession({ session_id: "sp3", agent: "claude", cwd: "/c", last_activity: 3, profile: "default", source: "scan" });
+    v.upsertSession({ session_id: "sp4", agent: "claude", cwd: "/d", last_activity: 4, source: "scan" }); // null profile
+    v.upsertMessages([msg("sp1", "m1", 1, { input: 50, output: 10 })], [{ uuid: "m1", text: "x" }]);
+    v.upsertMessages([msg("sp2", "m2", 2, { input: 1000, output: 0 })], [{ uuid: "m2", text: "y" }]);
+    v.upsertMessages([msg("sp3", "m3", 3, { input: 5, output: 0 })], [{ uuid: "m3", text: "z" }]);
+    v.upsertMessages([msg("sp4", "m4", 4, { input: 1, output: 0 })], [{ uuid: "m4", text: "w" }]);
+    const rows = v.tokensByProfile();
+    expect(rows.map((r) => r.profile)).toEqual(["work", "personal", "default", "unassigned"]);
+    expect(rows.find((r) => r.profile === "personal")).toEqual({ profile: "personal", input: 50, output: 10, cache: 0, sessions: 1 });
+    expect(rows.find((r) => r.profile === "unassigned")).toEqual({ profile: "unassigned", input: 1, output: 0, cache: 0, sessions: 1 });
+  });
+});
+
 describe("Vault.tokensOverTime", () => {
   test("buckets by UTC day over the last N days, zero-filling and excluding older messages", () => {
     const db = openDb(":memory:");
