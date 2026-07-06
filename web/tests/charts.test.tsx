@@ -5,7 +5,7 @@ import TokensByProjectChart from "../src/components/charts/TokensByProjectChart"
 import TokensByProfileChart from "../src/components/charts/TokensByProfileChart";
 
 const days = (n: number) =>
-  Array.from({ length: n }, (_, i) => ({ day: `2026-04-${String(i + 1).padStart(2, "0")}`, input: i, output: i, cache: i }));
+  Array.from({ length: n }, (_, i) => ({ day: `2026-04-${String(i + 1).padStart(2, "0")}`, input: i, output: i, cache: i, byProfile: {} as Record<string, number> }));
 
 test("TokensOverTimeChart renders one bar group per data point", () => {
   const { container } = render(() => <TokensOverTimeChart data={days(30)} />);
@@ -15,6 +15,21 @@ test("TokensOverTimeChart renders one bar group per data point", () => {
 test("TokensOverTimeChart renders an empty-state when there is no data", () => {
   const { container } = render(() => <TokensOverTimeChart data={[]} />);
   expect(container.textContent).toContain("no data");
+});
+
+test("TokensOverTimeChart profile mode renders per-profile stacked segments", () => {
+  const data = [
+    { day: "2026-04-01", input: 0, output: 0, cache: 0, byProfile: { work: 100, personal: 50 } },
+    { day: "2026-04-02", input: 0, output: 0, cache: 0, byProfile: { work: 20 } },
+  ];
+  const { container } = render(() => (
+    <TokensOverTimeChart data={data} mode="profile" profiles={["work", "personal"]} colors={{ work: "#111111", personal: "#222222" }} />
+  ));
+  expect(container.querySelectorAll("g.totc-bar")).toHaveLength(2);
+  // day 1 → 2 segments, day 2 → 1 segment
+  expect(container.querySelectorAll("g.totc-bar rect").length).toBe(3);
+  const fills = Array.from(container.querySelectorAll("g.totc-bar rect")).map((r) => (r as SVGElement).style.fill);
+  expect(fills).toContain("rgb(17, 17, 17)");
 });
 
 const rows = [
