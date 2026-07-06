@@ -112,7 +112,7 @@ export default function Sessions() {
   const profileOptions = createMemo(() => stats()?.profiles ?? []);
   const profileColors = createMemo(() => profileColorMap(stats()?.profiles ?? []));
 
-  const empty = () => page.state === "ready" && total() === 0 && !debounced() && project() === "";
+  const empty = () => page.state === "ready" && total() === 0 && !debounced() && project() === "" && profile() === "";
 
   return (
     <div class="sessions-page">

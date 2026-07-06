@@ -136,3 +136,12 @@ test("switching the chart to 'by account' shows the profile legend", async () =>
   await waitFor(() => expect(container.querySelector(".chart-legend")?.textContent).toContain("work"));
   expect(container.textContent).not.toContain("input");
 });
+
+test("selecting an account with no matches shows the filter empty-state, not the global one", async () => {
+  fetchSessionsOverview.mockResolvedValue({ sessions: [], total: 0 });
+  const { container } = renderPage();
+  await waitFor(() => expect(container.querySelector(".sessions-profile")).toBeTruthy());
+  fireEvent.change(container.querySelector(".sessions-profile") as HTMLSelectElement, { target: { value: "work" } });
+  await waitFor(() => expect(container.textContent).toContain("no sessions match this filter"));
+  expect(container.textContent).not.toContain("no agent sessions recorded yet");
+});
