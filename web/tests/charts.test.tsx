@@ -3,6 +3,7 @@ import { render } from "@solidjs/testing-library";
 import TokensOverTimeChart from "../src/components/charts/TokensOverTimeChart";
 import TokensByProjectChart from "../src/components/charts/TokensByProjectChart";
 import TokensByProfileChart from "../src/components/charts/TokensByProfileChart";
+import type { TokensOverTimePoint } from "../src/api";
 
 const days = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ day: `2026-04-${String(i + 1).padStart(2, "0")}`, input: i, output: i, cache: i, byProfile: {} as Record<string, number> }));
@@ -18,7 +19,7 @@ test("TokensOverTimeChart renders an empty-state when there is no data", () => {
 });
 
 test("TokensOverTimeChart profile mode renders per-profile stacked segments", () => {
-  const data = [
+  const data: TokensOverTimePoint[] = [
     { day: "2026-04-01", input: 0, output: 0, cache: 0, byProfile: { work: 100, personal: 50 } },
     { day: "2026-04-02", input: 0, output: 0, cache: 0, byProfile: { work: 20 } },
   ];
