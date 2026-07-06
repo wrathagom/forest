@@ -178,3 +178,18 @@ describe("Vault.tokensOverTime byProfile", () => {
     expect(out[0]!.byProfile).toEqual({});
   });
 });
+
+describe("Vault.listAll profile filter + sort", () => {
+  test("filters by profile and by 'unassigned' (null profile)", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    v.upsertSession({ session_id: "lp1", agent: "claude", cwd: "/a", last_activity: 3, profile: "personal", source: "scan" });
+    v.upsertSession({ session_id: "lp2", agent: "claude", cwd: "/b", last_activity: 2, profile: "work", source: "scan" });
+    v.upsertSession({ session_id: "lp3", agent: "claude", cwd: "/c", last_activity: 1, source: "scan" }); // null
+    expect(v.listAll({ profile: "personal" }).sessions.map((s) => s.session_id)).toEqual(["lp1"]);
+    expect(v.listAll({ profile: "personal" }).total).toBe(1);
+    expect(v.listAll({ profile: "unassigned" }).sessions.map((s) => s.session_id)).toEqual(["lp3"]);
+    expect(v.listAll({ profile: "unassigned" }).total).toBe(1);
+    expect(v.listAll({ sort: "profile", dir: "asc" }).sessions.map((s) => s.session_id)).toEqual(["lp1", "lp2", "lp3"]);
+  });
+});

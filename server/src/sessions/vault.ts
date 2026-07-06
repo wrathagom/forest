@@ -46,7 +46,7 @@ export type TokensByProfileRow = TokenBucket & {
   sessions: number;
 };
 
-export type SessionListSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project";
+export type SessionListSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project" | "profile";
 
 export type SessionListRow = SessionRow & {
   project_name: string | null;
@@ -284,6 +284,7 @@ export class Vault {
 
   listAll(opts: {
     projectId?: string;            // undefined/"" = all; "none" = unassigned only
+    profile?: string;              // undefined/"" = all; "unassigned" = null profile only
     q?: string;
     sort?: SessionListSort;
     dir?: "asc" | "desc";
@@ -300,8 +301,9 @@ export class Vault {
         tokens: "(COALESCE(t.input,0)+COALESCE(t.output,0)+COALESCE(t.cache,0))",
         message_count: "s.message_count",
         project: "p.name",
+        profile: "s.profile",
       } as Record<string, string>)[opts.sort ?? "last_activity"] ?? "s.last_activity";
-    const nullsLast = opts.sort === "project" ? " NULLS LAST" : "";
+    const nullsLast = opts.sort === "project" || opts.sort === "profile" ? " NULLS LAST" : "";
 
     const q = opts.q?.trim() || "";
     const where: string[] = [];
@@ -311,6 +313,12 @@ export class Vault {
     } else if (opts.projectId) {
       where.push("s.project_id = ?");
       whereParams.push(opts.projectId);
+    }
+    if (opts.profile === "unassigned") {
+      where.push("s.profile IS NULL");
+    } else if (opts.profile) {
+      where.push("s.profile = ?");
+      whereParams.push(opts.profile);
     }
     if (q) {
       where.push("s.session_id IN (SELECT session_id FROM agent_messages_fts WHERE agent_messages_fts MATCH ?)");
