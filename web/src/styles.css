@@ -702,6 +702,11 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .chart-legend-item:hover { color: var(--fg); }
 .chart-legend-item.off { opacity: 0.35; }
 .chart-legend-item i { width: 0.7rem; height: 0.7rem; border-radius: 2px; display: inline-block; }
+.chart-toolbar { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+.chart-mode-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 0.72rem; }
+.chart-mode-toggle button { background: var(--bg-2); border: none; color: var(--fg-dim); padding: 0.2rem 0.6rem; cursor: pointer; font: inherit; }
+.chart-mode-toggle button:hover { color: var(--fg); }
+.chart-mode-toggle button.active { background: rgba(127, 127, 127, 0.25); color: var(--fg); }
 .tok-in { background: var(--tok-in); fill: var(--tok-in); }
 .tok-out { background: var(--tok-out); fill: var(--tok-out); }
 .tok-cache { background: var(--tok-cache); fill: var(--tok-cache); }
@@ -728,6 +733,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 
 .sessions-controls { display: flex; gap: 0.6rem; margin-top: 0.4rem; }
 .sessions-project { background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; color: var(--fg); padding: 0.35rem 0.5rem; font: inherit; }
+.sessions-profile { background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; color: var(--fg); padding: 0.35rem 0.5rem; font: inherit; }
 
 .sessions-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .sessions-table th { text-align: left; color: var(--fg-dim); font-weight: 600; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.06em; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
