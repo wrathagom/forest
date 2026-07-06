@@ -154,10 +154,27 @@ describe("Vault.tokensOverTime", () => {
 
     const out = v.tokensOverTime({ days: 7 });
     expect(out).toHaveLength(7);
-    expect(out[6]).toEqual({ day: dayKey(today), input: 100, output: 10, cache: 0 });
-    expect(out[5]).toEqual({ day: dayKey(today - dayMs), input: 0, output: 0, cache: 205 });
-    expect(out[0]).toEqual({ day: dayKey(today - 6 * dayMs), input: 0, output: 0, cache: 0 });
+    expect(out[6]).toEqual({ day: dayKey(today), input: 100, output: 10, cache: 0, byProfile: { unassigned: 110 } });
+    expect(out[5]).toEqual({ day: dayKey(today - dayMs), input: 0, output: 0, cache: 205, byProfile: { unassigned: 205 } });
+    expect(out[0]).toEqual({ day: dayKey(today - 6 * dayMs), input: 0, output: 0, cache: 0, byProfile: {} });
     // the 40-days-ago message must not appear anywhere
     expect(out.some((p) => p.input === 999)).toBe(false);
+  });
+});
+
+describe("Vault.tokensOverTime byProfile", () => {
+  test("splits each day's tokens by profile; empty map on inactive days", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    const today = utcMidnightToday();
+    v.upsertSession({ session_id: "tp1", agent: "claude", cwd: "/a", last_activity: today, profile: "personal", source: "scan" });
+    v.upsertSession({ session_id: "tp2", agent: "claude", cwd: "/b", last_activity: today, profile: "work", source: "scan" });
+    v.upsertMessages([msg("tp1", "n1", today + 1000, { input: 10, output: 5 })], [{ uuid: "n1", text: "a" }]);
+    v.upsertMessages([msg("tp2", "n2", today + 2000, { input: 100, output: 0 })], [{ uuid: "n2", text: "b" }]);
+    const out = v.tokensOverTime({ days: 7 });
+    const todayPoint = out[out.length - 1]!;
+    expect(todayPoint.day).toBe(dayKey(today));
+    expect(todayPoint.byProfile).toEqual({ personal: 15, work: 100 });
+    expect(out[0]!.byProfile).toEqual({});
   });
 });

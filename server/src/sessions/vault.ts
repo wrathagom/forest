@@ -34,7 +34,7 @@ export type SessionRow = {
 };
 
 export type TokenBucket = { input: number; output: number; cache: number };
-export type TokensOverTimePoint = TokenBucket & { day: string };
+export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, number> };
 export type TokensByProjectRow = TokenBucket & {
   projectId: string | null;
   projectName: string;
@@ -377,11 +377,37 @@ export class Vault {
       )
       .all(startUtc);
     const byDay = new Map(rows.map((r) => [r.day, r]));
+
+    const profRows = this.db
+      .query<{ day: string; profile: string; total: number }, [number]>(
+        `SELECT strftime('%Y-%m-%d', m.timestamp / 1000, 'unixepoch') AS day,
+                CASE WHEN s.profile IS NULL THEN 'unassigned' ELSE s.profile END AS profile,
+                COALESCE(SUM(m.input_tokens), 0) + COALESCE(SUM(m.output_tokens), 0)
+                  + COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS total
+           FROM agent_messages m
+           JOIN agent_sessions s ON s.session_id = m.session_id
+          WHERE m.timestamp >= ?
+          GROUP BY day, profile`,
+      )
+      .all(startUtc);
+    const profByDay = new Map<string, Record<string, number>>();
+    for (const r of profRows) {
+      const bucket = profByDay.get(r.day) ?? {};
+      bucket[r.profile] = r.total;
+      profByDay.set(r.day, bucket);
+    }
+
     const out: TokensOverTimePoint[] = [];
     for (let i = 0; i < opts.days; i++) {
       const key = new Date(startUtc + i * dayMs).toISOString().slice(0, 10);
       const hit = byDay.get(key);
-      out.push({ day: key, input: hit?.input ?? 0, output: hit?.output ?? 0, cache: hit?.cache ?? 0 });
+      out.push({
+        day: key,
+        input: hit?.input ?? 0,
+        output: hit?.output ?? 0,
+        cache: hit?.cache ?? 0,
+        byProfile: profByDay.get(key) ?? {},
+      });
     }
     return out;
   }
