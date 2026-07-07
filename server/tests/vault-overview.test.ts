@@ -123,6 +123,25 @@ describe("Vault.listAll", () => {
   });
 });
 
+describe("Vault.tokensByProfile", () => {
+  test("aggregates per profile, keeping null (unassigned) and 'default' distinct, sorted by total desc", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    v.upsertSession({ session_id: "sp1", agent: "claude", cwd: "/a", last_activity: 1, profile: "personal", source: "scan" });
+    v.upsertSession({ session_id: "sp2", agent: "claude", cwd: "/b", last_activity: 2, profile: "work", source: "scan" });
+    v.upsertSession({ session_id: "sp3", agent: "claude", cwd: "/c", last_activity: 3, profile: "default", source: "scan" });
+    v.upsertSession({ session_id: "sp4", agent: "claude", cwd: "/d", last_activity: 4, source: "scan" }); // null profile
+    v.upsertMessages([msg("sp1", "m1", 1, { input: 50, output: 10 })], [{ uuid: "m1", text: "x" }]);
+    v.upsertMessages([msg("sp2", "m2", 2, { input: 1000, output: 0 })], [{ uuid: "m2", text: "y" }]);
+    v.upsertMessages([msg("sp3", "m3", 3, { input: 5, output: 0 })], [{ uuid: "m3", text: "z" }]);
+    v.upsertMessages([msg("sp4", "m4", 4, { input: 1, output: 0 })], [{ uuid: "m4", text: "w" }]);
+    const rows = v.tokensByProfile();
+    expect(rows.map((r) => r.profile)).toEqual(["work", "personal", "default", "unassigned"]);
+    expect(rows.find((r) => r.profile === "personal")).toEqual({ profile: "personal", input: 50, output: 10, cache: 0, sessions: 1 });
+    expect(rows.find((r) => r.profile === "unassigned")).toEqual({ profile: "unassigned", input: 1, output: 0, cache: 0, sessions: 1 });
+  });
+});
+
 describe("Vault.tokensOverTime", () => {
   test("buckets by UTC day over the last N days, zero-filling and excluding older messages", () => {
     const db = openDb(":memory:");
@@ -135,10 +154,42 @@ describe("Vault.tokensOverTime", () => {
 
     const out = v.tokensOverTime({ days: 7 });
     expect(out).toHaveLength(7);
-    expect(out[6]).toEqual({ day: dayKey(today), input: 100, output: 10, cache: 0 });
-    expect(out[5]).toEqual({ day: dayKey(today - dayMs), input: 0, output: 0, cache: 205 });
-    expect(out[0]).toEqual({ day: dayKey(today - 6 * dayMs), input: 0, output: 0, cache: 0 });
+    expect(out[6]).toEqual({ day: dayKey(today), input: 100, output: 10, cache: 0, byProfile: { unassigned: 110 } });
+    expect(out[5]).toEqual({ day: dayKey(today - dayMs), input: 0, output: 0, cache: 205, byProfile: { unassigned: 205 } });
+    expect(out[0]).toEqual({ day: dayKey(today - 6 * dayMs), input: 0, output: 0, cache: 0, byProfile: {} });
     // the 40-days-ago message must not appear anywhere
     expect(out.some((p) => p.input === 999)).toBe(false);
+  });
+});
+
+describe("Vault.tokensOverTime byProfile", () => {
+  test("splits each day's tokens by profile; empty map on inactive days", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    const today = utcMidnightToday();
+    v.upsertSession({ session_id: "tp1", agent: "claude", cwd: "/a", last_activity: today, profile: "personal", source: "scan" });
+    v.upsertSession({ session_id: "tp2", agent: "claude", cwd: "/b", last_activity: today, profile: "work", source: "scan" });
+    v.upsertMessages([msg("tp1", "n1", today + 1000, { input: 10, output: 5 })], [{ uuid: "n1", text: "a" }]);
+    v.upsertMessages([msg("tp2", "n2", today + 2000, { input: 100, output: 0 })], [{ uuid: "n2", text: "b" }]);
+    const out = v.tokensOverTime({ days: 7 });
+    const todayPoint = out[out.length - 1]!;
+    expect(todayPoint.day).toBe(dayKey(today));
+    expect(todayPoint.byProfile).toEqual({ personal: 15, work: 100 });
+    expect(out[0]!.byProfile).toEqual({});
+  });
+});
+
+describe("Vault.listAll profile filter + sort", () => {
+  test("filters by profile and by 'unassigned' (null profile)", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    v.upsertSession({ session_id: "lp1", agent: "claude", cwd: "/a", last_activity: 3, profile: "personal", source: "scan" });
+    v.upsertSession({ session_id: "lp2", agent: "claude", cwd: "/b", last_activity: 2, profile: "work", source: "scan" });
+    v.upsertSession({ session_id: "lp3", agent: "claude", cwd: "/c", last_activity: 1, source: "scan" }); // null
+    expect(v.listAll({ profile: "personal" }).sessions.map((s) => s.session_id)).toEqual(["lp1"]);
+    expect(v.listAll({ profile: "personal" }).total).toBe(1);
+    expect(v.listAll({ profile: "unassigned" }).sessions.map((s) => s.session_id)).toEqual(["lp3"]);
+    expect(v.listAll({ profile: "unassigned" }).total).toBe(1);
+    expect(v.listAll({ sort: "profile", dir: "asc" }).sessions.map((s) => s.session_id)).toEqual(["lp1", "lp2", "lp3"]);
   });
 });

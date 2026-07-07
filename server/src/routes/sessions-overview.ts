@@ -10,6 +10,7 @@ const VALID_SORTS: ReadonlySet<string> = new Set([
   "tokens",
   "message_count",
   "project",
+  "profile",
 ]);
 
 function intParam(value: string | null, fallback: number): number {
@@ -30,6 +31,7 @@ export function sessionsOverviewRoutes(deps: SessionsOverviewDeps): Route[] {
         const result = deps.vault.listAll({
           q: sp.get("q") ?? undefined,
           projectId: sp.get("project") ?? undefined,
+          profile: sp.get("profile") ?? undefined,
           sort,
           dir,
           limit: intParam(sp.get("limit"), 50),
@@ -43,7 +45,9 @@ export function sessionsOverviewRoutes(deps: SessionsOverviewDeps): Route[] {
       pattern: /^\/api\/sessions\/stats$/,
       handler: () => {
         const tokensByProject = deps.vault.tokensByProject();
+        const tokensByProfile = deps.vault.tokensByProfile();
         const tokensOverTime = deps.vault.tokensOverTime({ days: 30 });
+        const profiles = tokensByProfile.map((r) => r.profile);
         const totals = tokensByProject.reduce(
           (acc, p) => ({
             sessions: acc.sessions + p.sessions,
@@ -53,7 +57,7 @@ export function sessionsOverviewRoutes(deps: SessionsOverviewDeps): Route[] {
           }),
           { sessions: 0, input: 0, output: 0, cache: 0 },
         );
-        return json({ tokensOverTime, tokensByProject, totals });
+        return json({ tokensOverTime, tokensByProject, tokensByProfile, profiles, totals });
       },
     },
   ];

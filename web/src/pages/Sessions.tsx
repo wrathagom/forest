@@ -9,6 +9,8 @@ import {
 import RelativeTime from "../components/RelativeTime";
 import TokensOverTimeChart from "../components/charts/TokensOverTimeChart";
 import TokensByProjectChart from "../components/charts/TokensByProjectChart";
+import TokensByProfileChart from "../components/charts/TokensByProfileChart";
+import { profileColorMap } from "../components/charts/profileColors";
 
 const PAGE = 50;
 
@@ -20,9 +22,13 @@ function fmt(n: number): string {
 function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 }
+function profileLabel(p: string | null): string {
+  return p ?? "unassigned";
+}
 
 const COLUMNS: Array<{ key: SessionsSort | null; label: string }> = [
   { key: "project", label: "project" },
+  { key: "profile", label: "profile" },
   { key: null, label: "session" },
   { key: null, label: "worktree" },
   { key: "started_at", label: "started" },
@@ -43,6 +49,8 @@ export default function Sessions() {
   const [total, setTotal] = createSignal(0);
   const [series, setSeries] = createSignal({ input: true, output: true, cache: true });
   const toggleSeries = (k: "input" | "output" | "cache") => setSeries((s) => ({ ...s, [k]: !s[k] }));
+  const [profile, setProfile] = createSignal("");           // "" all, else normalized profile key
+  const [chartMode, setChartMode] = createSignal<"type" | "profile">("type");
 
   createEffect(() => {
     const q = query();
@@ -53,6 +61,7 @@ export default function Sessions() {
   createEffect(() => {
     debounced();
     project();
+    profile();
     sort();
     dir();
     setOffset(0);
@@ -60,11 +69,12 @@ export default function Sessions() {
 
   const [stats] = createResource(fetchSessionsStats);
   const [page] = createResource(
-    () => ({ q: debounced(), project: project(), sort: sort(), dir: dir(), offset: offset() }),
+    () => ({ q: debounced(), project: project(), profile: profile(), sort: sort(), dir: dir(), offset: offset() }),
     (key) =>
       fetchSessionsOverview({
         q: key.q || undefined,
         project: key.project || undefined,
+        profile: key.profile || undefined,
         sort: key.sort,
         dir: key.dir,
         limit: PAGE,
@@ -99,7 +109,10 @@ export default function Sessions() {
     })),
   );
 
-  const empty = () => page.state === "ready" && total() === 0 && !debounced() && project() === "";
+  const profileOptions = createMemo(() => stats()?.profiles ?? []);
+  const profileColors = createMemo(() => profileColorMap(stats()?.profiles ?? []));
+
+  const empty = () => page.state === "ready" && total() === 0 && !debounced() && project() === "" && profile() === "";
 
   return (
     <div class="sessions-page">
@@ -115,15 +128,36 @@ export default function Sessions() {
       </Show>
 
       <Show when={!empty()}>
-        <div class="chart-legend">
-          <button type="button" class="chart-legend-item" classList={{ off: !series().input }} onclick={() => toggleSeries("input")}><i class="tok-in" /> input</button>
-          <button type="button" class="chart-legend-item" classList={{ off: !series().output }} onclick={() => toggleSeries("output")}><i class="tok-out" /> output</button>
-          <button type="button" class="chart-legend-item" classList={{ off: !series().cache }} onclick={() => toggleSeries("cache")}><i class="tok-cache" /> cache</button>
+        <div class="chart-toolbar">
+          <div class="chart-mode-toggle">
+            <button type="button" classList={{ active: chartMode() === "type" }} onclick={() => setChartMode("type")}>by type</button>
+            <button type="button" classList={{ active: chartMode() === "profile" }} onclick={() => setChartMode("profile")}>by account</button>
+          </div>
+          <Show when={chartMode() === "type"}>
+            <div class="chart-legend">
+              <button type="button" class="chart-legend-item" classList={{ off: !series().input }} onclick={() => toggleSeries("input")}><i class="tok-in" /> input</button>
+              <button type="button" class="chart-legend-item" classList={{ off: !series().output }} onclick={() => toggleSeries("output")}><i class="tok-out" /> output</button>
+              <button type="button" class="chart-legend-item" classList={{ off: !series().cache }} onclick={() => toggleSeries("cache")}><i class="tok-cache" /> cache</button>
+            </div>
+          </Show>
+          <Show when={chartMode() === "profile"}>
+            <div class="chart-legend">
+              <For each={profileOptions()}>
+                {(p) => <span class="chart-legend-item"><i style={{ background: profileColors()[p] }} /> {p}</span>}
+              </For>
+            </div>
+          </Show>
         </div>
 
         <section class="sessions-chart-card">
           <h3 class="section-title">tokens · last 30 days</h3>
-          <TokensOverTimeChart data={stats()?.tokensOverTime ?? []} series={series()} />
+          <TokensOverTimeChart
+            data={stats()?.tokensOverTime ?? []}
+            series={series()}
+            mode={chartMode()}
+            profiles={profileOptions()}
+            colors={profileColors()}
+          />
         </section>
 
         <div class="sessions-charts">
@@ -133,6 +167,14 @@ export default function Sessions() {
               data={stats()?.tokensByProject ?? []}
               series={series()}
               onSelectProject={(id) => setProject(id ?? "none")}
+            />
+          </section>
+          <section class="sessions-chart-card">
+            <h3 class="section-title">tokens by account</h3>
+            <TokensByProfileChart
+              data={stats()?.tokensByProfile ?? []}
+              series={series()}
+              onSelectProfile={(p) => setProfile(p)}
             />
           </section>
         </div>
@@ -148,6 +190,10 @@ export default function Sessions() {
         <select class="sessions-project" value={project()} onchange={(e) => setProject(e.currentTarget.value)}>
           <option value="">all projects</option>
           <For each={projectOptions()}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+        </select>
+        <select class="sessions-profile" value={profile()} onchange={(e) => setProfile(e.currentTarget.value)}>
+          <option value="">all accounts</option>
+          <For each={profileOptions()}>{(p) => <option value={p}>{p}</option>}</For>
         </select>
       </div>
 
@@ -193,6 +239,7 @@ export default function Sessions() {
                     }}
                   >
                     <td class="muted">{s.project_name ?? "—"}</td>
+                    <td class="muted">{profileLabel(s.profile)}</td>
                     <td class="sessions-summary">
                       <span class={`sessions-dot ${s.cwd_exists ? "live" : "gone"}`} />
                       <span innerHTML={s.snippet ?? escapeHtml(s.first_user_msg ?? s.session_id.slice(0, 8))} />

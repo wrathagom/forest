@@ -34,14 +34,19 @@ export type SessionRow = {
 };
 
 export type TokenBucket = { input: number; output: number; cache: number };
-export type TokensOverTimePoint = TokenBucket & { day: string };
+export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, number> };
 export type TokensByProjectRow = TokenBucket & {
   projectId: string | null;
   projectName: string;
   sessions: number;
 };
 
-export type SessionListSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project";
+export type TokensByProfileRow = TokenBucket & {
+  profile: string;
+  sessions: number;
+};
+
+export type SessionListSort = "last_activity" | "started_at" | "tokens" | "message_count" | "project" | "profile";
 
 export type SessionListRow = SessionRow & {
   project_name: string | null;
@@ -279,6 +284,7 @@ export class Vault {
 
   listAll(opts: {
     projectId?: string;            // undefined/"" = all; "none" = unassigned only
+    profile?: string;              // undefined/"" = all; "unassigned" = null profile only
     q?: string;
     sort?: SessionListSort;
     dir?: "asc" | "desc";
@@ -295,8 +301,9 @@ export class Vault {
         tokens: "(COALESCE(t.input,0)+COALESCE(t.output,0)+COALESCE(t.cache,0))",
         message_count: "s.message_count",
         project: "p.name",
+        profile: "s.profile",
       } as Record<string, string>)[opts.sort ?? "last_activity"] ?? "s.last_activity";
-    const nullsLast = opts.sort === "project" ? " NULLS LAST" : "";
+    const nullsLast = opts.sort === "project" || opts.sort === "profile" ? " NULLS LAST" : "";
 
     const q = opts.q?.trim() || "";
     const where: string[] = [];
@@ -306,6 +313,12 @@ export class Vault {
     } else if (opts.projectId) {
       where.push("s.project_id = ?");
       whereParams.push(opts.projectId);
+    }
+    if (opts.profile === "unassigned") {
+      where.push("s.profile IS NULL");
+    } else if (opts.profile) {
+      where.push("s.profile = ?");
+      whereParams.push(opts.profile);
     }
     if (q) {
       where.push("s.session_id IN (SELECT session_id FROM agent_messages_fts WHERE agent_messages_fts MATCH ?)");
@@ -372,11 +385,37 @@ export class Vault {
       )
       .all(startUtc);
     const byDay = new Map(rows.map((r) => [r.day, r]));
+
+    const profRows = this.db
+      .query<{ day: string; profile: string; total: number }, [number]>(
+        `SELECT strftime('%Y-%m-%d', m.timestamp / 1000, 'unixepoch') AS day,
+                CASE WHEN s.profile IS NULL THEN 'unassigned' ELSE s.profile END AS profile,
+                COALESCE(SUM(m.input_tokens), 0) + COALESCE(SUM(m.output_tokens), 0)
+                  + COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS total
+           FROM agent_messages m
+           JOIN agent_sessions s ON s.session_id = m.session_id
+          WHERE m.timestamp >= ?
+          GROUP BY day, profile`,
+      )
+      .all(startUtc);
+    const profByDay = new Map<string, Record<string, number>>();
+    for (const r of profRows) {
+      const bucket = profByDay.get(r.day) ?? {};
+      bucket[r.profile] = r.total;
+      profByDay.set(r.day, bucket);
+    }
+
     const out: TokensOverTimePoint[] = [];
     for (let i = 0; i < opts.days; i++) {
       const key = new Date(startUtc + i * dayMs).toISOString().slice(0, 10);
       const hit = byDay.get(key);
-      out.push({ day: key, input: hit?.input ?? 0, output: hit?.output ?? 0, cache: hit?.cache ?? 0 });
+      out.push({
+        day: key,
+        input: hit?.input ?? 0,
+        output: hit?.output ?? 0,
+        cache: hit?.cache ?? 0,
+        byProfile: profByDay.get(key) ?? {},
+      });
     }
     return out;
   }
@@ -409,6 +448,25 @@ export class Vault {
         cache: r.cache,
         sessions: r.sessions,
       }))
+      .sort((a, b) => b.input + b.output + b.cache - (a.input + a.output + a.cache));
+  }
+
+  tokensByProfile(): TokensByProfileRow[] {
+    const norm = "CASE WHEN s.profile IS NULL THEN 'unassigned' ELSE s.profile END";
+    const rows = this.db
+      .query<{ profile: string; input: number; output: number; cache: number; sessions: number }, []>(
+        `SELECT ${norm} AS profile,
+                COALESCE(SUM(m.input_tokens), 0)  AS input,
+                COALESCE(SUM(m.output_tokens), 0) AS output,
+                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache,
+                COUNT(DISTINCT s.session_id) AS sessions
+           FROM agent_sessions s
+           LEFT JOIN agent_messages m ON m.session_id = s.session_id
+          GROUP BY ${norm}`,
+      )
+      .all();
+    return rows
+      .map((r) => ({ profile: r.profile, input: r.input, output: r.output, cache: r.cache, sessions: r.sessions }))
       .sort((a, b) => b.input + b.output + b.cache - (a.input + a.output + a.cache));
   }
 
