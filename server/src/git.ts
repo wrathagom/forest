@@ -240,11 +240,15 @@ export async function gitDeleteBranch(
 
 export type MergeResult =
   | { ok: true; sha: string }
-  | { ok: false; reason: "dirty" | "conflict"; message: string };
+  | { ok: false; reason: "dirty" | "conflict" | "empty"; message: string };
 
 /**
  * Merges `branch` into whatever is checked out in `cwd` (the main checkout).
  * - Refuses if the working tree is dirty (`reason: "dirty"`).
+ * - Refuses if the branch has no commits ahead of HEAD (`reason: "empty"`) —
+ *   `git merge` would report "Already up to date" (exit 0, no merge commit),
+ *   which we'd otherwise report as a successful merge, silently marking a task
+ *   done:merged with nothing actually merged.
  * - On conflict, leaves the merge in progress for the user to resolve in a
  *   terminal (`reason: "conflict"`).
  * - Any other merge failure throws.
@@ -258,6 +262,11 @@ export async function gitMerge(
   if (status.code !== 0) throw new Error(firstLine(status.stderr) || "git status failed");
   if (status.stdout.trim() !== "") {
     return { ok: false, reason: "dirty", message: "the main checkout has uncommitted changes" };
+  }
+  const ahead = await run(["rev-list", "--count", `HEAD..${branch}`], cwd);
+  if (ahead.code !== 0) throw new Error(firstLine(ahead.stderr) || "git rev-list failed");
+  if (ahead.stdout.trim() === "0") {
+    return { ok: false, reason: "empty", message: `${branch} has no commits to merge into main` };
   }
   const merge = await run(["merge", "--no-ff", "-m", `Merge ${branch}`, branch], cwd);
   if (merge.code === 0) {

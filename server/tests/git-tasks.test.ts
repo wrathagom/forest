@@ -51,19 +51,31 @@ describe("gitMerge", () => {
     expect(r).toEqual({ ok: false, reason: "dirty", message: expect.any(String) });
     expect(calls.length).toBe(1); // status only — never ran `merge`
   });
-  test("clean + successful merge → {ok:true, sha}", async () => {
+  test("clean but branch has no commits ahead → {ok:false, reason:'empty'}, no merge attempted", async () => {
     const { run, calls } = fakeGit([
       { code: 0, stdout: "" },              // status --porcelain (clean)
+      { code: 0, stdout: "0\n" },           // rev-list --count HEAD..branch → nothing ahead
+    ]);
+    const r = await gitMerge("/repo", "task/go", run);
+    expect(r).toEqual({ ok: false, reason: "empty", message: expect.any(String) });
+    expect(calls.length).toBe(2); // status + rev-list only — never ran `merge`
+    expect(calls[1]).toEqual(["rev-list", "--count", "HEAD..task/go"]);
+  });
+  test("clean + commits ahead + successful merge → {ok:true, sha}", async () => {
+    const { run, calls } = fakeGit([
+      { code: 0, stdout: "" },              // status --porcelain (clean)
+      { code: 0, stdout: "2\n" },           // rev-list --count HEAD..branch → 2 ahead
       { code: 0 },                          // merge
       { code: 0, stdout: "abc123\n" },      // rev-parse HEAD
     ]);
     const r = await gitMerge("/repo", "task/go", run);
     expect(r).toEqual({ ok: true, sha: "abc123" });
-    expect(calls[1]).toEqual(["merge", "--no-ff", "-m", "Merge task/go", "task/go"]);
+    expect(calls[2]).toEqual(["merge", "--no-ff", "-m", "Merge task/go", "task/go"]);
   });
   test("merge conflict → {ok:false, reason:'conflict'}, merge left in progress", async () => {
     const { run } = fakeGit([
       { code: 0, stdout: "" },                       // status (clean)
+      { code: 0, stdout: "1\n" },                    // rev-list (1 ahead)
       { code: 1, stderr: "CONFLICT (content)\n" },   // merge fails
       { code: 0, stdout: "deadbeef\n" },             // rev-parse MERGE_HEAD succeeds
     ]);
@@ -73,6 +85,7 @@ describe("gitMerge", () => {
   test("non-conflict merge failure throws", async () => {
     const { run } = fakeGit([
       { code: 0, stdout: "" },                        // status (clean)
+      { code: 0, stdout: "1\n" },                     // rev-list (1 ahead)
       { code: 1, stderr: "fatal: not a valid object\n" }, // merge fails
       { code: 1 },                                    // rev-parse MERGE_HEAD fails
     ]);
