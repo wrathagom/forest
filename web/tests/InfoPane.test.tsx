@@ -24,9 +24,10 @@ test("renders nothing when not expanded", () => {
     <InfoPane
       projectId="p1"
       expanded={() => false}
-      activeFilePath={() => null}
+      highlightedPaths={() => []}
       onOpenFile={noop}
       onOpenDiff={noop}
+      onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}
       onOpenTask={noop}
@@ -40,9 +41,10 @@ test("renders monitor, files, git, sessions tab labels", () => {
     <InfoPane
       projectId="p1"
       expanded={() => true}
-      activeFilePath={() => null}
+      highlightedPaths={() => []}
       onOpenFile={noop}
       onOpenDiff={noop}
+      onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}
       onOpenTask={noop}
@@ -58,9 +60,10 @@ test("legacy persisted tab 'processes' migrates to 'monitor'", () => {
     <InfoPane
       projectId="p1"
       expanded={() => true}
-      activeFilePath={() => null}
+      highlightedPaths={() => []}
       onOpenFile={noop}
       onOpenDiff={noop}
+      onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}
       onOpenTask={noop}
@@ -75,9 +78,10 @@ test("shows the tasks tab and renders TasksPanel when selected", async () => {
     <InfoPane
       projectId="p1"
       expanded={() => true}
-      activeFilePath={() => null}
+      highlightedPaths={() => []}
       onOpenFile={() => {}}
       onOpenDiff={() => {}}
+      onOpenFileRight={() => {}}
       onOpenCommit={() => {}}
       onOpenSession={() => {}}
       onOpenTask={() => {}}
