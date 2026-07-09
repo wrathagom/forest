@@ -42,6 +42,41 @@ export function saveActiveTab(projectId: string, id: string | null): void {
   write(`activeTab.${projectId}`, id);
 }
 
+export const MIN_RATIO = 0.2;
+export const MAX_RATIO = 0.8;
+const DEFAULT_RATIO = 0.5;
+
+export function clampRatio(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_RATIO;
+  return Math.min(MAX_RATIO, Math.max(MIN_RATIO, value));
+}
+
+export function saveSecondaryTab(projectId: string, id: string | null): void {
+  write(`secondaryTab.${projectId}`, id);
+}
+
+/**
+ * The tab pinned to the right pane. localStorage outlives file deletions and
+ * tabs closed elsewhere, so this validates the spec's invariants rather than
+ * trusting what it reads: the id must name a `file:` tab that is currently
+ * open, and must not be the active tab.
+ */
+export function loadSecondaryTab(projectId: string): string | null {
+  const raw = read<unknown>(`secondaryTab.${projectId}`, null);
+  if (typeof raw !== "string" || !raw.startsWith("file:")) return null;
+  if (!loadOpenFiles(projectId).includes(raw.slice("file:".length))) return null;
+  if (raw === loadActiveTab(projectId)) return null;
+  return raw;
+}
+
+export function saveSplitRatio(projectId: string, ratio: number): void {
+  write(`splitRatio.${projectId}`, ratio);
+}
+
+export function loadSplitRatio(projectId: string): number {
+  return clampRatio(read<unknown>(`splitRatio.${projectId}`, DEFAULT_RATIO));
+}
+
 export function loadExpandedDirs(projectId: string): string[] {
   return read<string[]>(`fileTree.expanded.${projectId}`, []);
 }
