@@ -1,5 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import {
+  mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, statSync, utimesSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { slugForCwd, transcriptPathFor, relocateTranscript } from "../src/sessions/transcript-relocate";
@@ -69,6 +71,57 @@ describe("relocateTranscript", () => {
     expect(readFileSync(dest, "utf8")).toBe('{"cwd":"/proj/.worktrees/task-foo"}\n');
     // source is left intact
     expect(existsSync(transcriptPathFor(cfgPersonal.path, FROM, SID))).toBe(true);
+  });
+
+  // The scanner skips a transcript whose mtime has not advanced past the
+  // session's last_activity. A copy that looks brand new gets re-ingested,
+  // which bumps last_activity to the copy time and floats the session to the
+  // top of "recent sessions" with a bogus timestamp. Bun only preserves mtime
+  // incidentally — via APFS clonefile, and only for files past a size
+  // threshold — so without an explicit utimes this varies by file size and fs.
+  test("preserves the source mtime so the scanner won't re-ingest the copy", () => {
+    const src = seed(cfgPersonal, FROM, '{"cwd":"/proj/.worktrees/task-foo"}\n');
+    const old = Date.now() / 1000 - 86_400;
+    utimesSync(src, old, old);
+
+    relocateTranscript(
+      { configDirs: [cfgPersonal] },
+      { sessionId: SID, fromCwd: FROM, toCwd: TO, profile: "personal" },
+    );
+
+    const dest = transcriptPathFor(cfgPersonal.path, TO, SID);
+    expect(Math.floor(statSync(dest).mtimeMs)).toBe(Math.floor(statSync(src).mtimeMs));
+  });
+
+  // A session's subagent transcripts live in a sidecar dir beside the main
+  // transcript, at <slug>/<sid>/subagents/agent-<agentId>.jsonl. The main
+  // transcript names them only by `agentId`, and they are located by path — so
+  // a session resumed from a new cwd cannot open them unless they come along.
+  test("copies the subagents sidecar dir alongside the transcript", () => {
+    seed(cfgPersonal, FROM, '{"agentId":"a1b2"}\n');
+    const sideDir = join(transcriptPathFor(cfgPersonal.path, FROM, SID), "..", SID, "subagents");
+    mkdirSync(sideDir, { recursive: true });
+    writeFileSync(join(sideDir, "agent-a1b2.jsonl"), '{"isSidechain":true}\n');
+
+    const result = relocateTranscript(
+      { configDirs: [cfgPersonal] },
+      { sessionId: SID, fromCwd: FROM, toCwd: TO, profile: "personal" },
+    );
+
+    expect(result.status).toBe("copied");
+    const destSide = join(transcriptPathFor(cfgPersonal.path, TO, SID), "..", SID, "subagents", "agent-a1b2.jsonl");
+    expect(existsSync(destSide)).toBe(true);
+    expect(readFileSync(destSide, "utf8")).toBe('{"isSidechain":true}\n');
+  });
+
+  test("copies fine when the session has no subagents sidecar", () => {
+    seed(cfgPersonal, FROM, "{}\n");
+    expect(
+      relocateTranscript(
+        { configDirs: [cfgPersonal] },
+        { sessionId: SID, fromCwd: FROM, toCwd: TO, profile: "personal" },
+      ).status,
+    ).toBe("copied");
   });
 
   test("is a no-op when fromCwd === toCwd", () => {

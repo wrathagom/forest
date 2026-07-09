@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, cpSync, statSync, utimesSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ClaudeConfigDir } from "./config-dirs";
 
@@ -15,7 +15,11 @@ import type { ClaudeConfigDir } from "./config-dirs";
  *
  * When the worktree has been deleted the transcript itself still exists (it
  * lives under the Claude config dir, not the worktree), so we can make the
- * resume work by copying it into the target cwd's slug dir first.
+ * resume work by copying it — and its subagent sidecar dir — into the target
+ * cwd's slug dir first.
+ *
+ * On APFS `copyFileSync` clones, so the duplicate shares blocks copy-on-write
+ * and costs practically nothing until one side is appended to.
  */
 export function slugForCwd(cwd: string): string {
   return cwd.replace(/[^a-zA-Z0-9]/g, "-");
@@ -23,6 +27,46 @@ export function slugForCwd(cwd: string): string {
 
 export function transcriptPathFor(configDir: string, cwd: string, sessionId: string): string {
   return join(configDir, "projects", slugForCwd(cwd), `${sessionId}.jsonl`);
+}
+
+/**
+ * Subagent transcripts sit in a sidecar dir beside the main transcript, at
+ * `<slug(cwd)>/<sessionId>/subagents/agent-<agentId>.jsonl`. The main transcript
+ * names them only by `agentId` and they are found by path, so they have to
+ * travel with it — otherwise a resumed session cannot open its own subagent
+ * transcripts. (Forest itself never reads them: the scanner lists files
+ * directly in the slug dir and does not recurse.)
+ */
+export function sidecarDirFor(configDir: string, cwd: string, sessionId: string): string {
+  return join(configDir, "projects", slugForCwd(cwd), sessionId);
+}
+
+/**
+ * Copy preserving mtime. The scanner skips a transcript whose mtime has not
+ * advanced past the session's stored `last_activity`, so a copy stamped with
+ * the current time gets re-ingested and drags `last_activity` forward to the
+ * moment of the copy. Bun preserves mtime only incidentally — through APFS
+ * clonefile, and only above a file-size threshold — so it has to be explicit.
+ */
+function copyPreservingMtime(src: string, dest: string): void {
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(src, dest);
+  const { atime, mtime } = statSync(src);
+  utimesSync(dest, atime, mtime);
+}
+
+/** Bring a session's subagent transcripts across. No-op when it has none. */
+function copySidecar(configDir: string, fromCwd: string, toCwd: string, sessionId: string): void {
+  const src = sidecarDirFor(configDir, fromCwd, sessionId);
+  if (!existsSync(src)) return;
+  // `force: false` leaves any already-copied file alone, so this stays safe to
+  // re-run against a target that was relocated by an earlier, sidecar-less version.
+  cpSync(src, sidecarDirFor(configDir, toCwd, sessionId), {
+    recursive: true,
+    preserveTimestamps: true,
+    force: false,
+    errorOnExist: false,
+  });
 }
 
 export type RelocateDeps = {
@@ -69,12 +113,17 @@ export function relocateTranscript(deps: RelocateDeps, input: RelocateInput): Re
 
   for (const dir of candidateDirs(deps.configDirs, input.profile)) {
     const dest = transcriptPathFor(dir.path, input.toCwd, input.sessionId);
-    if (existsSync(dest)) return { status: "present", path: dest };
+    if (existsSync(dest)) {
+      // Self-heal: an earlier relocation may have moved the transcript without
+      // its subagent transcripts.
+      copySidecar(dir.path, input.fromCwd, input.toCwd, input.sessionId);
+      return { status: "present", path: dest };
+    }
 
     const src = transcriptPathFor(dir.path, input.fromCwd, input.sessionId);
     if (existsSync(src)) {
-      mkdirSync(dirname(dest), { recursive: true });
-      copyFileSync(src, dest);
+      copyPreservingMtime(src, dest);
+      copySidecar(dir.path, input.fromCwd, input.toCwd, input.sessionId);
       return { status: "copied", from: src, to: dest };
     }
   }
