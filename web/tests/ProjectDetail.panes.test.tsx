@@ -133,3 +133,44 @@ test("normal-clicking the pinned file never mounts two editors for it", async ()
   expect(localStorage.getItem("forest.activeTab.alpha")).toBe(JSON.stringify("file:b.ts"));
   expect(localStorage.getItem("forest.secondaryTab.alpha")).toBe(JSON.stringify(null));
 });
+
+test("the right pane stays pinned while the left navigates to a diff", async () => {
+  // A modified file so a plain click routes through onOpenDiff -> openDiff.
+  fetchTree.mockResolvedValue({
+    entries: [
+      { path: "a.ts", type: "file", gitStatus: null },
+      { path: "b.ts", type: "file", gitStatus: null },
+      { path: "modified.ts", type: "file", gitStatus: "M" },
+    ],
+  });
+  localStorage.setItem("forest.openFiles.alpha", JSON.stringify(["a.ts", "b.ts"]));
+  localStorage.setItem("forest.activeTab.alpha", JSON.stringify("file:a.ts"));
+  localStorage.setItem("forest.secondaryTab.alpha", JSON.stringify("file:b.ts"));
+  localStorage.setItem("forest.info.expanded", JSON.stringify(true));
+  localStorage.setItem("forest.info.tab", JSON.stringify("files"));
+
+  const { container } = renderApp();
+  navigate("/projects/alpha");
+  await waitFor(() => expect(container.querySelector(".terminal-area.split")).toBeTruthy());
+
+  const editorsFor = (p: string) =>
+    container.querySelectorAll(`[data-stub="FileEditor"][data-path="${p}"]`).length;
+  expect(editorsFor("b.ts")).toBe(1);
+
+  // Open a diff on the LEFT by plain-clicking the modified file in the tree.
+  const treeRow = (name: string) =>
+    Array.from(container.querySelectorAll(".file-tree .tree-file")).find(
+      (r) => r.querySelector(".tree-file-name")?.textContent === name,
+    );
+  await waitFor(() => expect(treeRow("modified.ts")).toBeTruthy());
+  fireEvent.click(treeRow("modified.ts")!);
+
+  // The navigation actually happened: the diff is now showing on the left.
+  await waitFor(() => expect(container.querySelector('[data-stub="DiffView"]')).toBeTruthy());
+
+  // The right pane is sticky: opening a non-file tab on the left leaves the pin
+  // (and the split) untouched.
+  expect(container.querySelector(".terminal-area.split")).toBeTruthy();
+  expect(container.querySelector(".tab.pinned")).toBeTruthy();
+  expect(editorsFor("b.ts")).toBe(1);
+});
