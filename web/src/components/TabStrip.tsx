@@ -5,8 +5,10 @@ import LauncherButton, { type LauncherEntry } from "./LauncherButton";
 export default function TabStrip(props: {
   tabs: Tab[];
   activeId: string | null;
+  secondaryId?: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
+  onToggleSplit?: (id: string) => void;
   onLaunch: (entry: LauncherEntry) => void;
   launchers: LauncherEntry[];
   lastUsedLauncher: string | null;
@@ -22,14 +24,20 @@ export default function TabStrip(props: {
     }
     props.onClose(t.id);
   };
+
+  const handleSplit = (e: MouseEvent, t: Tab) => {
+    e.stopPropagation();
+    props.onToggleSplit!(t.id);
+  };
+
   return (
     <div class="tab-strip">
       <For each={props.tabs}>
         {(t) => (
           <div
             class={`tab tab-${t.kind} ${props.activeId === t.id ? "active" : ""} ${
-              t.kind === "file" && t.dirty ? "dirty" : ""
-            }`}
+              props.secondaryId === t.id ? "pinned" : ""
+            } ${t.kind === "file" && t.dirty ? "dirty" : ""}`}
             title={t.kind === "terminal" && t.agent ? t.agent : undefined}
             onclick={() => props.onSelect(t.id)}
           >
@@ -38,6 +46,17 @@ export default function TabStrip(props: {
               {t.kind === "terminal" && t.agent ? "🤖 " : ""}
               {t.label}
             </span>
+            {/* Only file tabs may be pinned right: TerminalView owns a live PTY
+                and must never be mounted in two panes at once. */}
+            <Show when={t.kind === "file" && props.onToggleSplit}>
+              <button
+                class="tab-split"
+                title={props.secondaryId === t.id ? "return to left pane" : "open in right pane"}
+                onclick={(e) => handleSplit(e, t)}
+              >
+                ◨
+              </button>
+            </Show>
             <button class="tab-kill" title="close" onclick={(e) => handleClose(e, t)}>
               ×
             </button>
