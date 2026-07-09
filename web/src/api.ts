@@ -423,6 +423,27 @@ export async function getAgentSessionDetail(sessionId: string): Promise<AgentSes
   );
 }
 
+export type PrepareResumeResult =
+  | { status: "noop" }
+  | { status: "present"; path: string }
+  | { status: "copied"; from: string; to: string };
+
+/**
+ * Ensure `sessionId` can be resumed from `cwd`. Claude looks up `--resume <id>`
+ * only under the current cwd's transcript dir, so a session recorded in a
+ * deleted worktree needs its transcript copied across first. Idempotent.
+ */
+export async function prepareResume(sessionId: string, cwd: string): Promise<PrepareResumeResult> {
+  return unwrap(
+    await fetch(`/api/agent-sessions/${encodeURIComponent(sessionId)}/prepare-resume`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cwd }),
+    }),
+    "prepare resume",
+  );
+}
+
 export async function createWorktree(
   projectId: string,
   body: { branch: string; name: string },

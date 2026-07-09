@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show, onCleanup, untrack, createMemo, 
 import { createStore, reconcile } from "solid-js/store";
 import { useParams, useSearchParams } from "@solidjs/router";
 import { useProjects } from "../projects-context";
-import { listSessions, createSession, killSession, createWorktree, fetchConfig, type SessionRow } from "../api";
+import { listSessions, createSession, killSession, createWorktree, prepareResume, fetchConfig, type SessionRow } from "../api";
 import ProjectHeader from "../components/ProjectHeader";
 import TabStrip from "../components/TabStrip";
 import type { LauncherEntry } from "../components/LauncherButton";
@@ -413,35 +413,51 @@ export default function ProjectDetail() {
                 <SessionTranscript
                   sessionId={s.sessionId}
                   onResume={async (kind, detail) => {
-                    let cwd = detail.session.cwd;
-                    if (kind === "in-main") {
-                      cwd = project()?.path ?? cwd;
-                    } else if (kind === "recreate-worktree") {
-                      if (!detail.session.branch) {
-                        setError("session has no branch recorded");
-                        return;
-                      }
-                      try {
+                    setError(null);
+                    try {
+                      let cwd = detail.session.cwd;
+                      if (kind === "in-main") {
+                        // Never fall back to the session's own cwd here — for a gone
+                        // worktree that directory no longer exists and the pty spawn
+                        // would fail deep in the server.
+                        const mainPath = project()?.path;
+                        if (!mainPath) {
+                          setError("project path not loaded yet — try again in a moment");
+                          return;
+                        }
+                        cwd = mainPath;
+                      } else if (kind === "recreate-worktree") {
+                        if (!detail.session.branch) {
+                          setError("session has no branch recorded");
+                          return;
+                        }
                         const wt = await createWorktree(params.id, {
                           branch: detail.session.branch,
                           name: detail.session.worktree_label ?? detail.session.branch,
                         });
                         cwd = wt.path;
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : String(err));
-                        return;
                       }
+
+                      // `claude --resume <id>` only searches the transcript dir belonging
+                      // to the cwd it starts in. When we resume somewhere other than where
+                      // the session was recorded (main, or a recreated worktree with a
+                      // different path) its transcript has to be copied across first,
+                      // otherwise claude exits immediately with "No conversation found".
+                      await prepareResume(detail.session.session_id, cwd);
+
+                      const ses = await createSession(params.id, {
+                        cwd, command: "claude",
+                        args: [
+                          "--resume", detail.session.session_id,
+                          "--permission-mode", "bypassPermissions",
+                        ],
+                        cols: 80, rows: 24,
+                      });
+                      setState("rows", reconcile([...state.rows, ses], { key: "id", merge: true }));
+                      setActiveId(`term:${ses.id}`);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : String(err));
                     }
-                    const ses = await createSession(params.id, {
-                      cwd, command: "claude",
-                      args: [
-                        "--resume", detail.session.session_id,
-                        "--permission-mode", "bypassPermissions",
-                      ],
-                      cols: 80, rows: 24,
-                    });
-                    setState("rows", reconcile([...state.rows, ses], { key: "id", merge: true }));
-                    setActiveId(`term:${ses.id}`);
                   }}
                 />
               </Show>

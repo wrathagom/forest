@@ -1,10 +1,11 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openDb } from "../src/store/db";
 import { Vault } from "../src/sessions/vault";
 import { agentSessionsRoutes } from "../src/routes/agent-sessions";
+import { transcriptPathFor } from "../src/sessions/transcript-relocate";
 import { upsertProject } from "../src/store/projects";
 import { LiveAgentSessions } from "../src/sessions/live";
 
@@ -124,5 +125,83 @@ describe("agent-sessions routes", () => {
     expect(body.sessions[0]!.projectId).toBe(projectId);
     expect(body.sessions[0]!.projectName).toBe("proj");
     expect(body.sessions[0]!.lastUserMsg).toBe("do the thing");
+  });
+});
+
+describe("POST /api/agent-sessions/:sid/prepare-resume", () => {
+  const SID = "sid-resume-1";
+
+  /** A session recorded in a worktree that has since been deleted. */
+  function setup(opts: { seedTranscript: boolean }) {
+    const db = openDb(":memory:");
+    const projectPath = join(tmp, "proj");
+    const worktreePath = join(projectPath, ".worktrees", "task-foo");
+    mkdirSync(projectPath, { recursive: true });
+    const projectId = upsertProject(db, { path: projectPath, name: "proj" });
+
+    const claudeRoot = join(tmp, "claude-cfg");
+    if (opts.seedTranscript) {
+      const src = transcriptPathFor(claudeRoot, worktreePath, SID);
+      mkdirSync(join(src, ".."), { recursive: true });
+      writeFileSync(src, '{"cwd":"gone"}\n');
+    }
+
+    const vault = new Vault(db);
+    vault.upsertSession({
+      session_id: SID, agent: "claude", cwd: worktreePath,
+      last_activity: 1, source: "scan", profile: "default",
+    });
+
+    const routes = agentSessionsRoutes({
+      vault,
+      listProjects: () => [{ id: projectId, path: projectPath }],
+      claudeConfigDirs: () => [{ path: claudeRoot, profile: "default" }],
+    });
+    const route = routes.find((r) =>
+      r.method === "POST" && r.pattern.test(`/api/agent-sessions/${SID}/prepare-resume`),
+    )!;
+    return { db, route, projectPath, claudeRoot };
+  }
+
+  const call = (route: { handler: (c: never) => Promise<Response> | Response }, db: ReturnType<typeof openDb>, sid: string, body: unknown) =>
+    route.handler(ctx(db, new Request(`http://x/api/agent-sessions/${sid}/prepare-resume`, {
+      method: "POST", body: JSON.stringify(body),
+    }), { sid }) as never);
+
+  test("copies the transcript into the target cwd's slug dir", async () => {
+    const { db, route, projectPath, claudeRoot } = setup({ seedTranscript: true });
+
+    const res = await call(route, db, SID, { cwd: projectPath });
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe("copied");
+
+    // claude --resume, run from main, will now find it
+    expect(existsSync(transcriptPathFor(claudeRoot, projectPath, SID))).toBe(true);
+  });
+
+  test("is idempotent — second call reports the transcript already present", async () => {
+    const { db, route, projectPath } = setup({ seedTranscript: true });
+    await call(route, db, SID, { cwd: projectPath });
+    const res = await call(route, db, SID, { cwd: projectPath });
+    expect((await res.json()).status).toBe("present");
+  });
+
+  test("400s when the transcript cannot be found", async () => {
+    const { db, route, projectPath } = setup({ seedTranscript: false });
+    const res = await call(route, db, SID, { cwd: projectPath });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/transcript not found/i);
+  });
+
+  test("400s when cwd is missing", async () => {
+    const { db, route } = setup({ seedTranscript: true });
+    const res = await call(route, db, SID, {});
+    expect(res.status).toBe(400);
+  });
+
+  test("404s for an unknown session", async () => {
+    const { db, route, projectPath } = setup({ seedTranscript: true });
+    const res = await call(route, db, "no-such-sid", { cwd: projectPath });
+    expect(res.status).toBe(404);
   });
 });
