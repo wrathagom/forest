@@ -60,9 +60,10 @@ function buildDirtyDirs(entries: TreeEntry[]): Set<string> {
 export default function FileTreePanel(props: {
   projectId: string;
   entries: TreeEntry[];
-  activeFilePath: string | null;
+  highlightedPaths: string[];
   onOpenFile: (path: string) => void;
   onOpenDiff: (path: string) => void;
+  onOpenFileRight: (path: string) => void;
 }) {
   const [expanded, setExpanded] = createSignal<Set<string>>(
     new Set(loadExpandedDirs(props.projectId)),
@@ -124,7 +125,14 @@ export default function FileTreePanel(props: {
     saveExpandedDirs(props.projectId, [...next]);
   };
 
-  const onFileClick = (node: Node) => {
+  const onFileClick = (node: Node, e: MouseEvent) => {
+    // Alt-click pins the file to the right pane. This must be checked BEFORE the
+    // git-status branch below: only `file:` tabs may be pinned, so alt-clicking a
+    // modified file has to open the file, not its diff.
+    if (e.altKey) {
+      props.onOpenFileRight(node.path);
+      return;
+    }
     // "!" marks a gitignored file — open it normally; ignored files have no diff.
     if (node.gitStatus && node.gitStatus !== "!") props.onOpenDiff(node.path);
     else props.onOpenFile(node.path);
@@ -143,10 +151,10 @@ export default function FileTreePanel(props: {
           fallback={
             <div
               class={`tree-row tree-file ${
-                props.activeFilePath === p.node.path ? "tree-file-active" : ""
+                props.highlightedPaths.includes(p.node.path) ? "tree-file-active" : ""
               } ${p.node.gitStatus ? `tree-file-${p.node.gitStatus}` : ""}`}
               style={indent}
-              onclick={() => onFileClick(p.node)}
+              onclick={(e) => onFileClick(p.node, e)}
             >
               <span class={`tree-badge ${p.node.gitStatus ? `tree-badge-${p.node.gitStatus}` : ""}`}>
                 {p.node.gitStatus ?? ""}

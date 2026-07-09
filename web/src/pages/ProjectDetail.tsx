@@ -13,14 +13,22 @@ import CommitView from "../components/CommitView";
 import InfoPane from "../components/InfoPane";
 import SessionTranscript from "../components/SessionTranscript";
 import TaskView from "../components/TaskView";
+import PaneResizer from "../components/PaneResizer";
 import { persistedSignal } from "../lib/persisted";
 import {
   loadOpenFiles,
   saveOpenFiles,
   loadActiveTab,
   saveActiveTab,
+  loadSecondaryTab,
+  saveSecondaryTab,
+  loadSplitRatio,
+  saveSplitRatio,
+  FILE_PREFIX,
+  isFileId,
   type Tab,
 } from "../lib/tabs";
+import { splitRight, selectTab, closeTab, reconcilePanes, type PaneState } from "../lib/panes";
 
 type SessionsState = { rows: SessionRow[]; loaded: boolean; error: Error | null };
 type FileTabState = { path: string; dirty: boolean };
@@ -49,7 +57,16 @@ export default function ProjectDetail() {
   const [sessionTabs, setSessionTabs] = createStore<SessionTabState[]>([]);
   const [taskTabs, setTaskTabs] = createStore<TaskTabState[]>([]);
   const [activeId, setActiveId] = createSignal<string | null>(loadActiveTab(params.id));
+  const [secondaryId, setSecondaryId] = createSignal<string | null>(loadSecondaryTab(params.id));
+  const [splitRatio, setSplitRatio] = createSignal<number>(loadSplitRatio(params.id));
   const [error, setError] = createSignal<string | null>(null);
+
+  const panes = (): PaneState => ({ activeId: activeId(), secondaryId: secondaryId() });
+  const applyPanes = (next: PaneState) => {
+    setActiveId(next.activeId);
+    setSecondaryId(next.secondaryId);
+  };
+  let areaRef: HTMLDivElement | undefined;
   const [infoExpanded, setInfoExpanded] = persistedSignal("info.expanded", false);
   const [launchersRes] = createResource(async () => (await fetchConfig()).launchers ?? []);
   const [lastUsedLauncher, setLastUsedLauncher] = persistedSignal<string | null>("launcher.lastUsed", "shell");
@@ -69,77 +86,15 @@ export default function ProjectDetail() {
   createEffect(() => {
     saveActiveTab(tabsProjectId, activeId());
   });
+  createEffect(() => {
+    saveSecondaryTab(tabsProjectId, secondaryId());
+  });
 
   // Session IDs we've auto-closed after a clean exit. The server retains exited
   // sessions for ~30s (so a reconnecting client can see final state), so the
   // safety-net poll below would otherwise resurrect the tab. UUIDs aren't
   // reused, so filtering these out permanently is safe.
   const closedSessions = new Set<string>();
-
-  const refetchSessions = async () => {
-    try {
-      const fresh = (await listSessions(params.id)).filter((s) => !closedSessions.has(s.id));
-      setState("rows", reconcile(fresh, { key: "id", merge: true }));
-      setState("error", null);
-      // If the persisted active tab no longer corresponds to a live tab, transition.
-      untrack(() => {
-        const id = activeId();
-        const validTermIds = new Set(fresh.map((s) => `term:${s.id}`));
-        const validFileIds = new Set(fileTabs.map((f) => `file:${f.path}`));
-        const validDiffIds = new Set(diffTabs.map((d) => `diff:${d.path}`));
-        const validCommitIds = new Set(commitTabs.map((c) => `commit:${c.sha}`));
-        const validSessionIds = new Set(sessionTabs.map((s) => `session:${s.sessionId}`));
-        const validTaskIds = new Set(taskTabs.map((t) => `task:${t.taskId}`));
-        const isValid =
-          id !== null &&
-          (validTermIds.has(id) ||
-            validFileIds.has(id) ||
-            validDiffIds.has(id) ||
-            validCommitIds.has(id) ||
-            validSessionIds.has(id) ||
-            validTaskIds.has(id));
-        if (!isValid) {
-          if (fresh[0]) setActiveId(`term:${fresh[0].id}`);
-          else if (fileTabs[0]) setActiveId(`file:${fileTabs[0].path}`);
-          else setActiveId(null);
-        }
-      });
-    } catch (err) {
-      setState("error", err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setState("loaded", true);
-    }
-  };
-
-  // Initial fetch + resync when params.id changes (route navigation).
-  createEffect(() => {
-    void params.id;
-    untrack(() => void refetchSessions());
-  });
-
-  // When the route changes, reload tab state for the new project. `tabsProjectId`
-  // is updated *before* the store writes so the persist effects above key off the
-  // new project. The transient (non-persisted) tab stores are cleared too — unlike
-  // file/active tabs they have no per-project storage, so without this they'd
-  // simply follow you into the next project.
-  createEffect(() => {
-    const id = params.id;
-    if (id === tabsProjectId) return;
-    tabsProjectId = id;
-    untrack(() => {
-      setFileTabs(reconcile(loadOpenFiles(id).map((path) => ({ path, dirty: false }))));
-      setActiveId(loadActiveTab(id));
-      setDiffTabs(reconcile([]));
-      setCommitTabs(reconcile([]));
-      setSessionTabs(reconcile([]));
-      setTaskTabs(reconcile([]));
-    });
-  });
-
-  // Safety-net poll. Local mutations on create/kill keep us mostly in sync;
-  // this just catches state changes from outside the page (rare).
-  const interval = setInterval(() => void refetchSessions(), 10_000);
-  onCleanup(() => clearInterval(interval));
 
   const tabs = createMemo<Tab[]>(() => [
     ...state.rows.map(
@@ -194,18 +149,89 @@ export default function ProjectDetail() {
     ),
   ]);
 
-  const activeFilePath = () => {
-    const id = activeId();
-    if (!id || !id.startsWith("file:")) return null;
-    return id.slice("file:".length);
+  const refetchSessions = async () => {
+    try {
+      const fresh = (await listSessions(params.id)).filter((s) => !closedSessions.has(s.id));
+      setState("rows", reconcile(fresh, { key: "id", merge: true }));
+      setState("error", null);
+      // If the persisted active/pinned tabs no longer correspond to live tabs,
+      // transition. reconcilePanes also enforces activeId !== secondaryId, which
+      // the old hand-rolled fallback to fileTabs[0] did not.
+      untrack(() => applyPanes(reconcilePanes(tabs(), panes())));
+    } catch (err) {
+      setState("error", err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setState("loaded", true);
+    }
   };
+
+  // Initial fetch + resync when params.id changes (route navigation).
+  createEffect(() => {
+    void params.id;
+    untrack(() => void refetchSessions());
+  });
+
+  // When the route changes, reload tab state for the new project. `tabsProjectId`
+  // is updated *before* the store writes so the persist effects above key off the
+  // new project. The transient (non-persisted) tab stores are cleared too — unlike
+  // file/active tabs they have no per-project storage, so without this they'd
+  // simply follow you into the next project.
+  createEffect(() => {
+    const id = params.id;
+    if (id === tabsProjectId) return;
+    tabsProjectId = id;
+    untrack(() => {
+      setFileTabs(reconcile(loadOpenFiles(id).map((path) => ({ path, dirty: false }))));
+      setActiveId(loadActiveTab(id));
+      setSecondaryId(loadSecondaryTab(id));
+      setSplitRatio(loadSplitRatio(id));
+      setDiffTabs(reconcile([]));
+      setCommitTabs(reconcile([]));
+      setSessionTabs(reconcile([]));
+      setTaskTabs(reconcile([]));
+    });
+  });
+
+  // Safety-net poll. Local mutations on create/kill keep us mostly in sync;
+  // this just catches state changes from outside the page (rare).
+  const interval = setInterval(() => void refetchSessions(), 10_000);
+  onCleanup(() => clearInterval(interval));
+
+  const filePathOf = (id: string | null) =>
+    isFileId(id) ? id!.slice(FILE_PREFIX.length) : null;
+  const activeFilePath = () => filePathOf(activeId());
+  const secondaryFilePath = () => filePathOf(secondaryId());
+  const highlightedPaths = () =>
+    [activeFilePath(), secondaryFilePath()].filter((p): p is string => p !== null);
 
   const openFile = (path: string) => {
     const id = `file:${path}`;
     if (!fileTabs.some((f) => f.path === path)) {
       setFileTabs((prev) => [...prev, { path, dirty: false }]);
     }
-    setActiveId(id);
+    // Must go through selectTab, not setActiveId: this is the only setActiveId
+    // call site that sets a `file:` id, so it is the only one that can collide
+    // with the pinned tab. selectTab unpins when you select the pinned file.
+    applyPanes(selectTab(panes(), id));
+  };
+
+  /** ◨ button: send a file right, or bring the pinned one back. */
+  const toggleSplit = (id: string) => {
+    if (secondaryId() === id) applyPanes(selectTab(panes(), id));
+    else applyPanes(splitRight(tabs(), panes(), id));
+  };
+
+  /**
+   * Alt-click in the file tree: open the file straight into the right pane.
+   * Adds the tab first so `tabs()` sees it. If it ends up being the only tab,
+   * `splitRight` declines and opens it on the left instead — a split with one
+   * file is meaningless.
+   */
+  const openFileRight = (path: string) => {
+    if (!fileTabs.some((f) => f.path === path)) {
+      setFileTabs((prev) => [...prev, { path, dirty: false }]);
+    }
+    applyPanes(splitRight(tabs(), panes(), `file:${path}`));
   };
 
   const openDiff = (path: string) => {
@@ -260,11 +286,12 @@ export default function ProjectDetail() {
     }
   });
 
-  const onSelect = (id: string) => setActiveId(id);
+  const onSelect = (id: string) => applyPanes(selectTab(panes(), id));
 
   const onClose = async (id: string) => {
     const tab = tabs().find((t) => t.id === id);
     if (!tab) return;
+    const next = closeTab(tabs(), panes(), id);
     if (tab.kind === "terminal") {
       try {
         await killSession(tab.sessionId);
@@ -290,10 +317,7 @@ export default function ProjectDetail() {
       const remaining = taskTabs.filter((t) => t.taskId !== tab.taskId);
       setTaskTabs(reconcile(remaining));
     }
-    if (activeId() === id) {
-      const next = tabs().find((t) => t.id !== id);
-      setActiveId(next?.id ?? null);
-    }
+    applyPanes(next);
   };
 
   // Auto-close a terminal tab when its session exits cleanly (code 0). Non-zero
@@ -305,10 +329,7 @@ export default function ProjectDetail() {
     const tabId = `term:${sessionId}`;
     const remaining = state.rows.filter((s) => s.id !== sessionId);
     setState("rows", reconcile(remaining, { key: "id", merge: true }));
-    if (activeId() === tabId) {
-      const next = tabs().find((t) => t.id !== tabId);
-      setActiveId(next?.id ?? null);
-    }
+    applyPanes(closeTab(tabs(), panes(), tabId));
   };
 
   const onLaunch = async (entry: LauncherEntry) => {
@@ -335,8 +356,10 @@ export default function ProjectDetail() {
       <TabStrip
         tabs={tabs()}
         activeId={activeId()}
+        secondaryId={secondaryId()}
         onSelect={onSelect}
         onClose={onClose}
+        onToggleSplit={toggleSplit}
         onLaunch={onLaunch}
         launchers={launchersRes() ?? []}
         lastUsedLauncher={lastUsedLauncher()}
@@ -347,7 +370,12 @@ export default function ProjectDetail() {
       <Show when={error()}>
         <div class="banner banner-error">{error()}</div>
       </Show>
-      <div class="terminal-area">
+      <div
+        class={`terminal-area ${secondaryId() !== null ? "split" : ""}`}
+        ref={areaRef}
+        style={{ "--split-left": `${splitRatio() * 100}%` }}
+      >
+        <div class="pane pane-left">
         <Show
           when={tabs().length > 0}
           fallback={
@@ -464,13 +492,36 @@ export default function ProjectDetail() {
             )}
           </For>
         </Show>
+        </div>
+        <Show when={secondaryId() !== null}>
+          <PaneResizer
+            ratio={splitRatio}
+            onRatio={setSplitRatio}
+            onCommit={() => saveSplitRatio(tabsProjectId, splitRatio())}
+            container={() => areaRef}
+          />
+          <div class="pane pane-right">
+            <For each={fileTabs}>
+              {(f) => (
+                <Show when={secondaryId() === `file:${f.path}`}>
+                  <FileEditor
+                    projectId={params.id}
+                    path={f.path}
+                    onDirtyChange={(dirty) => setFileDirty(f.path, dirty)}
+                  />
+                </Show>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
       <InfoPane
         projectId={params.id}
         expanded={infoExpanded}
-        activeFilePath={activeFilePath}
+        highlightedPaths={highlightedPaths}
         onOpenFile={openFile}
         onOpenDiff={openDiff}
+        onOpenFileRight={openFileRight}
         onOpenCommit={openCommit}
         onOpenSession={openSessionTab}
         onOpenTask={openTask}

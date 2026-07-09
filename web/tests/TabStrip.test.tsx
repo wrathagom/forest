@@ -124,4 +124,82 @@ describe("TabStrip", () => {
     const tab = container.querySelector(".tab.tab-terminal") as HTMLElement;
     expect(tab.title).toBe("claude");
   });
+
+  test("file tabs get a split button", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    expect(container.querySelector(".tab-split")).toBeTruthy();
+  });
+
+  test("terminal tabs get no split button — a PTY cannot be mounted twice", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[termTab]} activeId={null} onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    expect(container.querySelector(".tab-split")).toBeNull();
+  });
+
+  test("no split button when the host provides no onToggleSplit", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} onSelect={() => {}} onClose={() => {}} {...defaultLauncherProps} />
+    ));
+    expect(container.querySelector(".tab-split")).toBeNull();
+  });
+
+  test("clicking the split button calls onToggleSplit and not onSelect", () => {
+    const onToggleSplit = vi.fn();
+    const onSelect = vi.fn();
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} onSelect={onSelect} onClose={() => {}} onToggleSplit={onToggleSplit} {...defaultLauncherProps} />
+    ));
+    fireEvent.click(container.querySelector(".tab-split")!);
+    expect(onToggleSplit).toHaveBeenCalledWith("file:src/x.ts");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  test("the pinned tab gets a pinned class", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[termTab, fileTab]} activeId="term:1" secondaryId="file:src/x.ts" onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    const pinned = container.querySelector(".tab.pinned");
+    expect(pinned?.textContent).toContain("x.ts");
+  });
+
+  test("the pinned tab's split button is titled as a way back", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} secondaryId="file:src/x.ts" onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    const btn = container.querySelector(".tab-split") as HTMLElement;
+    expect(btn.title).toBe("return to left pane");
+    expect(btn.getAttribute("aria-label")).toBe("return to left pane");
+  });
+
+  test("an unpinned file tab's split button is titled as a way right", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    const btn = container.querySelector(".tab-split") as HTMLElement;
+    expect(btn.title).toBe("open in right pane");
+    expect(btn.getAttribute("aria-label")).toBe("open in right pane");
+  });
+
+  test("a dirty file tab can also be pinned — shows both the dot and the pinned class", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[termTab, dirtyTab]} activeId="term:1" secondaryId="file:src/y.ts"
+        onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    const pinned = container.querySelector(".tab.pinned") as HTMLElement;
+    expect(pinned.classList.contains("dirty")).toBe(true);
+    expect(pinned.textContent).toContain("● y.ts");
+  });
+
+  test("clicking the split button on the pinned tab still reports its id (bring-back)", () => {
+    const onToggleSplit = vi.fn();
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} secondaryId="file:src/x.ts"
+        onSelect={() => {}} onClose={() => {}} onToggleSplit={onToggleSplit} {...defaultLauncherProps} />
+    ));
+    fireEvent.click(container.querySelector(".tab-split")!);
+    expect(onToggleSplit).toHaveBeenCalledWith("file:src/x.ts");
+  });
 });

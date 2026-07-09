@@ -101,15 +101,33 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .tab.active { color: var(--fg); border-color: var(--accent); background: rgba(110, 231, 183, 0.06); }
 .tab-kill { background: none; border: 0; color: inherit; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0 0.2rem; }
 .tab-kill:hover { color: var(--error); }
+.tab-split { background: transparent; border: 0; color: var(--fg-dim); cursor: pointer; font: inherit; font-size: 0.75rem; padding: 0 0.15rem; }
+.tab:hover .tab-split { color: var(--fg); }
+.tab.pinned .tab-split { color: var(--accent); }
+.tab.pinned { border-color: var(--accent); }
 .tab-add { background: var(--bg-2); border: 1px dashed var(--border); color: var(--fg-dim); border-radius: 3px; padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.85rem; }
 .tab-add:hover { color: var(--fg); border-color: var(--fg-dim); }
 .terminal-host { width: 100%; height: 100%; padding: 0.4rem; box-sizing: border-box; background: #0e0e10; }
 .terminal-host .xterm-viewport { background: #0e0e10 !important; }
 .project-detail { display: grid; grid-template-rows: auto auto 1fr; height: 100%; }
-.terminal-area { position: relative; min-height: 0; min-width: 0; }
-.terminal-area > .terminal-host { position: absolute; inset: 0; }
-.terminal-area > .file-editor { position: absolute; inset: 0; }
-.terminal-area > .session-transcript { position: absolute; inset: 0; overflow: auto; display: flex; flex-direction: column; }
+.terminal-area { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
+.terminal-area.split { grid-template-columns: var(--split-left, 50%) 6px 1fr; }
+.pane { position: relative; min-height: 0; min-width: 0; }
+.pane > .terminal-host { position: absolute; inset: 0; }
+.pane > .file-editor { position: absolute; inset: 0; }
+.pane > .session-transcript { position: absolute; inset: 0; overflow: auto; display: flex; flex-direction: column; }
+
+.pane-resizer { background: var(--border); cursor: col-resize; }
+.pane-resizer:hover { background: var(--accent); }
+.pane-resizer:focus-visible { background: var(--accent); outline: none; }
+
+/* Too narrow to compare: collapse to the left pane. secondaryId stays in state,
+   so widening the window restores the split. */
+@media (max-width: 900px) {
+  .terminal-area.split { grid-template-columns: 1fr; }
+  .terminal-area.split > .pane-resizer,
+  .terminal-area.split > .pane-right { display: none; }
+}
 .terminal-empty { display: flex; align-items: center; justify-content: center; height: 100%; }
 .svc-terminals { color: var(--accent); border-color: rgba(110, 231, 183, 0.35); background: rgba(110, 231, 183, 0.1); }
 

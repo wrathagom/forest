@@ -18,9 +18,10 @@ function migrate(value: unknown): Tab {
 export default function InfoPane(props: {
   projectId: string;
   expanded: () => boolean;
-  activeFilePath: () => string | null;
+  highlightedPaths: () => string[];
   onOpenFile: (path: string) => void;
   onOpenDiff: (path: string) => void;
+  onOpenFileRight: (path: string) => void;
   onOpenCommit: (sha: string) => void;
   onOpenSession: (sessionId: string, label: string) => void;
   onOpenTask: (taskId: string, title: string) => void;
@@ -58,9 +59,10 @@ export default function InfoPane(props: {
               <FileTreePanel
                 projectId={props.projectId}
                 entries={tree()!.entries}
-                activeFilePath={props.activeFilePath()}
+                highlightedPaths={props.highlightedPaths()}
                 onOpenFile={props.onOpenFile}
                 onOpenDiff={props.onOpenDiff}
+                onOpenFileRight={props.onOpenFileRight}
               />
             </Show>
           </Show>
