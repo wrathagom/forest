@@ -24,6 +24,8 @@ import {
   saveSecondaryTab,
   loadSplitRatio,
   saveSplitRatio,
+  FILE_PREFIX,
+  isFileId,
   type Tab,
 } from "../lib/tabs";
 import { splitRight, selectTab, closeTab, reconcilePanes, type PaneState } from "../lib/panes";
@@ -196,7 +198,7 @@ export default function ProjectDetail() {
   onCleanup(() => clearInterval(interval));
 
   const filePathOf = (id: string | null) =>
-    id !== null && id.startsWith("file:") ? id.slice("file:".length) : null;
+    isFileId(id) ? id!.slice(FILE_PREFIX.length) : null;
   const activeFilePath = () => filePathOf(activeId());
   const secondaryFilePath = () => filePathOf(secondaryId());
   const highlightedPaths = () =>
@@ -207,7 +209,10 @@ export default function ProjectDetail() {
     if (!fileTabs.some((f) => f.path === path)) {
       setFileTabs((prev) => [...prev, { path, dirty: false }]);
     }
-    setActiveId(id);
+    // Must go through selectTab, not setActiveId: this is the only setActiveId
+    // call site that sets a `file:` id, so it is the only one that can collide
+    // with the pinned tab. selectTab unpins when you select the pinned file.
+    applyPanes(selectTab(panes(), id));
   };
 
   /** ◨ button: send a file right, or bring the pinned one back. */
@@ -216,7 +221,12 @@ export default function ProjectDetail() {
     else applyPanes(splitRight(tabs(), panes(), id));
   };
 
-  /** Alt-click in the file tree: open the file straight into the right pane. */
+  /**
+   * Alt-click in the file tree: open the file straight into the right pane.
+   * Adds the tab first so `tabs()` sees it. If it ends up being the only tab,
+   * `splitRight` declines and opens it on the left instead — a split with one
+   * file is meaningless.
+   */
   const openFileRight = (path: string) => {
     if (!fileTabs.some((f) => f.path === path)) {
       setFileTabs((prev) => [...prev, { path, dirty: false }]);

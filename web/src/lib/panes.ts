@@ -40,8 +40,8 @@ export function selectTab(state: PaneState, id: string): PaneState {
 }
 
 /**
- * Close a tab. `tabs` is the list *before* removal — the caller mutates its
- * store afterwards.
+ * Close a tab. `tabs` may be the list before or after `id` is removed — `id` is
+ * excluded from the next-tab search either way.
  */
 export function closeTab(tabs: Tab[], state: PaneState, id: string): PaneState {
   const secondaryId = state.secondaryId === id ? null : state.secondaryId;
