@@ -63,6 +63,10 @@ export function closeTab(tabs: Tab[], state: PaneState, id: string): PaneState {
 export function reconcilePanes(tabs: Tab[], state: PaneState): PaneState {
   const ids = new Set(tabs.map((t) => t.id));
 
+  // Order matters: each clause below assumes the ones above it have already run.
+  // In particular the stale-pin drop must precede the activeId backfill (which
+  // excludes secondaryId), and the only-tab-left promotion must precede the
+  // final equality cleanup. Reordering can silently reintroduce the two-editor bug.
   let secondaryId = state.secondaryId;
   if (secondaryId !== null && (!isFileId(secondaryId) || !ids.has(secondaryId))) secondaryId = null;
 

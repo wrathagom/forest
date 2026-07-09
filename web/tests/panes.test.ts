@@ -6,9 +6,15 @@ const term: Tab = { kind: "terminal", id: "term:1", sessionId: "1", label: "term
 const fileA: Tab = { kind: "file", id: "file:a.ts", path: "a.ts", label: "a.ts", dirty: false };
 const fileB: Tab = { kind: "file", id: "file:b.ts", path: "b.ts", label: "b.ts", dirty: false };
 
-/** Invariant 2 from the spec: a file never has two editors. */
+/**
+ * The two spec invariants, asserted together on every transition result.
+ *   1. secondaryId is always a `file:` id or null — a terminal owns a live PTY
+ *      and can never be mounted in the right pane.
+ *   2. activeId !== secondaryId — a file never has two editors.
+ */
 function assertInvariant(s: PaneState) {
-  if (s.activeId !== null) expect(s.activeId).not.toBe(s.secondaryId);
+  if (s.secondaryId !== null) expect(s.secondaryId.startsWith("file:")).toBe(true);
+  if (s.activeId !== null && s.secondaryId !== null) expect(s.activeId).not.toBe(s.secondaryId);
 }
 
 describe("splitRight", () => {
@@ -38,17 +44,27 @@ describe("splitRight", () => {
 
   test("refuses non-file ids — terminals may never be pinned right", () => {
     const before: PaneState = { activeId: "file:a.ts", secondaryId: null };
-    expect(splitRight([term, fileA], before, "term:1")).toEqual(before);
+    const s = splitRight([term, fileA], before, "term:1");
+    expect(s).toEqual(before);
+    assertInvariant(s);
   });
 
   test("refuses unknown ids", () => {
     const before: PaneState = { activeId: "file:a.ts", secondaryId: null };
-    expect(splitRight([fileA], before, "file:gone.ts")).toEqual(before);
+    const s = splitRight([fileA], before, "file:gone.ts");
+    expect(s).toEqual(before);
+    assertInvariant(s);
   });
 
   test("re-pinning the already-pinned file is a no-op", () => {
     const before: PaneState = { activeId: "term:1", secondaryId: "file:b.ts" };
     expect(splitRight([term, fileA, fileB], before, "file:b.ts")).toEqual(before);
+  });
+
+  test("splitting the only tab when nothing is active still opens it left", () => {
+    const s = splitRight([fileA], { activeId: null, secondaryId: null }, "file:a.ts");
+    expect(s).toEqual({ activeId: "file:a.ts", secondaryId: null });
+    assertInvariant(s);
   });
 });
 
@@ -88,6 +104,7 @@ describe("closeTab", () => {
   test("closing an inactive, unpinned tab changes nothing", () => {
     const s = closeTab([term, fileA, fileB], { activeId: "term:1", secondaryId: null }, "file:a.ts");
     expect(s).toEqual({ activeId: "term:1", secondaryId: null });
+    assertInvariant(s);
   });
 });
 
@@ -95,11 +112,13 @@ describe("reconcilePanes", () => {
   test("drops a pinned id whose tab no longer exists", () => {
     const s = reconcilePanes([term], { activeId: "term:1", secondaryId: "file:gone.ts" });
     expect(s).toEqual({ activeId: "term:1", secondaryId: null });
+    assertInvariant(s);
   });
 
   test("drops a non-file pinned id", () => {
     const s = reconcilePanes([term, fileA], { activeId: "file:a.ts", secondaryId: "term:1" });
     expect(s).toEqual({ activeId: "file:a.ts", secondaryId: null });
+    assertInvariant(s);
   });
 
   test("replaces a stale activeId with the first tab that is not pinned", () => {
@@ -124,9 +143,14 @@ describe("reconcilePanes", () => {
   });
 
   test("no tabs at all yields a fully empty state", () => {
-    expect(reconcilePanes([], { activeId: "term:1", secondaryId: "file:a.ts" })).toEqual({
-      activeId: null,
-      secondaryId: null,
-    });
+    const s = reconcilePanes([], { activeId: "term:1", secondaryId: "file:a.ts" });
+    expect(s).toEqual({ activeId: null, secondaryId: null });
+    assertInvariant(s);
+  });
+
+  test("duplicate ids in the tab list do not break reconciliation", () => {
+    const s = reconcilePanes([fileA, fileA, fileB], { activeId: null, secondaryId: "file:a.ts" });
+    expect(s).toEqual({ activeId: "file:b.ts", secondaryId: "file:a.ts" });
+    assertInvariant(s);
   });
 });
