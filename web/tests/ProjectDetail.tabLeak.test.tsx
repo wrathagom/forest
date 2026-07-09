@@ -112,3 +112,34 @@ test("the pinned tab does not follow you when switching projects", async () => {
   await waitFor(() => expect(container.querySelector(".tab.pinned")).toBeTruthy());
   expect(JSON.parse(localStorage.getItem("forest.secondaryTab.alpha")!)).toBe("file:src/two.ts");
 });
+
+// The previous test cannot catch a `saveSecondaryTab` keyed off the reactive
+// `params.id`. `loadSecondaryTab` validates the pinned path against the
+// destination project's open files, so if beta has no such path a leaked pin is
+// rejected on read and self-heals. Two projects sharing a relative path (think
+// `package.json`) get past that check — but beta must also have a SECOND tab of
+// its own: with `shared.ts` as its only tab, `reconcilePanes` promotes the lone
+// pinned tab to the active pane (an empty left pane is disallowed) and masks the
+// leak anyway. Give beta its own active tab plus the shared path and a leaked
+// pin has somewhere to stick — surfacing as a phantom split on beta.
+test("a pinned path shared by both projects still does not leak", async () => {
+  localStorage.setItem("forest.openFiles.alpha", JSON.stringify(["shared.ts", "only-alpha.ts"]));
+  localStorage.setItem("forest.activeTab.alpha", JSON.stringify("file:only-alpha.ts"));
+  localStorage.setItem("forest.secondaryTab.alpha", JSON.stringify("file:shared.ts"));
+
+  // beta has its own file open and active, plus the SAME shared path — but
+  // nothing pinned.
+  localStorage.setItem("forest.openFiles.beta", JSON.stringify(["only-beta.ts", "shared.ts"]));
+  localStorage.setItem("forest.activeTab.beta", JSON.stringify("file:only-beta.ts"));
+
+  const { container } = renderApp();
+  navigate("/projects/alpha");
+  await waitFor(() => expect(container.querySelector(".tab.pinned")).toBeTruthy());
+
+  navigate("/projects/beta");
+  // beta shows its own two tabs; neither may be pinned and there must be no split.
+  await waitFor(() => expect(tabLabels(container)).toEqual(["only-beta.ts", "shared.ts"]));
+  expect(container.querySelector(".tab.pinned")).toBeNull();
+  expect(container.querySelector(".terminal-area.split")).toBeNull();
+  expect(JSON.parse(localStorage.getItem("forest.secondaryTab.beta") ?? "null")).toBeNull();
+});
