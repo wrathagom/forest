@@ -20,6 +20,26 @@
 
 **Run tests from the repo root with `bun run test:web`, or a single file with `cd web && bunx vitest run tests/<file>`.**
 
+**Typecheck baseline — read this before running `tsc`.** `bunx tsc --noEmit` is *not* part of `bun run test:web` (which is just `vitest run`), and the repo does **not** currently typecheck clean. On the commit this plan was written against there are **22 pre-existing `error TS` lines**:
+
+| File | Errors | Cause |
+|---|---|---|
+| `src/pages/ProjectDetail.tsx` | 15 | `params.id` is `string \| undefined` under the router's types |
+| `src/pages/Settings.tsx` | 2 | same family |
+| `src/App.tsx` | 1 | resource refetch signature |
+| 4 test files | 1 each | same family |
+
+Do **not** try to fix these; they are out of scope. The gate for every task in this plan is:
+
+1. `bun run test:web` passes, **and**
+2. `bunx tsc --noEmit` reports no error that names a symbol this plan introduces — `panes`, `PaneState`, `secondaryId`, `onToggleSplit`, `PaneResizer`, `highlightedPaths`, `onOpenFileRight`, `clampRatio`, `splitRatio`.
+
+A raw error *count* is a bad gate for Task 7, which rewrites `ProjectDetail.tsx` and will shift those 15 line numbers around. Grep the output for the new symbols instead:
+
+```sh
+cd web && bunx tsc --noEmit 2>&1 | grep -E 'panes|PaneState|secondaryId|onToggleSplit|PaneResizer|highlightedPaths|onOpenFileRight|clampRatio|splitRatio' || echo "clean: no errors from this plan's symbols"
+```
+
 ---
 
 ### Task 1: Pure pane-transition module
@@ -1017,8 +1037,8 @@ Replace lines 58-64:
 
 - [ ] **Step 3: Verify it type-checks**
 
-Run: `cd web && bunx tsc --noEmit`
-Expected: exactly one class of error remaining — `ProjectDetail.tsx` still passes `activeFilePath` and omits `onOpenFileRight`. Task 7 fixes it. Do not commit a broken tree; go straight to Task 7 and commit the two together.
+Run: `cd web && bunx tsc --noEmit 2>&1 | grep -E 'highlightedPaths|onOpenFileRight'`
+Expected: errors pointing at `ProjectDetail.tsx`, which still passes `activeFilePath` and omits `onOpenFileRight`. That is the *only* new breakage; Task 7 fixes it. (Ignore the 22 pre-existing errors described in the header.) Do not commit a broken tree — go straight to Task 7 and commit the two together.
 
 ---
 
@@ -1272,8 +1292,8 @@ Finally, update the `InfoPane` call site (lines 468-477):
 
 - [ ] **Step 9: Verify the whole web tree type-checks and all tests pass**
 
-Run: `cd web && bunx tsc --noEmit`
-Expected: no output (clean).
+Run: `cd web && bunx tsc --noEmit 2>&1 | grep -E 'panes|PaneState|secondaryId|onToggleSplit|PaneResizer|highlightedPaths|onOpenFileRight|clampRatio|splitRatio' || echo "clean"`
+Expected: `clean`. The 22 pre-existing errors described in the header remain and are out of scope; `ProjectDetail.tsx` will still report its `params.id` errors at shifted line numbers.
 
 Run: `bun run test:web`
 Expected: PASS — every suite, including the pre-existing ones.
