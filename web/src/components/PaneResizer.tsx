@@ -21,6 +21,7 @@ export default function PaneResizer(props: {
     dragging = true;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     e.preventDefault();
+    e.currentTarget.focus();
   };
 
   const onPointerMove = (e: PointerEvent) => {
@@ -35,7 +36,11 @@ export default function PaneResizer(props: {
   const onPointerUp = (e: PointerEvent & { currentTarget: HTMLElement }) => {
     if (!dragging) return;
     dragging = false;
-    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // pointer may already be released (e.g. pointercancel) — ignore
+    }
     props.onCommit();
   };
 
@@ -61,6 +66,7 @@ export default function PaneResizer(props: {
       onpointerdown={onPointerDown}
       onpointermove={onPointerMove}
       onpointerup={onPointerUp}
+      onpointercancel={onPointerUp}
       onkeydown={onKeyDown}
     />
   );
