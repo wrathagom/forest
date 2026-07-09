@@ -31,9 +31,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     expect(screen.getByText(/src/)).toBeTruthy();
@@ -45,9 +46,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
@@ -62,9 +64,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={onOpenFile}
         onOpenDiff={onOpenDiff}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
@@ -80,9 +83,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={onOpenFile}
         onOpenDiff={onOpenDiff}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
@@ -92,14 +96,72 @@ describe("FileTreePanel", () => {
     expect(onOpenFile).not.toHaveBeenCalled();
   });
 
+  test("alt-click on a clean file opens it in the right pane", () => {
+    const onOpenFile = vi.fn();
+    const onOpenFileRight = vi.fn();
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={sampleTree}
+        highlightedPaths={[]}
+        onOpenFile={onOpenFile}
+        onOpenDiff={() => {}}
+        onOpenFileRight={onOpenFileRight}
+      />
+    ));
+    fireEvent.click(screen.getByText("package.json"), { altKey: true });
+    expect(onOpenFileRight).toHaveBeenCalledWith("package.json");
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+
+  test("alt-click on a git-modified file opens the FILE right, never the diff", () => {
+    const onOpenDiff = vi.fn();
+    const onOpenFileRight = vi.fn();
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={sampleTree}
+        highlightedPaths={[]}
+        onOpenFile={() => {}}
+        onOpenDiff={onOpenDiff}
+        onOpenFileRight={onOpenFileRight}
+      />
+    ));
+    fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
+    fireEvent.click(screen.getByText(/^[▸▾]\s+ui$/));
+    fireEvent.click(screen.getByText("App.tsx"), { altKey: true });
+    expect(onOpenFileRight).toHaveBeenCalledWith("src/ui/App.tsx");
+    expect(onOpenDiff).not.toHaveBeenCalled();
+  });
+
+  test("alt-click on a gitignored file opens it right", () => {
+    const onOpenFileRight = vi.fn();
+    const ignoredFileTree: TreeEntry[] = [
+      { path: "ignored.log", type: "file", size: 5, gitStatus: "!" },
+    ];
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={ignoredFileTree}
+        highlightedPaths={[]}
+        onOpenFile={() => {}}
+        onOpenDiff={() => {}}
+        onOpenFileRight={onOpenFileRight}
+      />
+    ));
+    fireEvent.click(screen.getByText("ignored.log"), { altKey: true });
+    expect(onOpenFileRight).toHaveBeenCalledWith("ignored.log");
+  });
+
   test("renders the badge character for files with gitStatus", () => {
     const { container } = render(() => (
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
@@ -116,9 +178,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     // src and src/ui are both ancestors of src/ui/App.tsx (M)
@@ -128,14 +191,48 @@ describe("FileTreePanel", () => {
     expect(dirtyDirs.some((t) => t?.endsWith("src"))).toBe(true);
   });
 
-  test("active file path is highlighted", () => {
+  test("every highlighted path is marked active, not just one", () => {
     const { container } = render(() => (
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath="src/main.ts"
+        highlightedPaths={["package.json", "untracked.md"]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
+      />
+    ));
+    const active = Array.from(container.querySelectorAll(".tree-file-active")).map(
+      (el) => el.textContent,
+    );
+    expect(active.length).toBe(2);
+    expect(active.join(" ")).toContain("package.json");
+    expect(active.join(" ")).toContain("untracked.md");
+  });
+
+  test("an unhighlighted file is not marked active", () => {
+    const { container } = render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={sampleTree}
+        highlightedPaths={["package.json"]}
+        onOpenFile={() => {}}
+        onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
+      />
+    ));
+    expect(container.querySelectorAll(".tree-file-active").length).toBe(1);
+  });
+
+  test("highlighted file path gets the active class", () => {
+    const { container } = render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={sampleTree}
+        highlightedPaths={["src/main.ts"]}
+        onOpenFile={() => {}}
+        onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
@@ -148,9 +245,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
@@ -174,9 +272,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={ignoredTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+\.worktrees$/));
@@ -191,9 +290,10 @@ describe("FileTreePanel", () => {
       <FileTreePanel
         projectId="p1"
         entries={ignoredTree}
-        activeFilePath={null}
+        highlightedPaths={[]}
         onOpenFile={() => {}}
         onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+\.worktrees$/));
