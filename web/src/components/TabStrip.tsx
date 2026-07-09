@@ -51,6 +51,7 @@ export default function TabStrip(props: {
             <Show when={t.kind === "file" && props.onToggleSplit}>
               <button
                 class="tab-split"
+                aria-label={props.secondaryId === t.id ? "return to left pane" : "open in right pane"}
                 title={props.secondaryId === t.id ? "return to left pane" : "open in right pane"}
                 onclick={(e) => handleSplit(e, t)}
               >

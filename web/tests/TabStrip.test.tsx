@@ -171,6 +171,7 @@ describe("TabStrip", () => {
     ));
     const btn = container.querySelector(".tab-split") as HTMLElement;
     expect(btn.title).toBe("return to left pane");
+    expect(btn.getAttribute("aria-label")).toBe("return to left pane");
   });
 
   test("an unpinned file tab's split button is titled as a way right", () => {
@@ -179,5 +180,26 @@ describe("TabStrip", () => {
     ));
     const btn = container.querySelector(".tab-split") as HTMLElement;
     expect(btn.title).toBe("open in right pane");
+    expect(btn.getAttribute("aria-label")).toBe("open in right pane");
+  });
+
+  test("a dirty file tab can also be pinned — shows both the dot and the pinned class", () => {
+    const { container } = render(() => (
+      <TabStrip tabs={[termTab, dirtyTab]} activeId="term:1" secondaryId="file:src/y.ts"
+        onSelect={() => {}} onClose={() => {}} onToggleSplit={() => {}} {...defaultLauncherProps} />
+    ));
+    const pinned = container.querySelector(".tab.pinned") as HTMLElement;
+    expect(pinned.classList.contains("dirty")).toBe(true);
+    expect(pinned.textContent).toContain("● y.ts");
+  });
+
+  test("clicking the split button on the pinned tab still reports its id (bring-back)", () => {
+    const onToggleSplit = vi.fn();
+    const { container } = render(() => (
+      <TabStrip tabs={[fileTab]} activeId={null} secondaryId="file:src/x.ts"
+        onSelect={() => {}} onClose={() => {}} onToggleSplit={onToggleSplit} {...defaultLauncherProps} />
+    ));
+    fireEvent.click(container.querySelector(".tab-split")!);
+    expect(onToggleSplit).toHaveBeenCalledWith("file:src/x.ts");
   });
 });
