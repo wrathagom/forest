@@ -1179,6 +1179,23 @@ Replace the tail of `onSessionExit` (lines 308-311) — the `if (activeId() === 
 
 - [ ] **Step 7: Add the split and open-right actions**
 
+> **Correction (found in code review).** This plan originally left `openFile` alone. That was a **critical bug**. `openFile` is the *only* `setActiveId` call site that sets a `file:` id — every other one sets `term:`/`diff:`/`commit:`/`session:`/`task:`, which can never equal `secondaryId`. So normal-clicking the pinned file in the tree (or DiffView's "edit file" button) set `activeId === secondaryId`, mounting two `FileEditor`s on one path — two dirty flags, two disk pollers — until the 10-second poll's `reconcilePanes` silently dropped the pin. `openFile` **must** route through `selectTab`:
+>
+> ```ts
+>   const openFile = (path: string) => {
+>     const id = `file:${path}`;
+>     if (!fileTabs.some((f) => f.path === path)) {
+>       setFileTabs((prev) => [...prev, { path, dirty: false }]);
+>     }
+>     // Must go through selectTab, not setActiveId: this is the only setActiveId
+>     // call site that sets a `file:` id, so it is the only one that can collide
+>     // with the pinned tab. selectTab unpins when you select the pinned file.
+>     applyPanes(selectTab(panes(), id));
+>   };
+> ```
+>
+> Regression test: `web/tests/ProjectDetail.panes.test.tsx`, which renders the real `InfoPane` + `FileTreePanel` and clicks the pinned file's tree row.
+
 After `openFile` (lines 203-209), add:
 
 ```ts
