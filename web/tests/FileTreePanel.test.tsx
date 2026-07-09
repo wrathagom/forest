@@ -153,6 +153,27 @@ describe("FileTreePanel", () => {
     expect(onOpenFileRight).toHaveBeenCalledWith("ignored.log");
   });
 
+  test("alt-click on a directory expands it and never pins to the right pane", () => {
+    const onOpenFileRight = vi.fn();
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={sampleTree}
+        highlightedPaths={[]}
+        onOpenFile={() => {}}
+        onOpenDiff={() => {}}
+        onOpenFileRight={onOpenFileRight}
+      />
+    ));
+    // Match the dir row exactly as the other dir tests do (caret + name),
+    // avoiding a bare /src/ which also matches the "src/main.ts" file path.
+    fireEvent.click(screen.getByText(/^[▸▾]\s+src$/), { altKey: true });
+    // It toggled: the directory's children are now visible.
+    expect(screen.getByText("main.ts")).toBeTruthy();
+    // It did NOT pin: directory rows ignore the event entirely.
+    expect(onOpenFileRight).not.toHaveBeenCalled();
+  });
+
   test("renders the badge character for files with gitStatus", () => {
     const { container } = render(() => (
       <FileTreePanel
