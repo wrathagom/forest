@@ -442,3 +442,59 @@ describe("Vault profile field", () => {
     expect(v.getSession("s-np")?.profile).toBeNull();
   });
 });
+
+// A worktree's transcript lives under the Claude config dir, not inside the
+// worktree, so deleting the worktree never bumps the transcript's mtime and the
+// scanner's `known >= mtime` guard skips re-ingesting it. A `cwd_exists` cached
+// at ingest time therefore stays 1 forever, and the UI keeps offering a plain
+// "Resume" that launches into a directory that is gone.
+describe("Vault re-derives cwd_exists on read", () => {
+  const gone = "/tmp/forest-test-gone-worktree";
+  const setup = () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    db.query(
+      "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES ('p1','p','/tmp/p',1,1)",
+    ).run();
+    v.upsertSession({
+      session_id: "sid-gone",
+      agent: "claude",
+      cwd: gone,
+      last_activity: 1_000,
+      project_id: "p1",
+      cwd_exists: true, // recorded while the worktree still existed
+      source: "scan",
+    });
+    return v;
+  };
+
+  test("getSession reports a deleted cwd as gone", () => {
+    expect(setup().getSession("sid-gone")?.cwd_exists).toBe(0);
+  });
+
+  test("getSessionDetail reports a deleted cwd as gone", () => {
+    expect(setup().getSessionDetail("sid-gone")?.session.cwd_exists).toBe(0);
+  });
+
+  test("listByProject reports a deleted cwd as gone", () => {
+    expect(setup().listByProject("p1")[0]?.cwd_exists).toBe(0);
+  });
+
+  test("listAll reports a deleted cwd as gone", () => {
+    expect(setup().listAll({ limit: 10, offset: 0 }).sessions[0]?.cwd_exists).toBe(0);
+  });
+
+  test("recentSessions reports a deleted cwd as gone", () => {
+    expect(setup().recentSessions(10)[0]?.cwd_exists).toBe(0);
+  });
+
+  test("an existing cwd still reports as present", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    v.upsertSession({
+      session_id: "sid-here", agent: "claude", cwd: process.cwd(),
+      last_activity: 1_000, cwd_exists: false, source: "scan",
+    });
+    expect(v.getSession("sid-here")?.cwd_exists).toBe(1);
+  });
+});

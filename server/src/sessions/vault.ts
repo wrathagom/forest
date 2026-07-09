@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { existsSync } from "node:fs";
 import type {
   SessionPatch,
   MessageRecord,
@@ -359,6 +360,7 @@ export class Vault {
     try {
       const selParams = [...(q ? [q] : []), ...whereParams, limit, offset];
       const sessions = this.db.query<SessionListRow, unknown[]>(sql).all(...selParams);
+      this.refreshCwdExists(sessions);
       this.backfillFirstUserMsg(sessions);
       const total = this.db.query<{ n: number }, unknown[]>(countSql).get(...whereParams)?.n ?? 0;
       return { sessions, total };
@@ -482,8 +484,27 @@ export class Vault {
           LIMIT ? OFFSET ?`,
       )
       .all(projectId, limit, offset);
+    this.refreshCwdExists(rows);
     this.backfillFirstUserMsg(rows);
     return rows;
+  }
+
+  // Whether a cwd exists is a fact about the filesystem *now*, but the stored
+  // column is only rewritten when a transcript is re-ingested. A transcript
+  // lives under the Claude config dir rather than inside the worktree it ran
+  // in, so deleting a worktree leaves its mtime untouched and the scanner skips
+  // it — the row would report cwd_exists = 1 forever. Derive it on read instead.
+  // Sessions sharing a cwd are stat'd once.
+  private refreshCwdExists(rows: Array<{ cwd: string; cwd_exists: number }>): void {
+    const seen = new Map<string, number>();
+    for (const row of rows) {
+      let exists = seen.get(row.cwd);
+      if (exists === undefined) {
+        exists = existsSync(row.cwd) ? 1 : 0;
+        seen.set(row.cwd, exists);
+      }
+      row.cwd_exists = exists;
+    }
   }
 
   // Rows ingested before their JSONL was scanned (or whose first line was a
@@ -518,6 +539,7 @@ export class Vault {
       )
       .get(sessionId);
     if (!session) return undefined;
+    this.refreshCwdExists([session]);
     const messages = this.db
       .query<SessionDetail["messages"][number], [string]>(
         `SELECT id, role, content, timestamp, model,
@@ -566,21 +588,23 @@ export class Vault {
           LIMIT ?3`,
       )
       .all(projectId, query, limit);
+    this.refreshCwdExists(rows);
     this.backfillFirstUserMsg(rows);
     return rows;
   }
 
   getSession(sessionId: string): SessionRow | undefined {
-    return (
-      this.db
-        .query<SessionRow, [string]>(
-          `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
-                  cwd_exists, parent_session_id, started_at, last_activity,
-                  message_count, first_user_msg, profile, permission_mode, launched_via
-             FROM agent_sessions WHERE session_id = ?`,
-        )
-        .get(sessionId) ?? undefined
-    );
+    const row = this.db
+      .query<SessionRow, [string]>(
+        `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
+                cwd_exists, parent_session_id, started_at, last_activity,
+                message_count, first_user_msg, profile, permission_mode, launched_via
+           FROM agent_sessions WHERE session_id = ?`,
+      )
+      .get(sessionId);
+    if (!row) return undefined;
+    this.refreshCwdExists([row]);
+    return row;
   }
 
   mtimeFor(sessionId: string): number | undefined {
@@ -605,7 +629,7 @@ export class Vault {
   }
 
   recentSessions(limit = 20): Array<SessionRow & { project_name: string | null }> {
-    return this.db
+    const rows = this.db
       .query<SessionRow & { project_name: string | null }, [number]>(
         `SELECT s.*, p.name AS project_name
          FROM agent_sessions s
@@ -615,5 +639,7 @@ export class Vault {
          LIMIT ?`,
       )
       .all(limit);
+    this.refreshCwdExists(rows);
+    return rows;
   }
 }
