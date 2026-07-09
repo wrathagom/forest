@@ -89,3 +89,26 @@ test("open file tabs do not follow you when switching projects", async () => {
     "src/two.ts",
   ]);
 });
+
+test("the pinned tab does not follow you when switching projects", async () => {
+  // alpha has two files open, the second pinned to the right pane. beta has none.
+  localStorage.setItem("forest.openFiles.alpha", JSON.stringify(["src/one.ts", "src/two.ts"]));
+  localStorage.setItem("forest.activeTab.alpha", JSON.stringify("file:src/one.ts"));
+  localStorage.setItem("forest.secondaryTab.alpha", JSON.stringify("file:src/two.ts"));
+
+  const { container } = renderApp();
+  navigate("/projects/alpha");
+  await waitFor(() => expect(container.querySelector(".tab.pinned")).toBeTruthy());
+  expect(container.querySelector(".terminal-area.split")).toBeTruthy();
+
+  // Switch to beta — alpha's pin must not leak in, and the split must close.
+  navigate("/projects/beta");
+  await waitFor(() => expect(tabLabels(container)).toEqual([]));
+  expect(container.querySelector(".terminal-area.split")).toBeNull();
+  expect(JSON.parse(localStorage.getItem("forest.secondaryTab.beta") ?? "null")).toBeNull();
+
+  // Returning to alpha restores the pin from alpha's own storage key.
+  navigate("/projects/alpha");
+  await waitFor(() => expect(container.querySelector(".tab.pinned")).toBeTruthy());
+  expect(JSON.parse(localStorage.getItem("forest.secondaryTab.alpha")!)).toBe("file:src/two.ts");
+});
