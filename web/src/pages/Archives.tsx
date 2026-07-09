@@ -7,7 +7,7 @@ export default function Archives() {
   const list = () => res()?.projects ?? [];
 
   return (
-    <div>
+    <div class="page">
       <h2 class="section-title">
         <span>archived</span>
         <Show when={list().length > 0}><span class="muted">{list().length}</span></Show>

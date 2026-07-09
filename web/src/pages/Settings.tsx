@@ -119,7 +119,7 @@ export default function Settings() {
   };
 
   return (
-    <div class="settings">
+    <div class="settings page">
       <h2>settings</h2>
       <Show when={cfg()}>{(c) => { init(c()); return null; }}</Show>
       <form onsubmit={onSave}>

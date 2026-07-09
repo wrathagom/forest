@@ -115,7 +115,7 @@ export default function Sessions() {
   const empty = () => page.state === "ready" && total() === 0 && !debounced() && project() === "" && profile() === "";
 
   return (
-    <div class="sessions-page">
+    <div class="sessions-page page">
       <h2 class="section-title">sessions</h2>
 
       <Show when={stats()}>

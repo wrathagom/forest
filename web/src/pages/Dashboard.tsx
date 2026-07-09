@@ -34,7 +34,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div>
+    <div class="page">
       <Show when={!empty()}>
         <div class="dashboard-toolbar">
           <input
