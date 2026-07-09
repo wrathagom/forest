@@ -845,7 +845,9 @@ This task also swaps `activeFilePath: string | null` for `highlightedPaths: stri
 
 **Files:**
 - Modify: `web/src/components/FileTreePanel.tsx` (props at 60-66; `onFileClick` at 127-131; row class at 145-147)
-- Test: `web/tests/FileTreePanel.test.tsx` (create)
+- Modify: `web/tests/FileTreePanel.test.tsx`
+
+> **Correction (found during execution).** An earlier draft of this plan said no test file existed for this component and told the implementer to create one. That was wrong — `web/tests/FileTreePanel.test.tsx` already exists with 10 tests covering rendering, dir expansion, git badges, the dirty-ancestor class, `localStorage` persistence, and lazy-load + retry. Those tests use the old `activeFilePath` prop and **must be migrated to `highlightedPaths`, not replaced.** Merge the new cases in; preserve every existing assertion.
 
 - [ ] **Step 1: Write the failing test**
 
