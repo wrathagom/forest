@@ -1,4 +1,4 @@
-import type { Tab } from "./tabs";
+import { isFileId, type Tab } from "./tabs";
 
 /**
  * Which tab each pane shows. `activeId` is the left pane and may name any tab
@@ -11,12 +11,6 @@ import type { Tab } from "./tabs";
  * pollers fighting each other.
  */
 export type PaneState = { activeId: string | null; secondaryId: string | null };
-
-const FILE_PREFIX = "file:";
-
-export function isFileId(id: string | null): id is string {
-  return typeof id === "string" && id.startsWith(FILE_PREFIX);
-}
 
 /** First tab in display order that is not excluded. Null when none remains. */
 function nextTab(tabs: Tab[], exclude: (string | null)[]): string | null {

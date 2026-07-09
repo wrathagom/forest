@@ -100,6 +100,17 @@ describe("secondaryTab persistence", () => {
     expect(loadSecondaryTab("p1")).toBe("file:a");
     expect(loadSecondaryTab("p2")).toBe("file:b");
   });
+
+  test("an explicit null pin round-trips as null", () => {
+    saveSecondaryTab("p1", null);
+    expect(loadSecondaryTab("p1")).toBeNull();
+  });
+
+  test("a pin survives when no active tab is stored", () => {
+    saveOpenFiles("p1", ["src/foo.ts"]);
+    saveSecondaryTab("p1", "file:src/foo.ts");
+    expect(loadSecondaryTab("p1")).toBe("file:src/foo.ts");
+  });
 });
 
 describe("splitRatio persistence", () => {
@@ -122,7 +133,12 @@ describe("splitRatio persistence", () => {
   test("falls back to 0.5 on non-finite or non-numeric values", () => {
     expect(clampRatio(Number.NaN)).toBe(0.5);
     expect(clampRatio(Number.POSITIVE_INFINITY)).toBe(0.5);
-    expect(clampRatio("0.4" as unknown)).toBe(0.5);
+    expect(clampRatio("0.4")).toBe(0.5);
     expect(clampRatio(null)).toBe(0.5);
+  });
+
+  test("the clamp bounds are inclusive", () => {
+    expect(clampRatio(0.2)).toBe(0.2);
+    expect(clampRatio(0.8)).toBe(0.8);
   });
 });

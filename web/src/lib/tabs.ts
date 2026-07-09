@@ -6,6 +6,13 @@ export type Tab =
   | { kind: "session"; id: string; sessionId: string; label: string }
   | { kind: "task"; id: string; taskId: string; label: string };
 
+/** Tab ids are `<kind>:<key>`. Only file tabs may be pinned to the right pane. */
+export const FILE_PREFIX = "file:";
+
+export function isFileId(id: string | null): boolean {
+  return typeof id === "string" && id.startsWith(FILE_PREFIX);
+}
+
 const PREFIX = "forest.";
 
 function read<T>(key: string, fallback: T): T {
@@ -63,8 +70,8 @@ export function saveSecondaryTab(projectId: string, id: string | null): void {
  */
 export function loadSecondaryTab(projectId: string): string | null {
   const raw = read<unknown>(`secondaryTab.${projectId}`, null);
-  if (typeof raw !== "string" || !raw.startsWith("file:")) return null;
-  if (!loadOpenFiles(projectId).includes(raw.slice("file:".length))) return null;
+  if (typeof raw !== "string" || !isFileId(raw)) return null;
+  if (!loadOpenFiles(projectId).includes(raw.slice(FILE_PREFIX.length))) return null;
   if (raw === loadActiveTab(projectId)) return null;
   return raw;
 }
@@ -74,7 +81,7 @@ export function saveSplitRatio(projectId: string, ratio: number): void {
 }
 
 export function loadSplitRatio(projectId: string): number {
-  return clampRatio(read<unknown>(`splitRatio.${projectId}`, DEFAULT_RATIO));
+  return clampRatio(read<unknown>(`splitRatio.${projectId}`, null));
 }
 
 export function loadExpandedDirs(projectId: string): string[] {
