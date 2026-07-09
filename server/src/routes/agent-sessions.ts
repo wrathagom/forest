@@ -2,6 +2,7 @@ import { json, notFound, badRequest } from "../server";
 import type { Route } from "../server";
 import { Vault } from "../sessions/vault";
 import { scanClaudeProjects, classifyCwd } from "../sessions/scanner";
+import { relocateTranscript } from "../sessions/transcript-relocate";
 import type { LiveAgentSessions } from "../sessions/live";
 import type { ClaudeConfigDir } from "../sessions/config-dirs";
 
@@ -89,6 +90,36 @@ export function agentSessionsRoutes(deps: RouteDeps): Route[] {
       pattern: /^\/api\/agent-sessions\/live$/,
       // the session bar surfaces at most ~10 live sessions
       handler: () => json({ sessions: deps.liveSessions?.list(10) ?? [] }),
+    },
+    {
+      // Make a session resumable from `cwd`. Claude scopes `--resume <id>` to the
+      // slug dir of the *current* cwd, so a session recorded in a (now deleted)
+      // worktree cannot be resumed from the main checkout until its transcript is
+      // copied across. Idempotent; safe to call when nothing needs moving.
+      method: "POST",
+      pattern: /^\/api\/agent-sessions\/([^/]+)\/prepare-resume$/,
+      paramNames: ["sid"],
+      handler: async (ctx) => {
+        const body = (await ctx.request.json().catch(() => null)) as { cwd?: string } | null;
+        if (!body?.cwd) return badRequest("cwd is required");
+        const session = deps.vault.getSession(ctx.params.sid!);
+        if (!session) return notFound();
+        try {
+          return json(
+            relocateTranscript(
+              { configDirs: deps.claudeConfigDirs() },
+              {
+                sessionId: session.session_id,
+                fromCwd: session.cwd,
+                toCwd: body.cwd,
+                profile: session.profile,
+              },
+            ),
+          );
+        } catch (err) {
+          return badRequest((err as Error).message);
+        }
+      },
     },
     {
       method: "GET",
