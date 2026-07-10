@@ -3,12 +3,16 @@ import { describe, expect, test } from "vitest";
 import ImageViewer from "../src/components/ImageViewer";
 
 function renderViewer() {
-  return render(() => (
-    <ImageViewer projectId="abc" path="/img/pic.png" mtimeMs={123} />
-  ));
+  return render(() => <ImageViewer src="/img/pic.png?v=1" alt="pic" />);
 }
 
 describe("ImageViewer", () => {
+  test("uses the provided src on the <img>", () => {
+    const { container } = renderViewer();
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("/img/pic.png?v=1");
+  });
+
   test("renders at fit: 100% readout and scale(1)", () => {
     const { container } = renderViewer();
     expect(screen.getByText("100%")).toBeTruthy();
