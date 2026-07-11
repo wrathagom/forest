@@ -1,11 +1,9 @@
 import { createSignal, createEffect } from "solid-js";
-import { fileRawUrl } from "../api";
 import { stepZoom, clampPan, ZOOM_MIN } from "../lib/imageZoom";
 
 export default function ImageViewer(props: {
-  projectId: string;
-  path: string;
-  mtimeMs: number;
+  src: string;
+  alt: string;
 }) {
   let container!: HTMLDivElement;
   let img!: HTMLImageElement;
@@ -16,8 +14,7 @@ export default function ImageViewer(props: {
 
   // Reset zoom/pan whenever the image changes.
   createEffect(() => {
-    props.path;
-    props.mtimeMs;
+    props.src;
     setZoom(ZOOM_MIN);
     setPan({ x: 0, y: 0 });
   });
@@ -80,8 +77,8 @@ export default function ImageViewer(props: {
     <div ref={container!} class="file-editor-image" tabindex={0} onkeydown={onKeyDown}>
       <img
         ref={img!}
-        src={fileRawUrl(props.projectId, props.path, props.mtimeMs)}
-        alt={props.path}
+        src={props.src}
+        alt={props.alt}
         draggable={false}
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}

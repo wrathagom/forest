@@ -193,6 +193,31 @@ describe("GET /api/projects/:id/git/diff", () => {
     }
   });
 
+  test("returns image mime and mtimeMs for an image path", async () => {
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    writeFileSync(join(projRoot, "pic.png"), png);
+    try {
+      const r = await fetch(`${url}/api/projects/${pid}/git/diff?path=pic.png`);
+      expect(r.status).toBe(200);
+      const body = await r.json();
+      expect(body.image).toBe("image/png");
+      expect(typeof body.mtimeMs).toBe("number");
+      expect(body.status).toBe("?");
+    } finally {
+      unlinkSync(join(projRoot, "pic.png"));
+    }
+  });
+
+  test("image is null for a text path", async () => {
+    const r = await fetch(`${url}/api/projects/${pid}/git/diff?path=b.txt`);
+    const body = await r.json();
+    expect(body.image).toBeNull();
+    expect(typeof body.mtimeMs).toBe("number");
+  });
+
   test("400 on missing path query", async () => {
     const r = await fetch(`${url}/api/projects/${pid}/git/diff`);
     expect(r.status).toBe(400);
@@ -255,5 +280,56 @@ describe("GET /api/projects/:id/git/commit", () => {
       `${url}/api/projects/${pid}/git/commit?sha=0000000000000000000000000000000000000000`,
     );
     expect(r.status).toBe(404);
+  });
+});
+
+describe("GET /api/projects/:id/git/blob", () => {
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  let root: string;
+  let bid: string;
+
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "forest-blob-"));
+    await git(["init", "-b", "main"], root);
+    await git(["config", "user.email", "t@e.com"], root);
+    await git(["config", "user.name", "T"], root);
+    await git(["config", "commit.gpgsign", "false"], root);
+    writeFileSync(join(root, "logo.png"), png);
+    await git(["add", "logo.png"], root);
+    await git(["commit", "-m", "add logo"], root);
+    // an added-but-uncommitted image (not in HEAD)
+    writeFileSync(join(root, "new.png"), png);
+    await git(["add", "new.png"], root);
+    bid = upsertProject(db, { path: root, name: "blobtest" });
+    upsertSnapshot(db, bid, emptySnapshot());
+  });
+
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  test("streams the HEAD bytes with the image content-type", async () => {
+    const r = await fetch(`${url}/api/projects/${bid}/git/blob?path=logo.png`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("image/png");
+    expect(r.headers.get("x-content-type-options")).toBe("nosniff");
+    const bytes = Buffer.from(await r.arrayBuffer());
+    expect(bytes.equals(png)).toBe(true);
+  });
+
+  test("404s for a path that is not in HEAD (added, uncommitted)", async () => {
+    const r = await fetch(`${url}/api/projects/${bid}/git/blob?path=new.png`);
+    expect(r.status).toBe(404);
+  });
+
+  test("400s for an invalid ref", async () => {
+    const r = await fetch(`${url}/api/projects/${bid}/git/blob?path=logo.png&ref=nope`);
+    expect(r.status).toBe(400);
+  });
+
+  test("400s for a path escaping the project", async () => {
+    const r = await fetch(`${url}/api/projects/${bid}/git/blob?path=../escape`);
+    expect(r.status).toBe(400);
   });
 });

@@ -248,6 +248,10 @@ export function fileRawUrl(projectId: string, path: string, version: number): st
   return `/api/projects/${encodeURIComponent(projectId)}/file/raw?path=${encodeURIComponent(path)}&v=${version}`;
 }
 
+export function fileBlobUrl(projectId: string, path: string, ref: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/git/blob?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(ref)}`;
+}
+
 export async function writeFile(
   projectId: string,
   path: string,
@@ -322,6 +326,8 @@ export type GitDiffResponse = {
   path: string;
   diff: string;
   status: GitFileStatus | null;
+  image: string | null;
+  mtimeMs: number | null;
 };
 
 export async function fetchGitDiff(

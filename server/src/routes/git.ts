@@ -1,8 +1,10 @@
+import { stat } from "node:fs/promises";
 import { json, notFound, badRequest } from "../server";
 import type { Route } from "../server";
 import { getProjectById } from "../store/projects";
 import { defaultRunGit, gitLog, gitDiffPath, gitShowCommit, gitBranches, type RunGit } from "../git";
 import { resolveProjectPath } from "../files/path";
+import { imageMimeFor } from "./files";
 
 export type ProjectGitDeps = {
   runGit?: RunGit;
@@ -84,10 +86,56 @@ export function projectGitRoutes(deps: ProjectGitDeps = {}): Route[] {
         }
         try {
           const result = await gitDiffPath(project.path, rel, abs, run);
-          return json({ path: rel, diff: result.diff, status: result.status });
+          let mtimeMs: number | null = null;
+          try {
+            mtimeMs = (await stat(abs)).mtimeMs;
+          } catch {
+            mtimeMs = null; // deleted in the working tree
+          }
+          return json({
+            path: rel,
+            diff: result.diff,
+            status: result.status,
+            image: imageMimeFor(rel),
+            mtimeMs,
+          });
         } catch (err) {
           return json({ error: (err as Error).message }, { status: 500 });
         }
+      },
+    },
+    {
+      method: "GET",
+      pattern: /^\/api\/projects\/([^/]+)\/git\/blob$/,
+      paramNames: ["id"],
+      handler: async (ctx) => {
+        const project = getProjectById(ctx.db, ctx.params.id!);
+        if (!project) return notFound();
+        const rel = ctx.url.searchParams.get("path");
+        if (!rel) return badRequest("missing path");
+        const abs = resolveProjectPath(project.path, rel);
+        if (!abs) return badRequest("invalid path");
+        if (!(await isGitRepo(project.path, run))) {
+          return json({ error: "not a git repo" }, { status: 404 });
+        }
+        const ref = ctx.url.searchParams.get("ref") ?? "HEAD";
+        const verified = await run(["rev-parse", "--verify", "--quiet", ref], project.path);
+        if (verified.code !== 0) return badRequest("invalid ref");
+        // Blob existence check — cat-file -e produces no stdout, so routing it
+        // through `run` (UTF-8) is safe. git uses forward slashes in tree paths.
+        const exists = await run(["cat-file", "-e", `${ref}:${rel}`], project.path);
+        if (exists.code !== 0) return notFound();
+        // Stream the raw bytes with Bun.spawn — NOT `run`, which would decode
+        // stdout as UTF-8 and corrupt binary content. Same SVG hardening as
+        // the /file/raw route.
+        const proc = Bun.spawn(["git", "show", `${ref}:${rel}`], { cwd: project.path });
+        return new Response(proc.stdout, {
+          headers: {
+            "content-type": imageMimeFor(rel) ?? "application/octet-stream",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "script-src 'none'; sandbox",
+          },
+        });
       },
     },
     {

@@ -1,5 +1,6 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import { fetchGitDiff, type GitDiffResponse } from "../api";
+import ImageDiffView from "./ImageDiffView";
 
 type Line = { kind: "ctx" | "add" | "del" | "hunk" | "meta"; text: string };
 
@@ -51,7 +52,15 @@ export default function DiffView(props: {
             <button class="panel-retry" onclick={() => props.onOpenFile(props.path)}>edit file</button>
           </div>
         </Show>
-        <Show when={data() && (data() as GitDiffResponse).diff.length > 0}>
+        <Show when={data() && (data() as GitDiffResponse).status !== null && (data() as GitDiffResponse).image}>
+          <ImageDiffView
+            projectId={props.projectId}
+            path={props.path}
+            status={(data() as GitDiffResponse).status!}
+            mtimeMs={(data() as GitDiffResponse).mtimeMs}
+          />
+        </Show>
+        <Show when={data() && !(data() as GitDiffResponse).image && (data() as GitDiffResponse).diff.length > 0}>
           <pre class="diff-pre">
             <For each={(data() as GitDiffResponse).diff.split("\n")}>
               {(line) => {

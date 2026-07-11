@@ -41,3 +41,10 @@ test("fetchTreeChildren requests the tree route with a path query param", async 
     "/api/projects/p1/tree?path=.worktrees%2Ffeat%20x",
   );
 });
+
+test("fileBlobUrl builds the git blob route with path and ref", async () => {
+  const { fileBlobUrl } = await import("../src/api");
+  expect(fileBlobUrl("p1", "assets/logo.png", "HEAD")).toBe(
+    "/api/projects/p1/git/blob?path=assets%2Flogo.png&ref=HEAD",
+  );
+});

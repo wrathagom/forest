@@ -441,6 +441,29 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .diff-view-path { font-family: "FiraCode Nerd Font Mono", ui-monospace, Menlo, monospace; }
 .diff-view-status { font-size: 0.75rem; }
 .diff-view-body, .commit-view-body { flex: 1; overflow: auto; }
+.diff-view-body { container-type: inline-size; }
+.image-diff {
+  display: flex;
+  height: 100%;
+  gap: 1px;
+}
+.image-diff-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.image-diff-single .image-diff-side { flex: 1; }
+.image-diff-label {
+  font-size: 0.7rem;
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid #2a2a2d;
+}
+.image-diff-side .file-editor-image { flex: 1; min-height: 0; }
+@container (max-width: 640px) {
+  .image-diff { flex-direction: column; }
+}
 .diff-pre {
   margin: 0;
   font-family: "FiraCode Nerd Font Mono", ui-monospace, Menlo, monospace;

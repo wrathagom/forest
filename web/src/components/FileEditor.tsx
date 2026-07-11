@@ -5,7 +5,7 @@ import { defaultKeymap, indentWithTab, history, historyKeymap } from "@codemirro
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { searchKeymap } from "@codemirror/search";
-import { fetchFile, writeFile } from "../api";
+import { fetchFile, writeFile, fileRawUrl } from "../api";
 import { loadLanguageExtension } from "../lib/language";
 import Markdown from "./Markdown";
 import EditorStatusBar, { type EditorStats } from "./EditorStatusBar";
@@ -278,9 +278,12 @@ export default function FileEditor(props: {
                 }
               >
                 <ImageViewer
-                  projectId={props.projectId}
-                  path={props.path}
-                  mtimeMs={(l() as { kind: "image"; mtimeMs: number }).mtimeMs}
+                  src={fileRawUrl(
+                    props.projectId,
+                    props.path,
+                    (l() as { kind: "image"; mtimeMs: number }).mtimeMs,
+                  )}
+                  alt={props.path}
                 />
               </Show>
             )}
