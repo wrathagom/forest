@@ -30,10 +30,21 @@ export default function InfoPane(props: {
   const activeTab = () => migrate(rawTab());
 
   const filesEnabled = () => props.expanded() && activeTab() === "files";
+  // The fetched project is carried alongside the entries. A resource holds its
+  // previous value while refetching, so on a project switch this is the only way
+  // to tell "project A's tree, still on screen" from "project B's tree". We render
+  // the panel only on a match, which also tears the panel down across a switch —
+  // its lazily-fetched entries and loaded/expanded-dir sets are per-project and
+  // must not survive into the next one. A same-key refetch (the 5s poll) keeps
+  // matching, so the panel and its expanded dirs are left alone.
   const [tree, { refetch: refetchTree }] = createResource(
     () => (filesEnabled() ? props.projectId : null),
-    async (key) => (key === null ? undefined : await fetchTree(key)),
+    async (key) => (key === null ? undefined : { projectId: key, ...(await fetchTree(key)) }),
   );
+  const treeForProject = () => {
+    const t = tree();
+    return t && t.projectId === props.projectId ? t : undefined;
+  };
   createEffect(() => {
     if (!filesEnabled()) return;
     const id = setInterval(() => void refetchTree(), 5000);
@@ -55,15 +66,17 @@ export default function InfoPane(props: {
             <MonitorPanel projectId={props.projectId} enabled={() => props.expanded() && activeTab() === "monitor"} />
           </Show>
           <Show when={activeTab() === "files"}>
-            <Show when={tree()?.entries} fallback={<div class="muted">loading…</div>}>
-              <FileTreePanel
-                projectId={props.projectId}
-                entries={tree()!.entries}
-                highlightedPaths={props.highlightedPaths()}
-                onOpenFile={props.onOpenFile}
-                onOpenDiff={props.onOpenDiff}
-                onOpenFileRight={props.onOpenFileRight}
-              />
+            <Show when={treeForProject()} fallback={<div class="muted">loading…</div>}>
+              {(t) => (
+                <FileTreePanel
+                  projectId={props.projectId}
+                  entries={t().entries}
+                  highlightedPaths={props.highlightedPaths()}
+                  onOpenFile={props.onOpenFile}
+                  onOpenDiff={props.onOpenDiff}
+                  onOpenFileRight={props.onOpenFileRight}
+                />
+              )}
             </Show>
           </Show>
           <Show when={activeTab() === "git"}>
