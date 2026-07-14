@@ -220,7 +220,14 @@ export class LiveAgentSessions {
   list(limit = 10): LiveEntry[] {
     return [...this.entries.values()]
       .filter((e) => e.parentSessionId === null)
-      .sort((a, b) => b.lastEventAt - a.lastEventAt)
+      .sort((a, b) => {
+        // Closed sessions sink to the far right, and are the first to be
+        // dropped once the limit is hit. Within each group, most recent first.
+        const aClosed = a.endedAt !== null;
+        const bClosed = b.endedAt !== null;
+        if (aClosed !== bClosed) return aClosed ? 1 : -1;
+        return b.lastEventAt - a.lastEventAt;
+      })
       .slice(0, limit);
   }
 }

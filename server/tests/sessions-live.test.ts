@@ -167,6 +167,37 @@ describe("LiveAgentSessions", () => {
     expect(live2.list(10)).toHaveLength(10);
   });
 
+  test("list sinks closed sessions to the end, most-recently-closed first", () => {
+    const live = new LiveAgentSessions();
+    // Two open sessions and two closed ones, interleaved in time.
+    live.applyHookEvent(ev({ agentSessionId: "open-old", event: "userpromptsubmit", at: 100 }));
+    live.applyHookEvent(ev({ agentSessionId: "closed-early", event: "sessionstart", at: 150 }));
+    live.applyHookEvent(ev({ agentSessionId: "closed-early", event: "sessionend", at: 200 }));
+    live.applyHookEvent(ev({ agentSessionId: "open-new", event: "userpromptsubmit", at: 300 }));
+    live.applyHookEvent(ev({ agentSessionId: "closed-late", event: "sessionstart", at: 350 }));
+    live.applyHookEvent(ev({ agentSessionId: "closed-late", event: "sessionend", at: 400 }));
+
+    // Open sessions first (recency desc), then closed (recency desc) at the far right.
+    expect(live.list().map((e) => e.agentSessionId)).toEqual([
+      "open-new",
+      "open-old",
+      "closed-late",
+      "closed-early",
+    ]);
+  });
+
+  test("list drops closed sessions before open ones once the limit is hit", () => {
+    const live = new LiveAgentSessions();
+    // One closed session that ended most recently, then two newer open sessions.
+    live.applyHookEvent(ev({ agentSessionId: "closed", event: "sessionstart", at: 100 }));
+    live.applyHookEvent(ev({ agentSessionId: "closed", event: "sessionend", at: 500 }));
+    live.applyHookEvent(ev({ agentSessionId: "open-a", event: "userpromptsubmit", at: 200 }));
+    live.applyHookEvent(ev({ agentSessionId: "open-b", event: "userpromptsubmit", at: 300 }));
+
+    // With room for 2, the closed session is dropped even though it ended latest.
+    expect(live.list(2).map((e) => e.agentSessionId)).toEqual(["open-b", "open-a"]);
+  });
+
   test("noteHeadlessRunStarted seeds a working entry with launchedVia=mobile", () => {
     const live = new LiveAgentSessions();
     live.noteHeadlessRunStarted({
