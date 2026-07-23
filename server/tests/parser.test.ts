@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseClaudeJsonlLine } from "../src/sessions/parser";
+import { parseAiTitleLine, parseClaudeJsonlLine } from "../src/sessions/parser";
 
 const fix = (name: string) =>
   readFileSync(join(import.meta.dir, "fixtures/claude-jsonl", name), "utf8").trim();
@@ -56,5 +56,24 @@ describe("parseClaudeJsonlLine", () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.reason).toMatch(/json|parse/i);
+  });
+});
+
+describe("parseAiTitleLine", () => {
+  test("ai-title line → session id + title", () => {
+    const out = parseAiTitleLine(fix("ai-title.jsonl"));
+    expect(out).toEqual({ session_id: "sid-test-1", title: "Sync claude.ai conversations" });
+  });
+
+  test("a normal user line → null", () => {
+    expect(parseAiTitleLine(fix("user-text.jsonl"))).toBeNull();
+  });
+
+  test("malformed line → null", () => {
+    expect(parseAiTitleLine(fix("malformed.jsonl"))).toBeNull();
+  });
+
+  test("ai-title with a blank title → null", () => {
+    expect(parseAiTitleLine('{"type":"ai-title","aiTitle":"   ","sessionId":"s1"}')).toBeNull();
   });
 });

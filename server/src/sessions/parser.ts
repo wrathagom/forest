@@ -199,7 +199,7 @@ export function parseClaudeJsonlLine(line: string): ParseResult {
     }
   }
 
-  if (type === "summary" || type === "compact") {
+  if (type === "compact") {
     events.push({
       session_id: sessionId,
       kind: "compacted",
@@ -218,4 +218,25 @@ export function parseClaudeJsonlLine(line: string): ParseResult {
     fts: [{ uuid, text: toFtsText(content) }],
     unrecognized,
   };
+}
+
+export type AiTitle = { session_id: string; title: string };
+
+/**
+ * Claude Code emits `{"type":"ai-title","aiTitle":…,"sessionId":…}` lines. They
+ * carry no cwd/timestamp, so `parseClaudeJsonlLine` rejects them — this picks
+ * them up separately. Returns null for every other kind of line.
+ */
+export function parseAiTitleLine(line: string): AiTitle | null {
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (raw?.type !== "ai-title") return null;
+  const sessionId = typeof raw.sessionId === "string" ? raw.sessionId : null;
+  const title = typeof raw.aiTitle === "string" ? raw.aiTitle.trim() : "";
+  if (!sessionId || !title) return null;
+  return { session_id: sessionId, title };
 }
