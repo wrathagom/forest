@@ -150,7 +150,12 @@ export class SessionSummarizer {
     this.killGraceMs = deps.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
     this.maxConcurrent = deps.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
     this.maxQueue = deps.maxQueue ?? DEFAULT_MAX_QUEUE;
-    this.log = deps.log ?? (() => {});
+    // Logging happens in the window between taking a concurrency slot and the
+    // try/finally that gives it back, so a throwing logger would leak a slot.
+    const rawLog = deps.log ?? (() => {});
+    this.log = (level, msg, meta) => {
+      try { rawLog(level, msg, meta); } catch { /* never let logging fail a run */ }
+    };
   }
 
   /** Where summarizer runs execute — outside any scanned project, so their own

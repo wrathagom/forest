@@ -161,7 +161,16 @@ const summarizer = new SessionSummarizer({
   claudeConfigDirs: configDirs,
   log,
 });
-mkdirSync(summarizer.summarizerCwd(), { recursive: true });
+// Best effort, like installHooksIfEnabled() below: an optional feature failing
+// to create its scratch dir must not stop the server from starting. Runs
+// without it fail at spawn (a missing cwd), which is now a non-cached error.
+try {
+  mkdirSync(summarizer.summarizerCwd(), { recursive: true });
+} catch (err) {
+  log("warn", "summarizer: could not create its run dir", {
+    dir: summarizer.summarizerCwd(), error: (err as Error).message,
+  });
+}
 
 function shutdown(): void {
   try { runner.shutdown(); } catch { /* ignore */ }
@@ -230,7 +239,6 @@ startServer({
       liveSessions,
       projectName: (id) => listVisibleProjects(db).find((p) => p.id === id)?.name ?? null,
       summarizer,
-      summarizerCwd: () => summarizer.summarizerCwd(),
     }),
     ...sessionsOverviewRoutes({ vault }),
     ...worktreeRoutes(),
