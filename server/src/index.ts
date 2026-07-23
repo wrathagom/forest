@@ -44,6 +44,7 @@ import { discoverClaudeConfigDirs } from "./sessions/config-dirs";
 import { LiveAgentSessions } from "./sessions/live";
 import { makeDismissalStore } from "./store/dismissals";
 import { AgentRunner } from "./sessions/runner";
+import { SessionSummarizer } from "./sessions/summarizer";
 import { agentSessionsRoutes } from "./routes/agent-sessions";
 import { sessionsOverviewRoutes } from "./routes/sessions-overview";
 import { worktreeRoutes } from "./routes/worktrees";
@@ -154,8 +155,17 @@ const runner = new AgentRunner({
   log,
 });
 
+const summarizer = new SessionSummarizer({
+  vault,
+  dataDir: dataDir(),
+  claudeConfigDirs: configDirs,
+  log,
+});
+mkdirSync(summarizer.summarizerCwd(), { recursive: true });
+
 function shutdown(): void {
   try { runner.shutdown(); } catch { /* ignore */ }
+  try { summarizer.shutdown(); } catch { /* ignore */ }
 }
 process.on("SIGINT", () => { shutdown(); process.exit(0); });
 process.on("SIGTERM", () => { shutdown(); process.exit(0); });
@@ -181,6 +191,7 @@ function scanAllProfiles(reason: string) {
     vault,
     configDirs: configDirs(),
     projects: listVisibleProjects(db).map((p) => ({ id: p.id, path: p.path })),
+    excludeCwd: summarizer.summarizerCwd(),
   })
     .then((r) => log("info", `agent-sessions: ${reason}`, r))
     .catch((err) => log("warn", `agent-sessions: ${reason} failed`, { error: (err as Error).message }));
@@ -218,6 +229,8 @@ startServer({
       claudeConfigDirs: configDirs,
       liveSessions,
       projectName: (id) => listVisibleProjects(db).find((p) => p.id === id)?.name ?? null,
+      summarizer,
+      summarizerCwd: () => summarizer.summarizerCwd(),
     }),
     ...sessionsOverviewRoutes({ vault }),
     ...worktreeRoutes(),

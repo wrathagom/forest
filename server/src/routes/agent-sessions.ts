@@ -5,6 +5,7 @@ import { scanClaudeProjects, classifyCwd } from "../sessions/scanner";
 import { relocateTranscript } from "../sessions/transcript-relocate";
 import type { LiveAgentSessions } from "../sessions/live";
 import type { ClaudeConfigDir } from "../sessions/config-dirs";
+import type { SessionSummarizer } from "../sessions/summarizer";
 
 export type RouteDeps = {
   vault: Vault;
@@ -12,6 +13,9 @@ export type RouteDeps = {
   claudeConfigDirs: () => ClaudeConfigDir[];
   liveSessions?: LiveAgentSessions;
   projectName?: (id: string) => string | null;
+  summarizer?: SessionSummarizer;
+  /** Absolute cwd of the summarizer's own runs, excluded from ingest scans. */
+  summarizerCwd?: () => string;
 };
 
 export function agentSessionsRoutes(deps: RouteDeps): Route[] {
@@ -40,6 +44,7 @@ export function agentSessionsRoutes(deps: RouteDeps): Route[] {
             projects,
             onlySessionIds: new Set([body.session_id]),
             source,
+            excludeCwd: deps.summarizerCwd?.(),
           });
           sessionsTouched = scan.sessionsTouched;
         } catch (err) {
@@ -119,6 +124,25 @@ export function agentSessionsRoutes(deps: RouteDeps): Route[] {
         } catch (err) {
           return badRequest((err as Error).message);
         }
+      },
+    },
+    {
+      // IMPORTANT: must be registered before the /api/agent-sessions/:sid route
+      // below, whose `([^/]+)` would otherwise claim this path first.
+      method: "GET",
+      pattern: /^\/api\/agent-sessions\/([^/]+)\/summary$/,
+      paramNames: ["sid"],
+      handler: (ctx) =>
+        json(deps.summarizer ? deps.summarizer.status(ctx.params.sid!) : { status: "absent" }),
+    },
+    {
+      method: "POST",
+      pattern: /^\/api\/agent-sessions\/([^/]+)\/summary$/,
+      paramNames: ["sid"],
+      handler: async (ctx) => {
+        if (!deps.summarizer) return json({ status: "absent" });
+        const body = (await ctx.request.json().catch(() => null)) as { force?: boolean } | null;
+        return json(await deps.summarizer.request(ctx.params.sid!, { force: body?.force === true }));
       },
     },
     {
