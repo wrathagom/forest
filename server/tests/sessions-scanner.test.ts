@@ -74,3 +74,62 @@ describe("scanClaudeProjects", () => {
     expect(r.filesProcessed).toBe(0);
   });
 });
+
+function aiTitleLine(sid: string, title: string) {
+  return JSON.stringify({ type: "ai-title", aiTitle: title, sessionId: sid });
+}
+
+describe("scanClaudeProjects: ai-title ingestion", () => {
+  test("ingesting a transcript with an ai-title line stores it on the session row", async () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    const cfg = join(tmp, ".claude");
+    const sid = "sid-title-1";
+    writeFixture(
+      join(cfg, "projects", "-tmp-proj", `${sid}.jsonl`),
+      [line(sid, "/tmp/proj"), aiTitleLine(sid, "Fix the parser")],
+      new Date(1_000_000_000_000),
+    );
+    const configDirs = [{ path: cfg, profile: "default" }];
+
+    await scanClaudeProjects({ db, vault: v, configDirs, projects: [] });
+    expect(v.getSession(sid)?.title).toBe("Fix the parser");
+  });
+
+  test("when several ai-title lines are present, the last one wins", async () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    const cfg = join(tmp, ".claude");
+    const sid = "sid-title-2";
+    writeFixture(
+      join(cfg, "projects", "-tmp-proj", `${sid}.jsonl`),
+      [
+        line(sid, "/tmp/proj"),
+        aiTitleLine(sid, "Draft title"),
+        aiTitleLine(sid, "Better title"),
+        aiTitleLine(sid, "Final title"),
+      ],
+      new Date(1_000_000_000_000),
+    );
+    const configDirs = [{ path: cfg, profile: "default" }];
+
+    await scanClaudeProjects({ db, vault: v, configDirs, projects: [] });
+    expect(v.getSession(sid)?.title).toBe("Final title");
+  });
+
+  test("an ai-title line whose sessionId doesn't match the file's session is ignored", async () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    const cfg = join(tmp, ".claude");
+    const sid = "sid-title-3";
+    writeFixture(
+      join(cfg, "projects", "-tmp-proj", `${sid}.jsonl`),
+      [line(sid, "/tmp/proj"), aiTitleLine("some-other-session", "Wrong session's title")],
+      new Date(1_000_000_000_000),
+    );
+    const configDirs = [{ path: cfg, profile: "default" }];
+
+    await scanClaudeProjects({ db, vault: v, configDirs, projects: [] });
+    expect(v.getSession(sid)?.title).toBeNull();
+  });
+});

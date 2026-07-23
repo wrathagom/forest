@@ -86,8 +86,12 @@ async function ingestJsonlFile(
   let aiTitle: string | null = null;
 
   for (const line of lines) {
-    const titleLine = parseAiTitleLine(line);
-    if (titleLine) aiTitle = titleLine.title;
+    const aiTitleRecord = parseAiTitleLine(line);
+    // Defensive: sessionId is the authoritative one derived from the
+    // transcript's filename. A checked sample of real transcripts never
+    // showed an ai-title line's sessionId diverge from its file, but this
+    // guards against silently attributing a title to the wrong session.
+    if (aiTitleRecord && aiTitleRecord.session_id === sessionId) aiTitle = aiTitleRecord.title;
     const out = parseClaudeJsonlLine(line);
     if (!out.ok) continue; // unrecognized lines are silently dropped here
     if (!firstSession) firstSession = out;
