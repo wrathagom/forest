@@ -35,6 +35,27 @@ export type SessionRow = {
   title: string | null;
 };
 
+/** Only terminal outcomes are stored, so status is 'ok' or 'error' — never
+ *  'pending'/'absent'/'skipped', which the API derives at request time. */
+export type SummaryRow = {
+  session_id: string;
+  summary: string | null;
+  moments: string; // JSON: Array<{uuid, label}>
+  model: string | null;
+  status: "ok" | "error";
+  error: string | null;
+  generated_at: number;
+  source_last_activity: number;
+  source_message_count: number;
+};
+
+export type DigestMessageRow = {
+  uuid: string | null;
+  role: string;
+  content: string;
+  timestamp: number;
+};
+
 export type TokenBucket = { input: number; output: number; cache: number };
 export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, number> };
 export type TokensByProjectRow = TokenBucket & {
@@ -645,5 +666,49 @@ export class Vault {
       .all(limit);
     this.refreshCwdExists(rows);
     return rows;
+  }
+
+  getSummary(sessionId: string): SummaryRow | undefined {
+    return this.db
+      .query<SummaryRow, [string]>(
+        `SELECT session_id, summary, moments, model, status, error,
+                generated_at, source_last_activity, source_message_count
+           FROM agent_session_summaries WHERE session_id = ?`,
+      )
+      .get(sessionId) ?? undefined;
+  }
+
+  putSummary(row: SummaryRow): void {
+    this.db
+      .query(
+        `INSERT OR REPLACE INTO agent_session_summaries (
+            session_id, summary, moments, model, status, error,
+            generated_at, source_last_activity, source_message_count
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.session_id, row.summary, row.moments, row.model, row.status,
+        row.error, row.generated_at, row.source_last_activity, row.source_message_count,
+      );
+  }
+
+  countMessages(sessionId: string): number {
+    return (
+      this.db
+        .query<{ n: number }, [string]>(
+          "SELECT COUNT(*) AS n FROM agent_messages WHERE session_id = ?",
+        )
+        .get(sessionId)?.n ?? 0
+    );
+  }
+
+  messagesForDigest(sessionId: string): DigestMessageRow[] {
+    return this.db
+      .query<DigestMessageRow, [string]>(
+        `SELECT uuid, role, content, timestamp
+           FROM agent_messages WHERE session_id = ?
+          ORDER BY timestamp ASC, id ASC`,
+      )
+      .all(sessionId);
   }
 }
