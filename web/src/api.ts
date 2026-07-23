@@ -377,6 +377,7 @@ export type AgentSessionRow = {
   message_count: number;
   first_user_msg: string | null;
   profile: string | null;
+  title: string | null;
   snippet?: string;
 };
 
@@ -384,6 +385,7 @@ export type AgentSessionDetail = {
   session: AgentSessionRow;
   messages: Array<{
     id: number;
+    uuid: string | null;
     role: string;
     content: string;
     timestamp: number;

@@ -73,7 +73,7 @@ export default function SessionTranscript(props: {
           <ol class="session-transcript-body">
             <For each={visibleMessages()}>
               {({ msg, blocks }) => (
-                <li class={`msg msg-${msg.role}`}>
+                <li class={`msg msg-${msg.role}`} data-msg-uuid={msg.uuid ?? undefined}>
                   <span class="muted msg-role">{msg.role}</span>
                   <MessageBlocks blocks={blocks} />
                 </li>

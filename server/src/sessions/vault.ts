@@ -83,6 +83,7 @@ export type SessionDetail = {
   session: SessionRow;
   messages: Array<{
     id: number;
+    uuid: string | null;
     role: string;
     content: string;
     timestamp: number;
@@ -567,7 +568,7 @@ export class Vault {
     this.refreshCwdExists([session]);
     const messages = this.db
       .query<SessionDetail["messages"][number], [string]>(
-        `SELECT id, role, content, timestamp, model,
+        `SELECT id, uuid, role, content, timestamp, model,
                 input_tokens, cache_create_tokens, cache_read_tokens,
                 output_tokens, stop_reason
            FROM agent_messages WHERE session_id = ? ORDER BY timestamp ASC, id ASC`,

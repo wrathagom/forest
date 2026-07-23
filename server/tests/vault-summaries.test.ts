@@ -121,3 +121,16 @@ describe("summary storage", () => {
     expect(rows[0]!.content).toBe("first");
   });
 });
+
+describe("getSessionDetail", () => {
+  test("includes each message's uuid so the UI can anchor to it", () => {
+    seedSession("s1");
+    vault.upsertMessages(
+      [{ session_id: "s1", uuid: "u-anchor", role: "user", content: "{}", timestamp: 1,
+         model: null, input_tokens: null, cache_create_tokens: null,
+         cache_read_tokens: null, output_tokens: null, stop_reason: null }],
+      [],
+    );
+    expect(vault.getSessionDetail("s1")!.messages[0]!.uuid).toBe("u-anchor");
+  });
+});
