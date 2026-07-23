@@ -90,3 +90,63 @@ describe("parseSummaryOutput", () => {
     expect(out.moments).toEqual([]);
   });
 });
+
+describe("parseSummaryOutput: brace-extraction fallback for recoverable malformed output", () => {
+  test("leading prose before a fenced block still parses", () => {
+    const raw = 'Here is the JSON:\n```json\n{"summary":"s","moments":[{"uuid":"u1","label":"a"}]}\n```';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.summary).toBe("s");
+    expect(out.moments).toEqual([{ uuid: "u1", label: "a" }]);
+  });
+
+  test("leading prose before bare (unfenced) JSON still parses", () => {
+    const raw = 'Sure thing, here you go: {"summary":"s","moments":[{"uuid":"u1","label":"a"}]}';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.summary).toBe("s");
+    expect(out.moments).toEqual([{ uuid: "u1", label: "a" }]);
+  });
+
+  test("trailing prose after a fenced block still parses", () => {
+    const raw = '```json\n{"summary":"s","moments":[{"uuid":"u1","label":"a"}]}\n```\nHope that helps!';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.summary).toBe("s");
+    expect(out.moments).toEqual([{ uuid: "u1", label: "a" }]);
+  });
+
+  test("uppercase ```JSON fence tag still parses", () => {
+    const raw = '```JSON\n{"summary":"s","moments":[{"uuid":"u1","label":"a"}]}\n```';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.summary).toBe("s");
+    expect(out.moments).toEqual([{ uuid: "u1", label: "a" }]);
+  });
+
+  test("~~~ fences still parse via the brace-extraction fallback", () => {
+    const raw = '~~~json\n{"summary":"s","moments":[{"uuid":"u1","label":"a"}]}\n~~~';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.summary).toBe("s");
+    expect(out.moments).toEqual([{ uuid: "u1", label: "a" }]);
+  });
+
+  test("genuinely non-JSON prose still fails even with the fallback", () => {
+    const out = parseSummaryOutput("I'm afraid I can't do that", valid);
+    expect(out.ok).toBe(false);
+  });
+
+  test("a JSON string value containing a ``` sequence still parses (regression guard)", () => {
+    const raw = '```json\n{"summary":"has ``` inside the text","moments":[]}\n```';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.summary).toBe("has ``` inside the text");
+  });
+});
