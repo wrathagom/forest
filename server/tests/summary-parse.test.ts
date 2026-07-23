@@ -31,11 +31,17 @@ describe("resultTextFromEnvelope", () => {
     expect(out.ok).toBe(false);
     if (!out.ok) expect(out.reason).toContain("Not logged in");
   });
-  test("non-JSON stdout → failure", () => {
-    expect(resultTextFromEnvelope("segfault").ok).toBe(false);
+  test("non-JSON stdout → failure with a user-facing reason", () => {
+    const out = resultTextFromEnvelope("segfault");
+    expect(out.ok).toBe(false);
+    // Pinned exact copy: this is rendered verbatim in the UI, so a future
+    // wording change should be a deliberate edit here, not a silent regression.
+    if (!out.ok) expect(out.reason).toBe("Claude returned malformed output");
   });
-  test("empty result text → failure", () => {
-    expect(resultTextFromEnvelope(JSON.stringify({ result: "   " })).ok).toBe(false);
+  test("empty result text → failure with a user-facing reason", () => {
+    const out = resultTextFromEnvelope(JSON.stringify({ result: "   " }));
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toMatch(/no output/i);
   });
 });
 
@@ -81,12 +87,34 @@ describe("parseSummaryOutput", () => {
     expect(out.moments).toEqual([]);
   });
 
-  test("garbage → failure", () => {
-    expect(parseSummaryOutput("I'm afraid I can't do that", valid).ok).toBe(false);
+  test("garbage with no braces at all → failure with the no-JSON-object reason", () => {
+    const out = parseSummaryOutput("I'm afraid I can't do that", valid);
+    expect(out.ok).toBe(false);
+    // Pinned exact copy: this is the distinct "no braces found" message from
+    // extractJsonPayload, threaded through the catch instead of being
+    // collapsed to a generic string — the whole point of the fix. It's also
+    // rendered verbatim in the UI, so wording changes should be deliberate.
+    if (!out.ok) expect(out.reason).toBe("Claude's reply contained no JSON object");
   });
 
-  test("missing summary → failure", () => {
-    expect(parseSummaryOutput('{"moments":[]}', valid).ok).toBe(false);
+  test("braces present but the contents are still not valid JSON → failure with the generic reason", () => {
+    // Has a `{` and a `}`, so it skips the no-braces case, but the sliced
+    // substring itself doesn't parse — distinct from the garbage-with-no-braces case above.
+    const out = parseSummaryOutput('Here is my answer for {the session}: {"summary":"s","moments":[]}', valid);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toBe("Claude's reply wasn't valid JSON");
+  });
+
+  test("valid JSON that isn't an object → failure with a user-facing reason", () => {
+    const out = parseSummaryOutput("42", valid);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toMatch(/JSON object/i);
+  });
+
+  test("missing summary → failure with a user-facing reason", () => {
+    const out = parseSummaryOutput('{"moments":[]}', valid);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toMatch(/summary/i);
   });
 
   test("missing moments key → summary with zero moments", () => {
@@ -174,6 +202,7 @@ describe("parseSummaryOutput: brace-extraction fallback for recoverable malforme
   test("genuinely non-JSON prose still fails even with the fallback", () => {
     const out = parseSummaryOutput("I'm afraid I can't do that", valid);
     expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.reason).toMatch(/JSON/i);
   });
 
   test("a JSON string value containing a ``` sequence still parses (regression guard)", () => {

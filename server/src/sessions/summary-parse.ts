@@ -8,6 +8,12 @@ export type EnvelopeParse = { ok: true; text: string } | { ok: false; reason: st
 
 const LABEL_MAX = 80;
 
+// These strings are persisted to the database and rendered verbatim in the UI
+// as the error state's message — write them for a human reading the summary
+// panel, not for a log line.
+const NOT_JSON = "Claude's reply wasn't valid JSON";
+const NO_JSON_OBJECT = "Claude's reply contained no JSON object";
+
 /** Haiku fence-wraps its JSON despite being told not to — measured, not assumed. */
 export function stripFences(raw: string): string {
   const t = raw.trim();
@@ -28,6 +34,10 @@ export function stripFences(raw: string): string {
  *     without weakening the anchored fence match above, which must stay
  *     anchored so an embedded ``` inside a JSON string value doesn't get
  *     mistaken for the closing fence.
+ *
+ * Throws an Error whose `message` is already the user-facing string the
+ * caller should surface — the no-braces-at-all case is distinguishable from
+ * "found braces but the contents still weren't valid JSON".
  */
 function extractJsonPayload(raw: string): unknown {
   try {
@@ -36,9 +46,13 @@ function extractJsonPayload(raw: string): unknown {
     // fall through to brace extraction
   }
   const first = raw.indexOf("{");
-  if (first === -1) throw new Error("no JSON object found in model output");
+  if (first === -1) throw new Error(NO_JSON_OBJECT);
   const last = raw.lastIndexOf("}");
-  return JSON.parse(raw.slice(first, last + 1));
+  try {
+    return JSON.parse(raw.slice(first, last + 1));
+  } catch {
+    throw new Error(NOT_JSON);
+  }
 }
 
 /** Unwrap `claude --output-format json`'s envelope to the model's own text. */
@@ -47,15 +61,15 @@ export function resultTextFromEnvelope(stdout: string): EnvelopeParse {
   try {
     env = JSON.parse(stdout);
   } catch {
-    return { ok: false, reason: "claude did not return JSON" };
+    return { ok: false, reason: "Claude returned malformed output" };
   }
-  if (!env || typeof env !== "object") return { ok: false, reason: "claude did not return JSON" };
+  if (!env || typeof env !== "object") return { ok: false, reason: "Claude returned malformed output" };
   const e = env as Record<string, unknown>;
   const text = typeof e.result === "string" ? e.result : "";
   if (e.is_error === true) {
     return { ok: false, reason: text.trim() || "claude reported an error" };
   }
-  if (!text.trim()) return { ok: false, reason: "claude returned no result text" };
+  if (!text.trim()) return { ok: false, reason: "Claude returned no output" };
   return { ok: true, text };
 }
 
@@ -68,14 +82,14 @@ export function parseSummaryOutput(raw: string, validUuids: Set<string>): Summar
   let obj: unknown;
   try {
     obj = extractJsonPayload(raw);
-  } catch {
-    return { ok: false, reason: "model output was not JSON" };
+  } catch (err) {
+    return { ok: false, reason: (err as Error).message };
   }
-  if (!obj || typeof obj !== "object") return { ok: false, reason: "model output was not an object" };
+  if (!obj || typeof obj !== "object") return { ok: false, reason: "Claude's reply wasn't a JSON object" };
   const o = obj as Record<string, unknown>;
 
   const summary = typeof o.summary === "string" ? o.summary.trim() : "";
-  if (!summary) return { ok: false, reason: "model output had no summary" };
+  if (!summary) return { ok: false, reason: "Claude's reply had no summary field" };
 
   const moments: Moment[] = [];
   if (Array.isArray(o.moments)) {
