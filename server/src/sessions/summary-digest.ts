@@ -5,18 +5,26 @@ export type Digest = {
   text: string;
   /** uuids actually present in `text` — the whitelist for anchor validation. */
   uuids: Set<string>;
+  /** Count of distinct citable messages in `text` — what a later task's
+   *  "is this session worth summarizing" decision keys off. */
   includedCount: number;
 };
 
 const PER_MESSAGE_MAX = 1200;
 const TOTAL_MAX = 60_000;
+// The tail favors the ending over the opening: how a session concluded is
+// more useful to a summary than how it started, so the tail gets the larger
+// share of the budget when both can't fit.
 const HEAD_FRACTION = 0.4;
 const TOOL_ARG_MAX = 80;
 
 function firstStringArg(input: unknown): string {
   if (!input || typeof input !== "object") return "";
   const i = input as Record<string, unknown>;
-  for (const key of ["command", "file_path", "path", "pattern", "query", "url", "description", "skill"]) {
+  // Order matters: `path` must come after `pattern` or a Grep/Glob call that
+  // supplies both (the common case) would render the directory it searched
+  // instead of what it searched for — the one field worth summarizing.
+  for (const key of ["command", "file_path", "notebook_path", "pattern", "path", "query", "url", "description", "skill"]) {
     const v = i[key];
     if (typeof v === "string" && v.trim()) {
       const line = v.trim().split("\n")[0]!;
@@ -33,11 +41,15 @@ function resultSize(content: unknown): number {
 }
 
 /**
- * Pull displayable text out of a stored JSONL line. Mirrors the frontend's
- * `parseMessageContent` filter so the model can only ever cite a message that
- * will have a DOM node to scroll to. Tool *results* are deliberately reduced to
- * status and size — their bodies are most of the token weight and none of the
- * meaning.
+ * Pull displayable text out of a stored JSONL line. Never more permissive
+ * than the frontend's `parseMessageContent` filter (see
+ * `web/src/lib/transcript.ts`), so the model can only ever cite a message
+ * that will have a DOM node to scroll to — it may be stricter (e.g. it drops
+ * unknown block types that the frontend still renders as a JSON fallback),
+ * but it must never treat something as displayable that the frontend
+ * wouldn't render. See `tests/digest-frontend-parity.test.ts`. Tool
+ * *results* are deliberately reduced to status and size — their bodies are
+ * most of the token weight and none of the meaning.
  */
 export function displayText(rawLine: string): string {
   let parsed: unknown;
@@ -83,6 +95,10 @@ export function renderDigest(messages: DigestMessageRow[]): Digest {
   let kept = lines;
 
   if (total > TOTAL_MAX) {
+    // Two passes: fill `head` from the start up to `headBudget`, then
+    // backfill `tail` from the end within what's left of the total budget,
+    // stopping once it reaches `head` — nothing `head` already claimed is
+    // re-included, so the two never overlap.
     const headBudget = Math.floor(TOTAL_MAX * HEAD_FRACTION);
     const head: typeof lines = [];
     let used = 0;

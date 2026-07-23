@@ -127,6 +127,30 @@ describe("renderDigest", () => {
   });
 });
 
+describe("firstStringArg key priority", () => {
+  test("Grep with both pattern and path renders the pattern, not the path", () => {
+    const d = renderDigest([
+      msg("u1", [{ type: "tool_use", name: "Grep", input: { pattern: "TODO|FIXME", path: "/Users/me/project/src" } }], 1, "assistant"),
+    ]);
+    expect(d.text).toContain("<tool_use Grep TODO|FIXME>");
+    expect(d.text).not.toContain("/Users/me/project/src");
+  });
+
+  test("NotebookEdit renders its notebook_path", () => {
+    const d = renderDigest([
+      msg("u1", [{ type: "tool_use", name: "NotebookEdit", input: { notebook_path: "/Users/me/analysis.ipynb" } }], 1, "assistant"),
+    ]);
+    expect(d.text).toContain("<tool_use NotebookEdit /Users/me/analysis.ipynb>");
+  });
+
+  test("Bash still renders its command", () => {
+    const d = renderDigest([
+      msg("u1", [{ type: "tool_use", name: "Bash", input: { command: "ls -la" } }], 1, "assistant"),
+    ]);
+    expect(d.text).toContain("<tool_use Bash ls -la>");
+  });
+});
+
 describe("buildPrompt", () => {
   test("includes the digest and demands verbatim uuids", () => {
     const p = buildPrompt("[u1] user: hi");
