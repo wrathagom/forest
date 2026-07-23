@@ -1,10 +1,21 @@
-import { For, Show, createResource, createMemo, createSignal } from "solid-js";
+import { For, Show, createResource, createMemo, createSignal, onCleanup } from "solid-js";
 import { getAgentSessionDetail, type AgentSessionDetail } from "../api";
 import MessageBlocks from "./MessageBlocks";
 import SessionSummary from "./SessionSummary";
 import { parseMessageContent } from "../lib/transcript";
 
 export type ResumeKind = "default" | "in-main" | "recreate-worktree";
+
+/** Must stay in step with the msg-flash animation duration in styles.css. */
+const FLASH_MS = 1200;
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
 
 export default function SessionTranscript(props: {
   sessionId: string;
@@ -15,6 +26,8 @@ export default function SessionTranscript(props: {
   const [resumeOpen, setResumeOpen] = createSignal(false);
 
   let bodyRef: HTMLOListElement | undefined;
+  let flashEl: HTMLElement | undefined;
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
   // The digest only ever includes messages that render, so a miss here means the
   // message was filtered out after the summary was made — do nothing rather than
@@ -25,10 +38,33 @@ export default function SessionTranscript(props: {
     if (!/^[A-Za-z0-9-]+$/.test(uuid)) return;
     const el = bodyRef?.querySelector<HTMLElement>(`[data-msg-uuid="${uuid}"]`);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+
+    // Send focus to the destination as well, so keyboard and screen-reader users
+    // land there too and Tab continues from the message, not from the chip.
+    el.setAttribute("tabindex", "-1");
+    el.focus({ preventScroll: true });
+
+    // Re-adding a class the element already carries animates nothing, so restart
+    // the flash explicitly — and give this click its own removal deadline rather
+    // than letting an earlier one cut it short.
+    if (flashTimer !== undefined) clearTimeout(flashTimer);
+    if (flashEl && flashEl !== el) flashEl.classList.remove("msg-flash");
+    el.classList.remove("msg-flash");
+    void el.offsetWidth; // force reflow so the animation replays
     el.classList.add("msg-flash");
-    setTimeout(() => el.classList.remove("msg-flash"), 1200);
+    flashEl = el;
+    flashTimer = setTimeout(() => {
+      el.classList.remove("msg-flash");
+      flashEl = undefined;
+      flashTimer = undefined;
+    }, FLASH_MS);
   }
+
+  onCleanup(() => {
+    if (flashTimer !== undefined) clearTimeout(flashTimer);
+  });
 
   const totals = createMemo(() => {
     const d = data();
