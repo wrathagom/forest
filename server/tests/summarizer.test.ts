@@ -272,6 +272,89 @@ describe("job control", () => {
     }
   });
 
+  // The cap must survive the FIRST completion. Draining the queue by reading
+  // `running.size` released every waiter at once, because the size doesn't grow
+  // until each released continuation resumes a microtask later.
+  test("the cap holds beyond the first completion", async () => {
+    const ids = ["s1", "s2", "s3", "s4", "s5", "s6"];
+    for (const id of ids) seed(id, 10);
+    let inFlight = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+    const spawn: SummarizerSpawnFn = () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      let resolve!: (v: { code: number; stdout: string; stderr: string }) => void;
+      const exited = new Promise<{ code: number; stdout: string; stderr: string }>((r) => { resolve = r; });
+      let released = false;
+      releases.push(() => {
+        if (released) return;
+        released = true;
+        inFlight--;
+        resolve({ code: 0, stdout: envelope('{"summary":"done","moments":[]}'), stderr: "" });
+      });
+      return { exited, kill: () => {} };
+    };
+    const s = make(spawn, { maxConcurrent: 2 });
+    const all = Promise.all(ids.map((id) => s.request(id)));
+    for (let i = 0; i < 20; i++) {
+      for (const r of [...releases]) r();
+      await new Promise((r) => setTimeout(r, 1));
+    }
+    await all;
+    expect(releases).toHaveLength(6);
+    expect(peak).toBe(2);
+  });
+
+  // Admission is claimed at request time, so a duplicate request for a session
+  // that is merely QUEUED is deduped too — not just one already spawned.
+  test("a session requested twice while queued only spawns once", async () => {
+    seed("a", 10); seed("b", 10);
+    const releases: Array<() => void> = [];
+    const spawn: SummarizerSpawnFn = () => {
+      let resolve!: (v: { code: number; stdout: string; stderr: string }) => void;
+      const exited = new Promise<{ code: number; stdout: string; stderr: string }>((r) => { resolve = r; });
+      releases.push(() => resolve({ code: 0, stdout: envelope('{"summary":"x","moments":[]}'), stderr: "" }));
+      return { exited, kill: () => {} };
+    };
+    const s = make(spawn, { maxConcurrent: 1 });
+    const pa = s.request("a"); // takes the only slot
+    const pb1 = s.request("b"); // queued
+    const pb2 = s.request("b"); // must NOT enqueue a second run for b
+    await Promise.resolve();
+    expect(releases).toHaveLength(1);
+    expect((await pb2).status).toBe("pending");
+    for (let i = 0; i < 10; i++) {
+      for (const r of [...releases]) r();
+      await new Promise((r) => setTimeout(r, 1));
+    }
+    await Promise.all([pa, pb1, pb2]);
+    expect(releases).toHaveLength(2); // a and b — never b twice
+  });
+
+  test("shutdown settles queued requests without spawning them", async () => {
+    seed("a", 10); seed("b", 10);
+    let spawns = 0;
+    const spawn: SummarizerSpawnFn = () => {
+      spawns++;
+      return { exited: new Promise(() => {}), kill: () => {} };
+    };
+    const s = make(spawn, { maxConcurrent: 1 });
+    void s.request("a");
+    const queued = s.request("b");
+    await Promise.resolve();
+    expect(spawns).toBe(1);
+
+    s.shutdown();
+    // Timeout guard: a regression must fail this test, not hang the suite.
+    const outcome = await Promise.race([
+      queued.then(() => "settled"),
+      new Promise((r) => setTimeout(() => r("hung"), 250)),
+    ]);
+    expect(outcome).toBe("settled");
+    expect(spawns).toBe(1);
+  });
+
   // (b) The timeout path: no given test covered it.
   test("a run that overruns the timeout is killed and stored as an error", async () => {
     seed("s1", 10);
