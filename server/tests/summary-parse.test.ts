@@ -13,6 +13,12 @@ describe("stripFences", () => {
   test("leaves unfenced text alone", () => {
     expect(stripFences('  {"a":1}  ')).toBe('{"a":1}');
   });
+  // Must call stripFences directly, not via parseSummaryOutput: the brace-extraction
+  // fallback in parseSummaryOutput recovers the object even from a broken (e.g.
+  // unanchored/non-greedy) stripFences match, which would mask this regression.
+  test("embedded ``` inside a JSON string value does not truncate the match", () => {
+    expect(stripFences('```json\n{"a":"has ``` here"}\n```')).toBe('{"a":"has ``` here"}');
+  });
 });
 
 describe("resultTextFromEnvelope", () => {
@@ -85,6 +91,34 @@ describe("parseSummaryOutput", () => {
 
   test("missing moments key → summary with zero moments", () => {
     const out = parseSummaryOutput('{"summary":"s"}', valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.moments).toEqual([]);
+  });
+
+  test("an over-length label is clipped to 80 characters plus an ellipsis (81 chars total)", () => {
+    const longLabel = "x".repeat(120);
+    const raw = JSON.stringify({ summary: "s", moments: [{ uuid: "u1", label: longLabel }] });
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.moments).toHaveLength(1);
+    const label = out.moments[0]!.label;
+    expect(label).toBe("x".repeat(80) + "…");
+    expect(label.length).toBe(81);
+  });
+
+  test("a non-object entry inside moments is skipped", () => {
+    const raw = '{"summary":"s","moments":["not-an-object",{"uuid":"u1","label":"a"}]}';
+    const out = parseSummaryOutput(raw, valid);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.moments).toEqual([{ uuid: "u1", label: "a" }]);
+  });
+
+  test("a non-array moments value degrades to an empty list, not a failure", () => {
+    const raw = '{"summary":"s","moments":"not-an-array"}';
+    const out = parseSummaryOutput(raw, valid);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.moments).toEqual([]);
