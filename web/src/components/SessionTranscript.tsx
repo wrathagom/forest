@@ -1,6 +1,7 @@
 import { For, Show, createResource, createMemo, createSignal } from "solid-js";
 import { getAgentSessionDetail, type AgentSessionDetail } from "../api";
 import MessageBlocks from "./MessageBlocks";
+import SessionSummary from "./SessionSummary";
 import { parseMessageContent } from "../lib/transcript";
 
 export type ResumeKind = "default" | "in-main" | "recreate-worktree";
@@ -12,6 +13,22 @@ export default function SessionTranscript(props: {
   const [data] = createResource(() => props.sessionId, getAgentSessionDetail);
 
   const [resumeOpen, setResumeOpen] = createSignal(false);
+
+  let bodyRef: HTMLOListElement | undefined;
+
+  // The digest only ever includes messages that render, so a miss here means the
+  // message was filtered out after the summary was made — do nothing rather than
+  // scroll somewhere arbitrary.
+  function jumpTo(uuid: string): void {
+    // uuids are hex + dashes, so a plain attribute selector is safe here — and
+    // CSS.escape is not guaranteed present under jsdom in the test environment.
+    if (!/^[A-Za-z0-9-]+$/.test(uuid)) return;
+    const el = bodyRef?.querySelector<HTMLElement>(`[data-msg-uuid="${uuid}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("msg-flash");
+    setTimeout(() => el.classList.remove("msg-flash"), 1200);
+  }
 
   const totals = createMemo(() => {
     const d = data();
@@ -70,7 +87,13 @@ export default function SessionTranscript(props: {
               <button onclick={() => props.onResume("default", d())}>Resume</button>
             </Show>
           </header>
-          <ol class="session-transcript-body">
+          <SessionSummary
+            sessionId={props.sessionId}
+            title={d().session.title ?? null}
+            isLive={false}
+            onJump={jumpTo}
+          />
+          <ol class="session-transcript-body" ref={bodyRef}>
             <For each={visibleMessages()}>
               {({ msg, blocks }) => (
                 <li class={`msg msg-${msg.role}`} data-msg-uuid={msg.uuid ?? undefined}>

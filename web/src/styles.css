@@ -883,3 +883,70 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .dashboard-toolbar .sort-select { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.5rem; font: inherit; font-size: 0.85rem; }
 .dashboard-toolbar .sort-select:focus { outline: none; border-color: var(--accent); }
 .archived-tag { font-size: 0.65rem; padding: 0.05rem 0.45rem; border-radius: 3px; background: var(--bg-2); color: var(--fg-dim); border: 1px solid var(--border); text-transform: lowercase; letter-spacing: 0.04em; line-height: 1.5; }
+
+/* --- Session summary (atop the transcript) --- */
+.session-summary {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.session-summary-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.session-summary-text {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--fg);
+}
+.session-summary-moments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.session-moment {
+  background: rgba(110,231,183,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(110,231,183,0.3);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.session-moment:hover { background: rgba(110,231,183,0.18); }
+.session-summary-error,
+.session-summary-stale {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.session-summary-action {
+  background: var(--bg);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0.2rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.session-summary-action:hover { background: rgba(110,231,183,0.1); }
+.session-summary-pending {
+  font-size: 0.85rem;
+}
+.msg-flash {
+  animation: msg-flash 1.2s ease-out;
+}
+@keyframes msg-flash {
+  0% { background: rgba(110,231,183,0.25); }
+  100% { background: transparent; }
+}
