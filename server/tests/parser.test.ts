@@ -76,4 +76,16 @@ describe("parseAiTitleLine", () => {
   test("ai-title with a blank title → null", () => {
     expect(parseAiTitleLine('{"type":"ai-title","aiTitle":"   ","sessionId":"s1"}')).toBeNull();
   });
+
+  test("ai-title with a whitespace-only sessionId → null", () => {
+    expect(parseAiTitleLine('{"type":"ai-title","aiTitle":"x","sessionId":"   "}')).toBeNull();
+  });
+
+  test("ai-title with a missing sessionId → null", () => {
+    expect(parseAiTitleLine('{"type":"ai-title","aiTitle":"x"}')).toBeNull();
+  });
+
+  test("ai-title with a non-string sessionId → null", () => {
+    expect(parseAiTitleLine('{"type":"ai-title","aiTitle":"x","sessionId":42}')).toBeNull();
+  });
 });

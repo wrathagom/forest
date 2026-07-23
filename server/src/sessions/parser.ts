@@ -235,7 +235,10 @@ export function parseAiTitleLine(line: string): AiTitle | null {
     return null;
   }
   if (raw?.type !== "ai-title") return null;
-  const sessionId = typeof raw.sessionId === "string" ? raw.sessionId : null;
+  // Both fields are trimmed before the emptiness check below, so a
+  // whitespace-only sessionId (or aiTitle) is rejected rather than stored
+  // as a garbage database key. Keep them symmetric.
+  const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
   const title = typeof raw.aiTitle === "string" ? raw.aiTitle.trim() : "";
   if (!sessionId || !title) return null;
   return { session_id: sessionId, title };
