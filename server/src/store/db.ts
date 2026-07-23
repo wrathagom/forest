@@ -151,5 +151,6 @@ export function openDb(path: string): Database {
   addColumnIfMissing(db, "agent_sessions", "permission_mode", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "launched_via", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "profile", "TEXT");
+  addColumnIfMissing(db, "agent_sessions", "title", "TEXT");
   return db;
 }

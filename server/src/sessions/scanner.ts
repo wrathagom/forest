@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { Vault, type IngestSource } from "./vault";
-import { parseClaudeJsonlLine } from "./parser";
+import { parseClaudeJsonlLine, parseAiTitleLine } from "./parser";
 import type { ClaudeConfigDir } from "./config-dirs";
 
 export type ScanInput = {
@@ -83,8 +83,11 @@ async function ingestJsonlFile(
   const allToolCalls: Parameters<Vault["upsertToolCalls"]>[0] = [];
   const allToolResults: Parameters<Vault["applyToolResults"]>[0] = [];
   const allEvents: Parameters<Vault["appendEvents"]>[0] = [];
+  let aiTitle: string | null = null;
 
   for (const line of lines) {
+    const titleLine = parseAiTitleLine(line);
+    if (titleLine) aiTitle = titleLine.title;
     const out = parseClaudeJsonlLine(line);
     if (!out.ok) continue; // unrecognized lines are silently dropped here
     if (!firstSession) firstSession = out;
@@ -107,6 +110,7 @@ async function ingestJsonlFile(
     last_activity: Math.max(firstSession.session.last_activity, fileMtime),
     source: input.source ?? "scan",
     profile,
+    title: aiTitle,
   });
   input.vault.upsertMessages(allMessages, allFts);
   input.vault.upsertToolCalls(allToolCalls);

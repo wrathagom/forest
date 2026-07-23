@@ -32,6 +32,7 @@ export type SessionRow = {
   profile: string | null;
   permission_mode: string | null;
   launched_via: string | null;
+  title: string | null;
 };
 
 export type TokenBucket = { input: number; output: number; cache: number };
@@ -120,6 +121,7 @@ export class Vault {
     profile?: string | null;
     permission_mode?: string | null;
     launched_via?: string | null;
+    title?: string | null;
   }): void {
     const now = Date.now();
     this.db
@@ -127,8 +129,8 @@ export class Vault {
         `INSERT INTO agent_sessions (
             session_id, agent, project_id, cwd, worktree_label, branch,
             cwd_exists, parent_session_id, started_at, last_activity,
-            first_user_msg, profile, imported_at, source, permission_mode, launched_via
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            first_user_msg, profile, imported_at, source, permission_mode, launched_via, title
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(session_id) DO UPDATE SET
             project_id     = COALESCE(excluded.project_id, project_id),
             worktree_label = COALESCE(excluded.worktree_label, worktree_label),
@@ -140,7 +142,8 @@ export class Vault {
             profile        = COALESCE(excluded.profile, profile),
             source         = excluded.source,
             permission_mode = COALESCE(excluded.permission_mode, permission_mode),
-            launched_via    = COALESCE(excluded.launched_via, launched_via)`,
+            launched_via    = COALESCE(excluded.launched_via, launched_via),
+            title           = COALESCE(excluded.title, title)`,
       )
       .run(
         input.session_id,
@@ -159,6 +162,7 @@ export class Vault {
         input.source,
         input.permission_mode ?? null,
         input.launched_via ?? null,
+        input.title ?? null,
       );
   }
 
@@ -337,7 +341,7 @@ export class Vault {
     const sql =
       `SELECT s.session_id, s.agent, s.project_id, s.cwd, s.worktree_label, s.branch,
               s.cwd_exists, s.parent_session_id, s.started_at, s.last_activity,
-              s.message_count, s.first_user_msg, s.profile, s.permission_mode, s.launched_via,
+              s.message_count, s.first_user_msg, s.profile, s.permission_mode, s.launched_via, s.title,
               p.name AS project_name,
               COALESCE(t.input, 0)  AS input_tokens,
               COALESCE(t.output, 0) AS output_tokens,
@@ -477,7 +481,7 @@ export class Vault {
       .query<SessionRow, [string, number, number]>(
         `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
                 cwd_exists, parent_session_id, started_at, last_activity,
-                message_count, first_user_msg, profile, permission_mode, launched_via
+                message_count, first_user_msg, profile, permission_mode, launched_via, title
            FROM agent_sessions
           WHERE project_id = ?
           ORDER BY last_activity DESC
@@ -534,7 +538,7 @@ export class Vault {
       .query<SessionRow, [string]>(
         `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
                 cwd_exists, parent_session_id, started_at, last_activity,
-                message_count, first_user_msg, profile, permission_mode, launched_via
+                message_count, first_user_msg, profile, permission_mode, launched_via, title
            FROM agent_sessions WHERE session_id = ?`,
       )
       .get(sessionId);
@@ -573,7 +577,7 @@ export class Vault {
         `SELECT s.session_id, s.agent, s.project_id, s.cwd, s.worktree_label,
                 s.branch, s.cwd_exists, s.parent_session_id, s.started_at,
                 s.last_activity, s.message_count, s.first_user_msg, s.profile,
-                s.permission_mode, s.launched_via,
+                s.permission_mode, s.launched_via, s.title,
                 (SELECT snippet(agent_messages_fts, 2, '<mark>', '</mark>', '…', 8)
                    FROM agent_messages_fts
                   WHERE agent_messages_fts.session_id = s.session_id
@@ -598,7 +602,7 @@ export class Vault {
       .query<SessionRow, [string]>(
         `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
                 cwd_exists, parent_session_id, started_at, last_activity,
-                message_count, first_user_msg, profile, permission_mode, launched_via
+                message_count, first_user_msg, profile, permission_mode, launched_via, title
            FROM agent_sessions WHERE session_id = ?`,
       )
       .get(sessionId);
