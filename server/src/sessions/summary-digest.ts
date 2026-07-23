@@ -27,9 +27,9 @@ function firstStringArg(input: unknown): string {
 }
 
 function resultSize(content: unknown): number {
-  if (typeof content === "string") return content.length;
+  if (typeof content === "string") return Buffer.byteLength(content, "utf8");
   if (content === undefined || content === null) return 0;
-  return JSON.stringify(content).length;
+  return Buffer.byteLength(JSON.stringify(content), "utf8");
 }
 
 /**

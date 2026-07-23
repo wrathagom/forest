@@ -42,6 +42,49 @@ describe("renderDigest", () => {
     expect(d.text).toContain("<tool_result error 4b>");
   });
 
+  test("tool result byte count is UTF-8 bytes, not UTF-16 code units", () => {
+    const content = "🎉🎉🎉café";
+    const expectedBytes = Buffer.byteLength(content, "utf8");
+    // sanity: this string must actually expose the UTF-16/UTF-8 gap, or the
+    // assertion below wouldn't distinguish a correct fix from a broken one.
+    expect(expectedBytes).not.toBe(content.length);
+    const d = renderDigest([
+      msg("u1", [{ type: "tool_result", is_error: false, content }], 1),
+    ]);
+    expect(d.text).toContain(`<tool_result ok ${expectedBytes}b>`);
+  });
+
+  test("thinking blocks are dropped even when mixed with visible text", () => {
+    const d = renderDigest([
+      msg("u1", [
+        { type: "thinking", thinking: "internal reasoning that should never surface" },
+        { type: "text", text: "the actual reply" },
+      ], 1, "assistant"),
+    ]);
+    expect(d.text).toContain("the actual reply");
+    expect(d.text).not.toContain("internal reasoning");
+  });
+
+  test("a message containing only a thinking block is dropped entirely", () => {
+    const d = renderDigest([
+      msg("u1", [{ type: "thinking", thinking: "just thinking, nothing else" }], 1, "assistant"),
+    ]);
+    expect(d.uuids.has("u1")).toBe(false);
+    expect(d.includedCount).toBe(0);
+    expect(d.text).not.toContain("just thinking");
+  });
+
+  test("tool_use args are clipped to the first line and TOOL_ARG_MAX chars", () => {
+    const longFirstLine = "x".repeat(100);
+    const secondLine = "SECRET_SECOND_LINE_SHOULD_NOT_APPEAR";
+    const d = renderDigest([
+      msg("u1", [{ type: "tool_use", name: "Bash", input: { command: `${longFirstLine}\n${secondLine}` } }], 1, "assistant"),
+    ]);
+    expect(d.text).toContain(`<tool_use Bash ${"x".repeat(80)}…>`);
+    expect(d.text).not.toContain(secondLine);
+    expect(d.text).not.toContain(longFirstLine);
+  });
+
   test("messages with no displayable text are dropped, uuid and all", () => {
     const d = renderDigest([
       { uuid: "u1", role: "permission-mode", content: '{"type":"permission-mode"}', timestamp: 1 },
