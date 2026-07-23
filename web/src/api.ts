@@ -743,3 +743,36 @@ export async function provisionBbs() {
 export async function testBbs() {
   return unwrap<{ ok: boolean }>(await fetch("/api/bbs/test", { method: "POST" }), "test bbs");
 }
+
+export type SessionMoment = { uuid: string; label: string };
+
+export type SessionSummaryStatus = {
+  status: "ready" | "pending" | "error" | "absent" | "skipped";
+  summary?: string;
+  moments?: SessionMoment[];
+  model?: string | null;
+  generatedAt?: number;
+  stale?: boolean;
+  error?: string | null;
+};
+
+export async function getSessionSummary(sessionId: string): Promise<SessionSummaryStatus> {
+  return unwrap(
+    await fetch(`/api/agent-sessions/${encodeURIComponent(sessionId)}/summary`),
+    "session summary",
+  );
+}
+
+export async function requestSessionSummary(
+  sessionId: string,
+  force = false,
+): Promise<SessionSummaryStatus> {
+  return unwrap(
+    await fetch(`/api/agent-sessions/${encodeURIComponent(sessionId)}/summary`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force }),
+    }),
+    "session summary",
+  );
+}
