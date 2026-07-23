@@ -138,6 +138,14 @@ describe("installHooks", () => {
     }
   });
 
+  test("shim short-circuits when FOREST_INTERNAL is set", () => {
+    installHooks({ dataDir: tmp, configDirs: [{ path: join(tmp, "claude"), profile: "default" }], port: 52810 });
+    const shim = readFileSync(join(tmp, "bin", "forest-ingest"), "utf8");
+    expect(shim).toContain("FOREST_INTERNAL");
+    // the guard must come before the curl that reports the event
+    expect(shim.indexOf("FOREST_INTERNAL")).toBeLessThan(shim.indexOf("curl"));
+  });
+
   test("installs the hook block into every config dir", () => {
     const a = join(tmp, "claude");
     const b = join(tmp, "claude-work");

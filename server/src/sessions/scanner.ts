@@ -12,6 +12,9 @@ export type ScanInput = {
   projects: Array<{ id: string; path: string }>;
   source?: IngestSource;          // default "scan"
   onlySessionIds?: Set<string>;   // narrow scope (used by hook receiver)
+  /** Absolute cwd whose transcripts are Forest's own (the summarizer) and must
+   *  never be ingested. Matched exactly — Claude's dir-slug format is internal. */
+  excludeCwd?: string;
 };
 
 export type ScanResult = {
@@ -104,6 +107,7 @@ async function ingestJsonlFile(
   if (!firstSession || !firstSession.ok) return;
 
   const cwd = firstSession.session.cwd;
+  if (input.excludeCwd && cwd === input.excludeCwd) return;
   const { projectId, worktreeLabel } = classifyCwd(cwd, input.projects);
 
   input.vault.upsertSession({

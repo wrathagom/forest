@@ -34,6 +34,8 @@ const MANAGED_HOOKS: ReadonlyArray<readonly [event: string, arg: string, matcher
 function shimContent(port: number, queueDir: string): string {
   return `#!/usr/bin/env bash
 ${FOREST_MARKER}
+# Forest's own summarizer runs claude headlessly; its events are not user sessions.
+if [ -n "\${FOREST_INTERNAL:-}" ]; then exit 0; fi
 EVENT="\${1:-unknown}"
 PORT="\${FOREST_PORT:-${port}}"
 mkdir -p "${queueDir}"
