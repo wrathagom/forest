@@ -678,7 +678,7 @@ export class Vault {
       .get(sessionId) ?? undefined;
   }
 
-  putSummary(row: SummaryRow): void {
+  upsertSummary(row: SummaryRow): void {
     this.db
       .query(
         `INSERT OR REPLACE INTO agent_session_summaries (
@@ -690,16 +690,6 @@ export class Vault {
         row.session_id, row.summary, row.moments, row.model, row.status,
         row.error, row.generated_at, row.source_last_activity, row.source_message_count,
       );
-  }
-
-  countMessages(sessionId: string): number {
-    return (
-      this.db
-        .query<{ n: number }, [string]>(
-          "SELECT COUNT(*) AS n FROM agent_messages WHERE session_id = ?",
-        )
-        .get(sessionId)?.n ?? 0
-    );
   }
 
   messagesForDigest(sessionId: string): DigestMessageRow[] {

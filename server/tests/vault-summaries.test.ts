@@ -46,9 +46,9 @@ describe("session title", () => {
 });
 
 describe("summary storage", () => {
-  test("putSummary then getSummary round-trips", () => {
+  test("upsertSummary then getSummary round-trips", () => {
     seedSession("s1");
-    vault.putSummary({
+    vault.upsertSummary({
       session_id: "s1", summary: "did a thing",
       moments: JSON.stringify([{ uuid: "u1", label: "start" }]),
       model: "claude-haiku-4-5-20251001", status: "ok", error: null,
@@ -66,21 +66,21 @@ describe("summary storage", () => {
     expect(vault.getSummary("s1")).toBeUndefined();
   });
 
-  test("putSummary replaces an existing row", () => {
+  test("upsertSummary replaces an existing row", () => {
     seedSession("s1");
     const base = {
       session_id: "s1", moments: "[]", model: null,
       generated_at: 1, source_last_activity: 1, source_message_count: 1,
     };
-    vault.putSummary({ ...base, summary: null, status: "error", error: "boom" });
-    vault.putSummary({ ...base, summary: "ok now", status: "ok", error: null });
+    vault.upsertSummary({ ...base, summary: null, status: "error", error: "boom" });
+    vault.upsertSummary({ ...base, summary: "ok now", status: "ok", error: null });
     expect(vault.getSummary("s1")!.status).toBe("ok");
     expect(vault.getSummary("s1")!.error).toBeNull();
   });
 
   test("deleting the session cascades the summary away", () => {
     seedSession("s1");
-    vault.putSummary({
+    vault.upsertSummary({
       session_id: "s1", summary: "x", moments: "[]", model: null,
       status: "ok", error: null, generated_at: 1,
       source_last_activity: 1, source_message_count: 1,
@@ -89,17 +89,18 @@ describe("summary storage", () => {
     expect(vault.getSummary("s1")).toBeUndefined();
   });
 
-  test("countMessages counts stored messages", () => {
-    seedSession("s1");
-    vault.upsertMessages(
-      [1, 2, 3].map((n) => ({
-        session_id: "s1", uuid: `u${n}`, role: "user", content: "{}",
-        timestamp: n, model: null, input_tokens: null, cache_create_tokens: null,
-        cache_read_tokens: null, output_tokens: null, stop_reason: null,
-      })),
-      [],
-    );
-    expect(vault.countMessages("s1")).toBe(3);
+  // Deliberate: with no matching agent_sessions row, the FOREIGN KEY constraint
+  // must reject the insert loudly rather than silently leaving an orphaned
+  // summary row. This pins that behavior so a future change to FK pragma
+  // handling or table creation order can't quietly turn it into a silent orphan.
+  test("upsertSummary throws when the session does not exist", () => {
+    expect(() =>
+      vault.upsertSummary({
+        session_id: "missing", summary: "x", moments: "[]", model: null,
+        status: "ok", error: null, generated_at: 1,
+        source_last_activity: 1, source_message_count: 1,
+      }),
+    ).toThrow(/FOREIGN KEY constraint failed/);
   });
 
   test("messagesForDigest returns uuid/role/content in timestamp order", () => {
