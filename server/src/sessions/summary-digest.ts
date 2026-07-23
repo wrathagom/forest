@@ -11,7 +11,22 @@ export type Digest = {
 };
 
 const PER_MESSAGE_MAX = 1200;
-const TOTAL_MAX = 60_000;
+/**
+ * Total digest budget, in UTF-8 BYTES — not characters.
+ *
+ * The built prompt is handed to `claude -p` as a single argv element, and
+ * Linux caps one argument at MAX_ARG_STRLEN = 131_072 *bytes* (macOS is far
+ * more generous at ~1 MB, which is why a char budget survived here). A budget
+ * counted in UTF-16 units lets a CJK transcript — roughly 3 UTF-8 bytes per
+ * unit — reach ~180 KB and fail at spawn with E2BIG. That failure is caught,
+ * persisted, and never auto-retried, so it is permanent for that session.
+ * 60_000 bytes plus the ~700-byte prompt preamble leaves better than 2x
+ * headroom under the ceiling on every supported platform.
+ */
+export const DIGEST_MAX_BYTES = 60_000;
+const TOTAL_MAX = DIGEST_MAX_BYTES;
+
+const byteLen = (s: string): number => Buffer.byteLength(s, "utf8");
 // The tail favors the ending over the opening: how a session concluded is
 // more useful to a summary than how it started, so the tail gets the larger
 // share of the budget when both can't fit.
@@ -82,16 +97,20 @@ export function displayText(rawLine: string): string {
 }
 
 export function renderDigest(messages: DigestMessageRow[]): Digest {
-  const lines: Array<{ uuid: string; line: string }> = [];
+  // `bytes` is what every budget decision below is measured in; the per-message
+  // clip stays in characters because it is a readability cap, not the safety
+  // limit — even 1200 CJK characters is only ~3.6 KB against a 60 KB total.
+  const lines: Array<{ uuid: string; line: string; bytes: number }> = [];
   for (const m of messages) {
     if (!m.uuid) continue; // unanchorable
     const text = displayText(m.content);
     if (!text) continue;
     const clipped = text.length > PER_MESSAGE_MAX ? text.slice(0, PER_MESSAGE_MAX) + "…" : text;
-    lines.push({ uuid: m.uuid, line: `[${m.uuid}] ${m.role}: ${clipped}` });
+    const line = `[${m.uuid}] ${m.role}: ${clipped}`;
+    lines.push({ uuid: m.uuid, line, bytes: byteLen(line) });
   }
 
-  const total = lines.reduce((n, l) => n + l.line.length + 1, 0);
+  const total = lines.reduce((n, l) => n + l.bytes + 1, 0);
   let kept = lines;
 
   if (total > TOTAL_MAX) {
@@ -103,21 +122,22 @@ export function renderDigest(messages: DigestMessageRow[]): Digest {
     const head: typeof lines = [];
     let used = 0;
     for (const l of lines) {
-      if (used + l.line.length + 1 > headBudget) break;
+      if (used + l.bytes + 1 > headBudget) break;
       head.push(l);
-      used += l.line.length + 1;
+      used += l.bytes + 1;
     }
     const tail: typeof lines = [];
     used = 0;
     for (let i = lines.length - 1; i >= head.length; i--) {
       const l = lines[i]!;
-      if (used + l.line.length + 1 > TOTAL_MAX - headBudget) break;
+      if (used + l.bytes + 1 > TOTAL_MAX - headBudget) break;
       tail.unshift(l);
-      used += l.line.length + 1;
+      used += l.bytes + 1;
     }
     const omitted = lines.length - head.length - tail.length;
+    const marker = `… ${omitted} messages omitted …`;
     kept = omitted > 0
-      ? [...head, { uuid: "", line: `… ${omitted} messages omitted …` }, ...tail]
+      ? [...head, { uuid: "", line: marker, bytes: byteLen(marker) }, ...tail]
       : [...head, ...tail];
   }
 

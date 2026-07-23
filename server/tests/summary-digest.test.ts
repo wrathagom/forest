@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { renderDigest, buildPrompt } from "../src/sessions/summary-digest";
+import { renderDigest, buildPrompt, DIGEST_MAX_BYTES } from "../src/sessions/summary-digest";
 
 const line = (content: unknown, role = "user") =>
   JSON.stringify({ type: role, message: { role, content } });
@@ -124,6 +124,38 @@ describe("renderDigest", () => {
   test("under budget, nothing is omitted", () => {
     const d = renderDigest([msg("u1", "a", 1), msg("u2", "b", 2)]);
     expect(d.text).not.toContain("omitted");
+  });
+
+  // The budget exists to keep the built prompt under Linux's MAX_ARG_STRLEN
+  // (131_072 BYTES for a single argv element), and the prompt is passed as one
+  // argv element. A budget counted in UTF-16 units lets a CJK transcript (~3
+  // bytes per unit) blow through that ceiling ~3x over and fail at spawn with
+  // E2BIG — a failure that then gets cached and never auto-retried.
+  test("a multi-byte-heavy digest stays inside the BYTE budget, not the char budget", () => {
+    // 400 messages of CJK: ~3 UTF-8 bytes per UTF-16 unit.
+    const many = Array.from({ length: 400 }, (_, i) =>
+      msg(`u${i}`, `第${i}番 ` + "漢".repeat(500), i),
+    );
+    const d = renderDigest(many);
+    const digestBytes = Buffer.byteLength(d.text, "utf8");
+    const promptBytes = Buffer.byteLength(buildPrompt(d.text), "utf8");
+    expect(digestBytes).toBeLessThanOrEqual(DIGEST_MAX_BYTES);
+    // Real ceiling this protects: one argv element on Linux.
+    expect(promptBytes).toBeLessThan(131_072);
+    // Still a useful digest: head and tail survived, the middle was dropped.
+    expect(d.text).toMatch(/… \d+ messages omitted …/);
+    expect(d.uuids.has("u0")).toBe(true);
+    expect(d.uuids.has("u399")).toBe(true);
+  });
+
+  test("an ASCII digest still fills the byte budget (the cap did not just shrink 3x)", () => {
+    const many = Array.from({ length: 400 }, (_, i) =>
+      msg(`u${i}`, `message number ${i} ` + "z".repeat(500), i),
+    );
+    const d = renderDigest(many);
+    const bytes = Buffer.byteLength(d.text, "utf8");
+    expect(bytes).toBeLessThanOrEqual(DIGEST_MAX_BYTES);
+    expect(bytes).toBeGreaterThan(DIGEST_MAX_BYTES - 2_000);
   });
 });
 
