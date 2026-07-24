@@ -13,8 +13,8 @@ import SessionDetail from "../src/pages/mobile/SessionDetail";
 const detail = (): AgentSessionDetail => ({
   session: { session_id: "s1", agent: "claude", project_id: "p1", cwd: "/x/api", worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null, started_at: 1, last_activity: 2, message_count: 2, first_user_msg: "add a migration", permission_mode: "acceptEdits", launched_via: "mobile" } as never,
   messages: [
-    { id: 1, role: "user", content: "add a migration", timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null, cache_read_tokens: null, output_tokens: null, stop_reason: null },
-    { id: 2, role: "assistant", content: "Created migrations/0042.sql. Run it on staging?", timestamp: 2, model: "claude", input_tokens: 100, cache_create_tokens: 0, cache_read_tokens: 0, output_tokens: 50, stop_reason: "end_turn" },
+    { id: 1, uuid: null, role: "user", content: "add a migration", timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null, cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    { id: 2, uuid: null, role: "assistant", content: "Created migrations/0042.sql. Run it on staging?", timestamp: 2, model: "claude", input_tokens: 100, cache_create_tokens: 0, cache_read_tokens: 0, output_tokens: 50, stop_reason: "end_turn" },
   ],
   toolCalls: [{ id: 1, tool_use_id: "t1", tool_name: "Write", tool_input: null, started_at: 1, finished_at: 2, duration_ms: 1, result_status: "ok", result_size: 1 }],
   events: [],

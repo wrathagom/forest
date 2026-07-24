@@ -1,8 +1,10 @@
 import { test, expect, vi } from "vitest";
-import { render, waitFor } from "@solidjs/testing-library";
+import { render, waitFor, fireEvent } from "@solidjs/testing-library";
 import SessionTranscript from "../src/components/SessionTranscript";
 
 vi.mock("../src/api", () => ({
+  getSessionSummary: vi.fn(async () => ({ status: "skipped" })),
+  requestSessionSummary: vi.fn(async () => ({ status: "skipped" })),
   getAgentSessionDetail: vi.fn(async () => ({
     session: {
       session_id: "s1", agent: "claude", project_id: "p1", cwd: "/proj",
@@ -60,6 +62,331 @@ test("suppresses messages whose content parses to zero displayable blocks", asyn
   expect(container.querySelectorAll("li.msg")).toHaveLength(1);
   expect(container.textContent).not.toContain("permission-mode");
   expect(container.textContent).not.toContain("file-history-snapshot");
+});
+
+test("each rendered message carries its uuid for anchoring", async () => {
+  const api = await import("../src/api");
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s4", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 1, first_user_msg: null, title: null,
+    },
+    messages: [
+      { id: 1, uuid: "u-anchor", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"anchor me"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+  const { container } = render(() => <SessionTranscript sessionId="s4" onResume={() => {}} />);
+  await waitFor(() => expect(container.textContent).toContain("anchor me"));
+  expect(container.querySelector('[data-msg-uuid="u-anchor"]')).not.toBeNull();
+});
+
+test("a filtered-out message (zero displayable blocks) contributes no data-msg-uuid node", async () => {
+  const api = await import("../src/api");
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s5", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 2, first_user_msg: null, title: null,
+    },
+    messages: [
+      // filtered out: parses to zero displayable blocks, yet still carries a uuid
+      { id: 1, uuid: "u-filtered", role: "permission-mode", content: '{"type":"permission-mode"}',
+        timestamp: 0, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+      // survives the filter
+      { id: 2, uuid: "u-visible", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"hello there"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+  const { container } = render(() => <SessionTranscript sessionId="s5" onResume={() => {}} />);
+  await waitFor(() => expect(container.textContent).toContain("hello there"));
+  // A "key moment" anchor pointing at the filtered message's uuid would find nothing.
+  expect(container.querySelector('[data-msg-uuid="u-filtered"]')).toBeNull();
+  expect(container.querySelector('[data-msg-uuid="u-visible"]')).not.toBeNull();
+});
+
+test("a null uuid renders no data-msg-uuid attribute at all (not the string \"undefined\")", async () => {
+  const api = await import("../src/api");
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s6", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 1, first_user_msg: null, title: null,
+    },
+    messages: [
+      { id: 1, uuid: null, role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"no uuid here"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+  const { container } = render(() => <SessionTranscript sessionId="s6" onResume={() => {}} />);
+  await waitFor(() => expect(container.textContent).toContain("no uuid here"));
+  expect(container.querySelector('[data-msg-uuid]')).toBeNull();
+  const li = container.querySelector("li.msg")!;
+  expect(li.getAttribute("data-msg-uuid")).toBeNull();
+  expect(li.outerHTML).not.toContain("undefined");
+});
+
+test("jumping to a moment scrolls that message into view and flashes it", async () => {
+  const api = await import("../src/api");
+  (api.getSessionSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
+    status: "ready", summary: "a summary", moments: [{ uuid: "u-anchor", label: "the moment" }],
+    stale: false,
+  });
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s5", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 1, first_user_msg: null, title: null,
+    },
+    messages: [
+      { id: 1, uuid: "u-anchor", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"anchor me"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+
+  const { container, getByText } = render(() => (
+    <SessionTranscript sessionId="s5" onResume={() => {}} />
+  ));
+  await waitFor(() => expect(container.textContent).toContain("the moment"));
+
+  const target = container.querySelector('[data-msg-uuid="u-anchor"]') as HTMLElement;
+  const scrolled: unknown[] = [];
+  target.scrollIntoView = ((opts: unknown) => scrolled.push(opts)) as never;
+
+  fireEvent.click(getByText("the moment"));
+  expect(scrolled).toHaveLength(1);
+  expect(target.classList.contains("msg-flash")).toBe(true);
+});
+
+test("jumping to a moment whose uuid matches no rendered message does nothing", async () => {
+  const api = await import("../src/api");
+  (api.getSessionSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
+    status: "ready", summary: "a summary",
+    moments: [{ uuid: "u-missing", label: "a moment for a filtered message" }],
+    stale: false,
+  });
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s7", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 1, first_user_msg: null, title: null,
+    },
+    messages: [
+      // survives the filter, but its uuid does not match the moment above
+      { id: 1, uuid: "u-visible", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"hello there"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+
+  const { container, getByText } = render(() => (
+    <SessionTranscript sessionId="s7" onResume={() => {}} />
+  ));
+  await waitFor(() => expect(container.textContent).toContain("a moment for a filtered message"));
+
+  const target = container.querySelector('[data-msg-uuid="u-visible"]') as HTMLElement;
+  const scrolled: unknown[] = [];
+  target.scrollIntoView = ((opts: unknown) => scrolled.push(opts)) as never;
+
+  expect(() => fireEvent.click(getByText("a moment for a filtered message"))).not.toThrow();
+  expect(scrolled).toHaveLength(0);
+  expect(target.classList.contains("msg-flash")).toBe(false);
+});
+
+test("jumping with a hostile uuid does not become a selector injection", async () => {
+  const api = await import("../src/api");
+  const hostile = 'u1"], [data-msg-uuid="u2';
+  (api.getSessionSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
+    status: "ready", summary: "a summary",
+    moments: [{ uuid: hostile, label: "sketchy moment" }],
+    stale: false,
+  });
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s8", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 2, first_user_msg: null, title: null,
+    },
+    messages: [
+      { id: 1, uuid: "u1", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"first"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+      { id: 2, uuid: "u2", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"second"}}',
+        timestamp: 2, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+
+  const { container, getByText } = render(() => (
+    <SessionTranscript sessionId="s8" onResume={() => {}} />
+  ));
+  await waitFor(() => expect(container.textContent).toContain("sketchy moment"));
+
+  const u1 = container.querySelector('[data-msg-uuid="u1"]') as HTMLElement;
+  const u2 = container.querySelector('[data-msg-uuid="u2"]') as HTMLElement;
+  const scrolled: unknown[] = [];
+  u1.scrollIntoView = ((opts: unknown) => scrolled.push(opts)) as never;
+  u2.scrollIntoView = ((opts: unknown) => scrolled.push(opts)) as never;
+
+  expect(() => fireEvent.click(getByText("sketchy moment"))).not.toThrow();
+  expect(scrolled).toHaveLength(0);
+  expect(u1.classList.contains("msg-flash")).toBe(false);
+  expect(u2.classList.contains("msg-flash")).toBe(false);
+});
+
+test("the msg-flash class is removed again after the timeout elapses", async () => {
+  const api = await import("../src/api");
+  (api.getSessionSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
+    status: "ready", summary: "a summary", moments: [{ uuid: "u-anchor", label: "the moment" }],
+    stale: false,
+  });
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: "s9", agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 1, first_user_msg: null, title: null,
+    },
+    messages: [
+      { id: 1, uuid: "u-anchor", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"anchor me"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+
+  const { container, getByText } = render(() => (
+    <SessionTranscript sessionId="s9" onResume={() => {}} />
+  ));
+  // Let the initial async render (resource load, summary poll) settle on real timers
+  // before switching to fake ones — waitFor itself polls via setTimeout.
+  await waitFor(() => expect(container.textContent).toContain("the moment"));
+
+  const target = container.querySelector('[data-msg-uuid="u-anchor"]') as HTMLElement;
+  target.scrollIntoView = (() => {}) as never;
+
+  vi.useFakeTimers();
+  try {
+    fireEvent.click(getByText("the moment"));
+    expect(target.classList.contains("msg-flash")).toBe(true);
+
+    vi.advanceTimersByTime(1200);
+    expect(target.classList.contains("msg-flash")).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+/** One-message session with a "the moment" chip pointing at it. */
+async function renderAnchoredSession(sessionId: string) {
+  const api = await import("../src/api");
+  (api.getSessionSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
+    status: "ready", summary: "a summary", moments: [{ uuid: "u-anchor", label: "the moment" }],
+    stale: false,
+  });
+  (api.getAgentSessionDetail as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    session: {
+      session_id: sessionId, agent: "claude", project_id: "p1", cwd: "/proj",
+      worktree_label: "main", branch: null, cwd_exists: 1, parent_session_id: null,
+      started_at: 0, last_activity: 1, message_count: 1, first_user_msg: null, title: null,
+    },
+    messages: [
+      { id: 1, uuid: "u-anchor", role: "user",
+        content: '{"type":"user","message":{"role":"user","content":"anchor me"}}',
+        timestamp: 1, model: null, input_tokens: null, cache_create_tokens: null,
+        cache_read_tokens: null, output_tokens: null, stop_reason: null },
+    ],
+    toolCalls: [], events: [],
+  });
+  const utils = render(() => <SessionTranscript sessionId={sessionId} onResume={() => {}} />);
+  await waitFor(() => expect(utils.container.textContent).toContain("the moment"));
+  const target = utils.container.querySelector('[data-msg-uuid="u-anchor"]') as HTMLElement;
+  const scrolled: Array<{ behavior?: string }> = [];
+  target.scrollIntoView = ((opts: { behavior?: string }) => scrolled.push(opts)) as never;
+  return { ...utils, target, scrolled };
+}
+
+test("jumping moves focus to the destination message", async () => {
+  const { getByText, target } = await renderAnchoredSession("s10");
+
+  fireEvent.click(getByText("the moment"));
+
+  // Without this, Tab continues from the chip and assistive tech never moves.
+  expect(target.getAttribute("tabindex")).toBe("-1");
+  expect(document.activeElement).toBe(target);
+});
+
+test("re-clicking the same moment restarts the flash rather than inheriting the first deadline", async () => {
+  const { getByText, target } = await renderAnchoredSession("s11");
+
+  const removals: string[] = [];
+  const realRemove = target.classList.remove.bind(target.classList);
+  target.classList.remove = ((...names: string[]) => {
+    removals.push(...names);
+    realRemove(...names);
+  }) as never;
+
+  vi.useFakeTimers();
+  try {
+    fireEvent.click(getByText("the moment"));
+    expect(target.classList.contains("msg-flash")).toBe(true);
+
+    vi.advanceTimersByTime(800);
+    expect(target.classList.contains("msg-flash")).toBe(true);
+
+    // second click: the class must be taken off and put back on (animation restart)
+    removals.length = 0;
+    fireEvent.click(getByText("the moment"));
+    expect(removals).toContain("msg-flash");
+    expect(target.classList.contains("msg-flash")).toBe(true);
+
+    // the first click's 1200ms deadline has now passed — it must not clear ours
+    vi.advanceTimersByTime(600);
+    expect(target.classList.contains("msg-flash")).toBe(true);
+
+    // …but the second click's own window still expires
+    vi.advanceTimersByTime(700);
+    expect(target.classList.contains("msg-flash")).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("prefers-reduced-motion drops the smooth scroll", async () => {
+  const realMatchMedia = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("prefers-reduced-motion"),
+    media: query, onchange: null,
+    addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    addListener: () => {}, removeListener: () => {},
+  })) as never;
+  try {
+    const { getByText, scrolled } = await renderAnchoredSession("s12");
+    fireEvent.click(getByText("the moment"));
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0]?.behavior).toBe("auto");
+  } finally {
+    window.matchMedia = realMatchMedia;
+  }
 });
 
 test("Resume button shows 'Resume (worktree gone)' when cwd_exists=0", async () => {

@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { Vault, type IngestSource } from "./vault";
-import { parseClaudeJsonlLine } from "./parser";
+import { parseClaudeJsonlLine, parseAiTitleLine } from "./parser";
 import type { ClaudeConfigDir } from "./config-dirs";
 
 export type ScanInput = {
@@ -12,6 +12,9 @@ export type ScanInput = {
   projects: Array<{ id: string; path: string }>;
   source?: IngestSource;          // default "scan"
   onlySessionIds?: Set<string>;   // narrow scope (used by hook receiver)
+  /** Absolute cwd whose transcripts are Forest's own (the summarizer) and must
+   *  never be ingested. Matched exactly — Claude's dir-slug format is internal. */
+  excludeCwd?: string;
 };
 
 export type ScanResult = {
@@ -83,8 +86,15 @@ async function ingestJsonlFile(
   const allToolCalls: Parameters<Vault["upsertToolCalls"]>[0] = [];
   const allToolResults: Parameters<Vault["applyToolResults"]>[0] = [];
   const allEvents: Parameters<Vault["appendEvents"]>[0] = [];
+  let aiTitle: string | null = null;
 
   for (const line of lines) {
+    const aiTitleRecord = parseAiTitleLine(line);
+    // Defensive: sessionId is the authoritative one derived from the
+    // transcript's filename. A checked sample of real transcripts never
+    // showed an ai-title line's sessionId diverge from its file, but this
+    // guards against silently attributing a title to the wrong session.
+    if (aiTitleRecord && aiTitleRecord.session_id === sessionId) aiTitle = aiTitleRecord.title;
     const out = parseClaudeJsonlLine(line);
     if (!out.ok) continue; // unrecognized lines are silently dropped here
     if (!firstSession) firstSession = out;
@@ -97,6 +107,7 @@ async function ingestJsonlFile(
   if (!firstSession || !firstSession.ok) return;
 
   const cwd = firstSession.session.cwd;
+  if (input.excludeCwd && cwd === input.excludeCwd) return;
   const { projectId, worktreeLabel } = classifyCwd(cwd, input.projects);
 
   input.vault.upsertSession({
@@ -107,6 +118,7 @@ async function ingestJsonlFile(
     last_activity: Math.max(firstSession.session.last_activity, fileMtime),
     source: input.source ?? "scan",
     profile,
+    title: aiTitle,
   });
   input.vault.upsertMessages(allMessages, allFts);
   input.vault.upsertToolCalls(allToolCalls);

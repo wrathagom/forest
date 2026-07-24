@@ -559,7 +559,8 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   padding: 0.05rem 0.4rem;
   font-size: 0.72rem;
 }
-.session-transcript-head button {
+.session-transcript-head button,
+.session-summary-action {
   background: var(--bg);
   color: var(--accent);
   border: 1px solid var(--accent);
@@ -569,7 +570,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   font-size: 0.78rem;
   cursor: pointer;
 }
-.session-transcript-head button:hover { background: rgba(110,231,183,0.1); }
+.session-transcript-head button:hover,
+.session-summary-action:hover:not(:disabled) { background: rgba(110,231,183,0.1); }
+.session-summary-action:disabled { opacity: 0.5; cursor: not-allowed; }
 .session-transcript-body {
   list-style: none;
   margin: 0;
@@ -883,3 +886,99 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .dashboard-toolbar .sort-select { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.5rem; font: inherit; font-size: 0.85rem; }
 .dashboard-toolbar .sort-select:focus { outline: none; border-color: var(--accent); }
 .archived-tag { font-size: 0.65rem; padding: 0.05rem 0.45rem; border-radius: 3px; background: var(--bg-2); color: var(--fg-dim); border: 1px solid var(--border); text-transform: lowercase; letter-spacing: 0.04em; line-height: 1.5; }
+
+/* --- Session summary (atop the transcript) --- */
+.session-summary,
+.session-summary-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.session-summary {
+  /* horizontal padding matches .session-transcript-head / -body */
+  padding: 0.75rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+.session-summary-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.session-summary-text {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+.session-summary-moments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.session-moment {
+  background: rgba(110,231,183,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(110,231,183,0.3);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.session-moment:hover { background: rgba(110,231,183,0.18); }
+.session-summary-error,
+.session-summary-stale {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+/* failure has to look like failure, not like the grey pending line */
+.session-summary-error {
+  background: rgba(248,113,113,0.12);
+  color: var(--error);
+  border: 1px solid rgba(248,113,113,0.4);
+  border-radius: 3px;
+  padding: 0.35rem 0.6rem;
+}
+.session-summary-pending {
+  font-size: 0.85rem;
+}
+
+/* jump-to-moment landing flash. .msg-blocks paints an opaque background over
+   almost the whole li, so tint the child and ring the li — a background
+   animation on the li alone is invisible behind it. */
+.msg-flash {
+  border-radius: 4px;
+  animation: msg-flash-ring 1.2s ease-out;
+}
+.msg-flash .msg-blocks {
+  animation: msg-flash-fill 1.2s ease-out;
+}
+.session-transcript-body .msg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@keyframes msg-flash-ring {
+  0%, 45% { box-shadow: 0 0 0 2px rgba(110,231,183,0.7); }
+  100% { box-shadow: 0 0 0 2px rgba(110,231,183,0); }
+}
+@keyframes msg-flash-fill {
+  0%, 45% { background: rgba(110,231,183,0.22); border-color: rgba(110,231,183,0.55); }
+  100% { background: var(--bg-2); border-color: var(--border); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* hold the highlight statically for as long as the class is applied
+     (SessionTranscript also drops the smooth scroll) */
+  .msg-flash, .msg-flash .msg-blocks { animation: none; }
+  .msg-flash { box-shadow: 0 0 0 2px rgba(110,231,183,0.7); }
+  .msg-flash .msg-blocks {
+    background: rgba(110,231,183,0.22);
+    border-color: rgba(110,231,183,0.55);
+  }
+}

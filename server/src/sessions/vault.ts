@@ -32,6 +32,28 @@ export type SessionRow = {
   profile: string | null;
   permission_mode: string | null;
   launched_via: string | null;
+  title: string | null;
+};
+
+/** Only terminal outcomes are stored, so status is 'ok' or 'error' — never
+ *  'pending'/'absent'/'skipped', which the API derives at request time. */
+export type SummaryRow = {
+  session_id: string;
+  summary: string | null;
+  moments: string; // JSON: Array<{uuid, label}>
+  model: string | null;
+  status: "ok" | "error";
+  error: string | null;
+  generated_at: number;
+  source_last_activity: number;
+  source_message_count: number;
+};
+
+export type DigestMessageRow = {
+  uuid: string | null;
+  role: string;
+  content: string;
+  timestamp: number;
 };
 
 export type TokenBucket = { input: number; output: number; cache: number };
@@ -61,6 +83,7 @@ export type SessionDetail = {
   session: SessionRow;
   messages: Array<{
     id: number;
+    uuid: string | null;
     role: string;
     content: string;
     timestamp: number;
@@ -120,6 +143,7 @@ export class Vault {
     profile?: string | null;
     permission_mode?: string | null;
     launched_via?: string | null;
+    title?: string | null;
   }): void {
     const now = Date.now();
     this.db
@@ -127,8 +151,8 @@ export class Vault {
         `INSERT INTO agent_sessions (
             session_id, agent, project_id, cwd, worktree_label, branch,
             cwd_exists, parent_session_id, started_at, last_activity,
-            first_user_msg, profile, imported_at, source, permission_mode, launched_via
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            first_user_msg, profile, imported_at, source, permission_mode, launched_via, title
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(session_id) DO UPDATE SET
             project_id     = COALESCE(excluded.project_id, project_id),
             worktree_label = COALESCE(excluded.worktree_label, worktree_label),
@@ -140,7 +164,8 @@ export class Vault {
             profile        = COALESCE(excluded.profile, profile),
             source         = excluded.source,
             permission_mode = COALESCE(excluded.permission_mode, permission_mode),
-            launched_via    = COALESCE(excluded.launched_via, launched_via)`,
+            launched_via    = COALESCE(excluded.launched_via, launched_via),
+            title           = COALESCE(excluded.title, title)`,
       )
       .run(
         input.session_id,
@@ -159,6 +184,7 @@ export class Vault {
         input.source,
         input.permission_mode ?? null,
         input.launched_via ?? null,
+        input.title ?? null,
       );
   }
 
@@ -337,7 +363,7 @@ export class Vault {
     const sql =
       `SELECT s.session_id, s.agent, s.project_id, s.cwd, s.worktree_label, s.branch,
               s.cwd_exists, s.parent_session_id, s.started_at, s.last_activity,
-              s.message_count, s.first_user_msg, s.profile, s.permission_mode, s.launched_via,
+              s.message_count, s.first_user_msg, s.profile, s.permission_mode, s.launched_via, s.title,
               p.name AS project_name,
               COALESCE(t.input, 0)  AS input_tokens,
               COALESCE(t.output, 0) AS output_tokens,
@@ -477,7 +503,7 @@ export class Vault {
       .query<SessionRow, [string, number, number]>(
         `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
                 cwd_exists, parent_session_id, started_at, last_activity,
-                message_count, first_user_msg, profile, permission_mode, launched_via
+                message_count, first_user_msg, profile, permission_mode, launched_via, title
            FROM agent_sessions
           WHERE project_id = ?
           ORDER BY last_activity DESC
@@ -534,7 +560,7 @@ export class Vault {
       .query<SessionRow, [string]>(
         `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
                 cwd_exists, parent_session_id, started_at, last_activity,
-                message_count, first_user_msg, profile, permission_mode, launched_via
+                message_count, first_user_msg, profile, permission_mode, launched_via, title
            FROM agent_sessions WHERE session_id = ?`,
       )
       .get(sessionId);
@@ -542,7 +568,7 @@ export class Vault {
     this.refreshCwdExists([session]);
     const messages = this.db
       .query<SessionDetail["messages"][number], [string]>(
-        `SELECT id, role, content, timestamp, model,
+        `SELECT id, uuid, role, content, timestamp, model,
                 input_tokens, cache_create_tokens, cache_read_tokens,
                 output_tokens, stop_reason
            FROM agent_messages WHERE session_id = ? ORDER BY timestamp ASC, id ASC`,
@@ -573,7 +599,7 @@ export class Vault {
         `SELECT s.session_id, s.agent, s.project_id, s.cwd, s.worktree_label,
                 s.branch, s.cwd_exists, s.parent_session_id, s.started_at,
                 s.last_activity, s.message_count, s.first_user_msg, s.profile,
-                s.permission_mode, s.launched_via,
+                s.permission_mode, s.launched_via, s.title,
                 (SELECT snippet(agent_messages_fts, 2, '<mark>', '</mark>', '…', 8)
                    FROM agent_messages_fts
                   WHERE agent_messages_fts.session_id = s.session_id
@@ -598,7 +624,7 @@ export class Vault {
       .query<SessionRow, [string]>(
         `SELECT session_id, agent, project_id, cwd, worktree_label, branch,
                 cwd_exists, parent_session_id, started_at, last_activity,
-                message_count, first_user_msg, profile, permission_mode, launched_via
+                message_count, first_user_msg, profile, permission_mode, launched_via, title
            FROM agent_sessions WHERE session_id = ?`,
       )
       .get(sessionId);
@@ -641,5 +667,39 @@ export class Vault {
       .all(limit);
     this.refreshCwdExists(rows);
     return rows;
+  }
+
+  getSummary(sessionId: string): SummaryRow | undefined {
+    return this.db
+      .query<SummaryRow, [string]>(
+        `SELECT session_id, summary, moments, model, status, error,
+                generated_at, source_last_activity, source_message_count
+           FROM agent_session_summaries WHERE session_id = ?`,
+      )
+      .get(sessionId) ?? undefined;
+  }
+
+  upsertSummary(row: SummaryRow): void {
+    this.db
+      .query(
+        `INSERT OR REPLACE INTO agent_session_summaries (
+            session_id, summary, moments, model, status, error,
+            generated_at, source_last_activity, source_message_count
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.session_id, row.summary, row.moments, row.model, row.status,
+        row.error, row.generated_at, row.source_last_activity, row.source_message_count,
+      );
+  }
+
+  messagesForDigest(sessionId: string): DigestMessageRow[] {
+    return this.db
+      .query<DigestMessageRow, [string]>(
+        `SELECT uuid, role, content, timestamp
+           FROM agent_messages WHERE session_id = ?
+          ORDER BY timestamp ASC, id ASC`,
+      )
+      .all(sessionId);
   }
 }

@@ -5,6 +5,7 @@ import { scanClaudeProjects, classifyCwd } from "../sessions/scanner";
 import { relocateTranscript } from "../sessions/transcript-relocate";
 import type { LiveAgentSessions } from "../sessions/live";
 import type { ClaudeConfigDir } from "../sessions/config-dirs";
+import type { SessionSummarizer } from "../sessions/summarizer";
 
 export type RouteDeps = {
   vault: Vault;
@@ -12,6 +13,12 @@ export type RouteDeps = {
   claudeConfigDirs: () => ClaudeConfigDir[];
   liveSessions?: LiveAgentSessions;
   projectName?: (id: string) => string | null;
+  /** Optional. Supplies both the summary endpoints and the cwd whose own runs
+   *  the ingest scan must skip — one dependency, so it cannot be half-wired.
+   *  (These were two independent optional fields; setting `summarizer` and
+   *  omitting the cwd silently disabled the exclusion and Forest began
+   *  ingesting its own summarizer runs with no error anywhere.) */
+  summarizer?: SessionSummarizer;
 };
 
 export function agentSessionsRoutes(deps: RouteDeps): Route[] {
@@ -40,6 +47,7 @@ export function agentSessionsRoutes(deps: RouteDeps): Route[] {
             projects,
             onlySessionIds: new Set([body.session_id]),
             source,
+            excludeCwd: deps.summarizer?.summarizerCwd(),
           });
           sessionsTouched = scan.sessionsTouched;
         } catch (err) {
@@ -119,6 +127,26 @@ export function agentSessionsRoutes(deps: RouteDeps): Route[] {
         } catch (err) {
           return badRequest((err as Error).message);
         }
+      },
+    },
+    {
+      // Order-independent, unlike /live above: `([^/]+)` excludes `/`, so the
+      // :sid catch-all below cannot match `.../<sid>/summary` no matter where
+      // it sits. Grouped here with the other :sid routes for readability only.
+      method: "GET",
+      pattern: /^\/api\/agent-sessions\/([^/]+)\/summary$/,
+      paramNames: ["sid"],
+      handler: (ctx) =>
+        json(deps.summarizer ? deps.summarizer.status(ctx.params.sid!) : { status: "absent" }),
+    },
+    {
+      method: "POST",
+      pattern: /^\/api\/agent-sessions\/([^/]+)\/summary$/,
+      paramNames: ["sid"],
+      handler: async (ctx) => {
+        if (!deps.summarizer) return json({ status: "absent" });
+        const body = (await ctx.request.json().catch(() => null)) as { force?: boolean } | null;
+        return json(await deps.summarizer.request(ctx.params.sid!, { force: body?.force === true }));
       },
     },
     {

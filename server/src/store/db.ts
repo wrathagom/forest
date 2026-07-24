@@ -132,6 +132,19 @@ const SCHEMA = `
     ON tasks(project_id);
   CREATE INDEX IF NOT EXISTS idx_tasks_status
     ON tasks(status);
+
+  CREATE TABLE IF NOT EXISTS agent_session_summaries (
+    session_id            TEXT PRIMARY KEY
+                            REFERENCES agent_sessions(session_id) ON DELETE CASCADE,
+    summary               TEXT,
+    moments               TEXT NOT NULL DEFAULT '[]',
+    model                 TEXT,
+    status                TEXT NOT NULL,
+    error                 TEXT,
+    generated_at          INTEGER NOT NULL,
+    source_last_activity  INTEGER NOT NULL,
+    source_message_count  INTEGER NOT NULL
+  );
 `;
 
 // IMPORTANT: table, column, and decl must be literal (hard-coded) strings — they are interpolated directly into SQL, not parameterised.
@@ -151,5 +164,6 @@ export function openDb(path: string): Database {
   addColumnIfMissing(db, "agent_sessions", "permission_mode", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "launched_via", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "profile", "TEXT");
+  addColumnIfMissing(db, "agent_sessions", "title", "TEXT");
   return db;
 }
