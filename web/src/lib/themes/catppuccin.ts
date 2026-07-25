@@ -4,7 +4,7 @@ import { buildTheme } from "./build";
 export const catppuccinLatte = buildTheme({
   id: "catppuccin-latte", name: "Latte", family: "Catppuccin", scheme: "light",
   bg: "#eff1f5", bg2: "#e6e9ef", bg3: "#ccd0da",
-  fg: "#4c4f69", fgDim: "#6c6f85", fgFaint: "#9ca0b0",
+  fg: "#4c4f69", fgDim: "#6c6f85", fgFaint: "#8c8fa1",
   border: "#ccd0da", borderStrong: "#bcc0cc",
   accent: "#8839ef", accentFg: "#eff1f5",
   purple: "#8839ef", green: "#40a02b", orange: "#fe640b", blue: "#1e66f5",
