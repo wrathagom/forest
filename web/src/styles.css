@@ -14,15 +14,23 @@
 }
 
 :root {
-  color-scheme: dark;
+  /* Fallbacks only — applyTheme() overwrites all of these on <html> at boot.
+     Kept so the stylesheet is legible on its own and so a JS failure degrades
+     to the original Forest Dark look rather than to unstyled black-on-white. */
   --bg: #0e0e10;
   --bg-2: #1a1a1d;
+  --bg-3: #0e0e10;
   --fg: #e6e6e6;
   --fg-dim: #9a9a9a;
+  --fg-faint: #666666;
   --border: #2a2a2d;
+  --border-strong: #3a3a3d;
   --accent: #6ee7b7;
+  --accent-fg: #0e0e10;
+  --ok: #6ee7b7;
   --warn: #f59e0b;
   --error: #f87171;
+  --info: #82aaff;
   --tok-in: #6ee7b7;
   --tok-out: #f59e0b;
   --tok-cache: #8b5cf6;
@@ -55,18 +63,18 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .git-stat { font-size: 0.75rem; padding: 0.05rem 0.4rem; border-radius: 3px; border: 1px solid transparent; line-height: 1.4; }
 .git-clean { color: var(--fg-dim); }
 .git-dirty { color: var(--warn); border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); }
-.git-ahead { color: var(--accent); border-color: rgba(110, 231, 183, 0.35); background: rgba(110, 231, 183, 0.08); }
+.git-ahead { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
 .git-behind { color: var(--error); border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.08); }
 .card-section { font-size: 0.85rem; color: var(--fg-dim); margin-top: 0.2rem; }
 .card-section.warn { color: var(--warn); }
 .label { display: block; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2rem; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.dot-ok { background: var(--accent); }
+.dot-ok { background: var(--ok); }
 .dot-warn { background: var(--warn); }
 .dot-error { background: var(--error); }
 .services { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .svc-count { padding: 0.1rem 0.45rem; border-radius: 3px; border: 1px solid transparent; font-size: 0.75rem; line-height: 1.4; }
-.svc-running { color: var(--accent); border-color: rgba(110, 231, 183, 0.35); background: rgba(110, 231, 183, 0.08); }
+.svc-running { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
 .svc-stopped { color: var(--fg-dim); border-color: var(--border); background: var(--bg); }
 .svc-procs { color: var(--fg); border-color: var(--border); background: var(--bg); }
 .ports { display: flex; gap: 0.25rem; flex-wrap: wrap; flex-basis: 100%; }
@@ -87,7 +95,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .nav-link:hover { color: var(--fg); }
 .banner { padding: 0.5rem 1.2rem; font-size: 0.85rem; }
 .banner-error { background: rgba(248, 113, 113, 0.12); color: var(--error); border-bottom: 1px solid var(--error); }
-.banner-ok { background: rgba(110, 231, 183, 0.12); color: var(--accent); border-bottom: 1px solid var(--accent); }
+.banner-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); border-bottom: 1px solid var(--ok); }
 .hint { color: var(--fg-dim); font-size: 0.75rem; margin-top: 0.1rem; }
 .settings-row { display: flex; gap: 0.5rem; }
 .settings-row button[type="button"] { background: transparent; }
@@ -129,7 +137,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   .terminal-area.split > .pane-right { display: none; }
 }
 .terminal-empty { display: flex; align-items: center; justify-content: center; height: 100%; }
-.svc-terminals { color: var(--accent); border-color: rgba(110, 231, 183, 0.35); background: rgba(110, 231, 183, 0.1); }
+.svc-terminals { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
 
 /* info pane layout */
 :root { --info-pane-width: 360px; }
@@ -340,7 +348,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   margin-right: 2px;
 }
 .tree-badge-M { color: var(--warn); }
-.tree-badge-A { color: var(--accent); }
+.tree-badge-A { color: var(--ok); }
 .tree-badge-\? { color: var(--error); }
 .tree-badge-D { color: var(--fg-dim); }
 .tree-badge-R { color: #82aaff; }
@@ -419,7 +427,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   font-size: 0.68rem;
   color: var(--fg-dim);
 }
-.git-branch-ahead { color: var(--accent); }
+.git-branch-ahead { color: var(--ok); }
 .git-branch-behind { color: var(--fg-dim); }
 .git-branch-worktree { color: var(--fg-dim); }
 .git-branch-dirty { color: var(--warn); }
@@ -474,9 +482,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   white-space: pre;
   padding: 0 0.6rem;
 }
-.diff-add { background: rgba(110,231,183,0.10); color: #86efac; }
-.diff-del { background: rgba(248,113,113,0.12); color: #fca5a5; }
-.diff-hunk { color: #82aaff; }
+.diff-add { background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); }
+.diff-del { background: color-mix(in srgb, var(--error) 12%, transparent); color: var(--error); }
+.diff-hunk { color: var(--info); }
 .diff-meta { color: var(--fg-dim); }
 .diff-ctx { color: var(--fg); }
 .commit-view-sha {
@@ -510,7 +518,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 }
 .sessions-row:hover { background: var(--bg-2); }
 .sessions-dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
-.sessions-dot.live { background: var(--accent); }
+.sessions-dot.live { background: var(--ok); }
 .sessions-dot.gone { background: var(--fg-dim); opacity: 0.5; }
 .sessions-worktree {
   color: var(--accent);
@@ -808,7 +816,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .session-chip-project { color: var(--fg); font-weight: 500; }
 .session-chip-time { color: var(--fg-dim); opacity: 0.7; }
 .session-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
-.session-chip-dot-working { background: var(--accent); animation: session-pulse 1.4s ease-in-out infinite; }
+.session-chip-dot-working { background: var(--ok); animation: session-pulse 1.4s ease-in-out infinite; }
 .session-chip-dot-waiting { background: var(--warn); }
 .session-chip-dot-stale { background: var(--fg-dim); opacity: 0.5; }
 .session-chip-dot-closed { background: var(--fg); }
@@ -847,7 +855,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .tasks-dot-running { background: #5b9dd9; }
 .tasks-dot-review { background: #e0a83a; }
 .tasks-dot-draft { background: var(--fg-dim); }
-.tasks-dot-done { background: var(--accent); }
+.tasks-dot-done { background: var(--ok); }
 .tasks-dot-abandoned { background: var(--border); }
 
 /* --- Task view (main-area task tab) --- */
@@ -875,7 +883,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .caffeinate-button:hover { background: var(--bg-2); }
 .caffeinate-off { color: var(--fg-dim); }
 .caffeinate-off:hover { color: var(--fg); }
-.caffeinate-on { color: var(--accent); }
+.caffeinate-on { color: var(--ok); }
 .caffeinate-error-dot { position: absolute; top: 0.15rem; right: 0.15rem; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--error); }
 .caffeinate-menu { position: absolute; right: 0; top: calc(100% + 0.3rem); background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.25rem; display: flex; flex-direction: column; min-width: 8rem; z-index: 10; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
 .caffeinate-menu-item { background: none; color: var(--fg); border: 0; text-align: left; padding: 0.3rem 0.5rem; font: inherit; font-size: 0.82rem; cursor: pointer; border-radius: 3px; white-space: nowrap; }
