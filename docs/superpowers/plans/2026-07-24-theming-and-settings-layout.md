@@ -586,6 +586,32 @@ describe("Forest Dark preserves today's look", () => {
     expect(forest.tokens[key]).toBe(expected);
   });
 });
+
+// The inline boot script in index.html is raw JS and cannot import from
+// apply.ts, so it hardcodes the cache key and the cached shape. Nothing else
+// ties the two together: rename BOOT_CACHE_KEY or drop a field from the cache
+// and every existing test still passes, while the flash the cache exists to
+// prevent silently comes back. These two assertions are that missing link.
+describe("index.html boot script contract", () => {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+
+  test("uses the real cache key", () => {
+    expect(html).toContain(BOOT_CACHE_KEY);
+  });
+
+  test("reads the same shape applyTheme writes", () => {
+    for (const prop of ["bg", "fg", "scheme"]) {
+      expect(html, `boot script must read b.${prop}`).toContain(`b.${prop}`);
+    }
+  });
+});
+```
+
+The test file needs two extra imports for that block:
+
+```ts
+import { readFileSync } from "node:fs";
+import { BOOT_CACHE_KEY } from "../src/lib/themes/apply";
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -729,7 +755,7 @@ render(
 - [ ] **Step 8: Run tests**
 
 Run: `cd web && bun run test -- theme-current`
-Expected: PASS, 22 tests
+Expected: PASS, 24 tests
 
 - [ ] **Step 9: Verify the app is visually unchanged**
 
