@@ -1948,6 +1948,32 @@ git commit -m "feat(themes): add the remaining nine theme families"
 
 ### Task 14: Sweep the light themes across every route
 
+> **Run this last, after Tasks 15-21.** `/settings` is one of the routes to
+> check, and it does not exist in its new form until Task 19. Sweeping before
+> then means sweeping it twice.
+
+**Four set-level observations from Task 13 to judge with eyes on a real render.**
+None is a bug — every value is faithful to its source palette — but each is a
+curatorial question that only a person can settle:
+
+- **Accent hue is heavily skewed purple.** 10 of 16 themes have `accent` in the
+  260°-301° band: all four Catppuccin flavors, both Rosé Pine variants, both One
+  variants, Dracula and Tokyo Night. Only Forest Dark (156°), Gruvbox Dark/Light
+  (157°/190°), Solarized Dark/Light (205°) and Nord (193°) break it. Since
+  `accent` drives selection, cursor, links and primary buttons, two-thirds of the
+  picker may feel like variations on one hue. If it does, the fix is swapping a
+  few themes to a different published accent — Catppuccin in particular supports
+  any of its 14 accents, mauve is just its default.
+- **Dracula and One Dark are the closest pair** — background luminance 0.0237 vs
+  0.0250, accents at 265° and 286°. Most likely to be mistaken for each other in
+  the picker.
+- **Rosé Pine's chart tuples end in two greys** (`subtle`, `muted`) because the
+  palette publishes only six hues. Numerically distinct, but check an actual
+  8-series chart under it.
+- **"Rosé Pine" is both a family name and a theme name**, the one asymmetric
+  entry in a set otherwise using `X Dark` / `X Light`. Matches upstream naming,
+  but look at how the grouped picker actually reads.
+
 Light themes are where hardcoded assumptions surface. No code in this task — it is where Phase 2 misses get caught, and skipping it means shipping a broken Latte.
 
 - [ ] **Step 1: Switch to Catppuccin Latte**
