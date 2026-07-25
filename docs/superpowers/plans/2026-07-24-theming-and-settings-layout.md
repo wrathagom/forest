@@ -3233,11 +3233,16 @@ Expected: PASS, 7 tests
 - [ ] **Step 7: Confirm the old page is fully replaced**
 
 ```bash
-grep -n "max-width: 480px" web/src/styles.css
+grep -n ".settings form" web/src/styles.css
 wc -l web/src/pages/Settings.tsx
 ```
 
-Expected: no match for the first (removed in Task 7), and roughly 30 lines for the second.
+Expected: no match for the first, and roughly 30 lines for the second.
+
+> Do **not** grep for `max-width: 480px` — it still matches, but on the *new*
+> `.settings-fields` rule from Task 7, not the old `.settings form` culprit.
+> The old rule constrained the whole page; the new one only caps a column of
+> text inputs inside a full-width pane, which is correct.
 
 - [ ] **Step 8: Commit**
 
