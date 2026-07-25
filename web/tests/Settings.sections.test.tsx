@@ -5,19 +5,36 @@ import { createResource, type Component } from "solid-js";
 import { SettingsConfigContext, type ServerConfig } from "../src/lib/settings-config";
 import ScanSection from "../src/components/settings/ScanSection";
 import TerminalsSection from "../src/components/settings/TerminalsSection";
+import LaunchersSection from "../src/components/settings/LaunchersSection";
+import IntegrationsSection from "../src/components/settings/IntegrationsSection";
+import SystemSection from "../src/components/settings/SystemSection";
 import { patchConfig, runDiscover } from "../src/api";
 
 const CONFIG: ServerConfig = {
   scanRoot: "/tmp/projects", pollIntervalMs: 10_000,
   sessionMaxTotal: 32, sessionMaxScrollbackLines: 10_000,
-  sessionDefaultShell: "/bin/zsh", projectSubdirs: ["Personal"], launchers: [],
-  claudeConfigDirs: [],
+  sessionDefaultShell: "/bin/zsh", projectSubdirs: ["Personal"],
+  launchers: [{ id: "shell", label: "shell", command: null, args: [] }],
+  claudeConfigDirs: [{ path: "/home/u/.claude-work", profile: "work" }],
+};
+
+// IntegrationsSection renders BbsSettings, which fetches its own config.
+const BBS_CONFIG = {
+  enabled: false,
+  baseUrl: "https://app.bigbeautifulscreens.com",
+  screenId: null, screenUrl: null, accountKey: null, screenKey: null,
+  alertLingerSec: 60, hudIntervalMs: 30_000, rotationIntervalSec: 8,
+  hudPanelCap: 6, alertEvents: [], status: { lastOk: null, lastError: null },
 };
 
 vi.mock("../src/api", () => ({
   fetchConfig: vi.fn(async () => CONFIG),
   patchConfig: vi.fn(async () => ({ ok: true })),
   runDiscover: vi.fn(async () => ({ count: 3, root: "/tmp/projects" })),
+  fetchBbsConfig: vi.fn(async () => BBS_CONFIG),
+  saveBbsConfig: vi.fn(async () => ({ ok: true })),
+  provisionBbs: vi.fn(async () => ({ ok: true })),
+  testBbs: vi.fn(async () => ({ ok: true })),
 }));
 
 const refetchProjects = vi.fn();
@@ -96,5 +113,48 @@ describe("TerminalsSection", () => {
     expect((save as HTMLButtonElement).disabled).toBe(true);
     fireEvent.input(screen.getByLabelText("default shell"), { target: { value: "/bin/fish" } });
     expect((save as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("LaunchersSection", () => {
+  test("saves only the launcher list", async () => {
+    renderSection(LaunchersSection);
+    const label = await screen.findByDisplayValue("shell");
+    fireEvent.input(label, { target: { value: "bash" } });
+    fireEvent.click(screen.getByRole("button", { name: "save" }));
+
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
+    expect(patchConfig).toHaveBeenCalledWith({
+      launchers: [{ id: "shell", label: "bash", command: null, args: [] }],
+    });
+    expect(runDiscover).not.toHaveBeenCalled();
+  });
+
+  test("adding a launcher marks the section dirty", async () => {
+    renderSection(LaunchersSection);
+    const save = await screen.findByRole("button", { name: "save" });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "+ add launcher" }));
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("IntegrationsSection", () => {
+  test("renders the BBS panel, which owns its own save buttons", async () => {
+    renderSection(IntegrationsSection);
+    expect(await screen.findByText("Big Beautiful Screens")).toBeTruthy();
+    expect(
+      await screen.findByPlaceholderText("https://app.bigbeautifulscreens.com"),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "save" })).toBeNull();
+  });
+});
+
+describe("SystemSection", () => {
+  test("lists detected claude config dirs read-only", async () => {
+    renderSection(SystemSection);
+    expect(await screen.findByText("work")).toBeTruthy();
+    expect(screen.getByText("/home/u/.claude-work")).toBeTruthy();
+    expect(screen.queryByText("save")).toBeNull();
   });
 });
