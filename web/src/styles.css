@@ -916,8 +916,11 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .tasks-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tasks-row-meta { font-size: 0.7rem; }
 .tasks-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex: none; background: var(--fg-dim); }
-.tasks-dot-running { background: #5b9dd9; }
-.tasks-dot-review { background: #e0a83a; }
+/* running/review were one-off blue/amber hexes. Folding them onto the role
+   tokens shifts both slightly under Forest Dark — deliberate, so the whole dot
+   family themes together and stays legible on light themes. */
+.tasks-dot-running { background: var(--info); }
+.tasks-dot-review { background: var(--warn); }
 .tasks-dot-draft { background: var(--fg-dim); }
 .tasks-dot-done { background: var(--ok); }
 .tasks-dot-abandoned { background: var(--border); }
