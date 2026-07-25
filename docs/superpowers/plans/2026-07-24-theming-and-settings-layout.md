@@ -3083,6 +3083,22 @@ export default function LaunchersSection() {
 
 `BbsSettings` already owns its own fetch and save button, so this is a heading plus the existing component. No guard: nothing in this section is held outside `BbsSettings`.
 
+**Also tokenize `BbsSettings`'s three inline colours** — they are the last
+hardcoded colours in `web/src`, and Task 21's grep expects none:
+
+| `BbsSettings.tsx` | Was | Now |
+|---|---|---|
+| `:79` last-publish-error text | `#c0392b` | `var(--error)` |
+| `:81` success message | `#2e7d32` | `var(--ok)` |
+| `:82` error message | `#c0392b` | `var(--error)` |
+
+This does change Forest Dark: dark red `#c0392b` becomes salmon `#f87171`, dark
+green `#2e7d32` becomes mint `#6ee7b7`. That is an improvement rather than a
+regression — both originals are light-theme colours sitting on Forest's
+near-black panel, where `#c0392b` on `#0e0e10` is close to unreadable. Leaving
+them literal would also make them wrong under every other theme, which is the
+whole point of the exercise.
+
 ```tsx
 // web/src/components/settings/IntegrationsSection.tsx
 import BbsSettings from "../BbsSettings";
