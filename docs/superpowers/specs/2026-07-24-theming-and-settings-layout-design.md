@@ -247,8 +247,19 @@ flash. Self-healing, single source of truth, no build step.
 
 Mechanical conversion: 53 tints to `color-mix()`, and the raw `#0e0e10`,
 `#2a2a2d`, `#555`, `#3a3a3d`, `#82aaff`, `#86efac`, `#fca5a5` literals onto real
-tokens. The accent/ok split from §1 is applied at the same time. `mobile.css`
-carries three tints and converts identically.
+tokens. The accent/ok split from §1 is applied at the same time.
+
+`mobile.css` is **not** a mechanical conversion, contrary to what an earlier
+draft of this section claimed. It carries ~31 colour declarations in an entirely
+separate greyscale (`#161616`, `#232323`, `#1e1e1e`, `#111` …) plus bespoke
+semantic colours, none of which equal a Forest Dark token. Tokenizing it and
+keeping `/m` pixel-identical are contradictory requirements.
+
+Tokenizing wins. `/m` re-skins to the token palette under Forest Dark — a small,
+deliberate visual change — because §4's mobile theme picker is pointless
+otherwise: a hardcoded `mobile.css` would leave `/m` dark grey under Catppuccin
+Latte no matter what the picker says. The full literal-to-token mapping lives in
+the implementation plan.
 
 `:root { color-scheme: dark }` is removed — `applyTheme` owns it now.
 

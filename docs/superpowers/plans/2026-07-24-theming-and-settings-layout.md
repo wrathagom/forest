@@ -919,9 +919,44 @@ grep -nE '#[0-9a-fA-F]{3,8}|rgba?\(' web/src/styles.css web/src/pages/mobile/mob
 
 Expected: only the `:root` fallback block from Task 5. Anything else is a miss.
 
+**Two literals the table above does not cover.** `.tasks-dot-running` `#5b9dd9`
+and `.tasks-dot-review` `#e0a83a` map to `var(--info)` and `var(--warn)`. They
+are semantically exactly info and warn, and they sit in a dot family whose other
+members are already tokens. This shifts them slightly (`#5b9dd9`→`#82aaff`,
+`#e0a83a`→`#f59e0b`) — deliberate, because leaving them hardcoded would keep
+them blue/amber on a light theme, where they would look wrong.
+
+**`mobile.css` re-skins; it does not stay identical.** Unlike `styles.css`, the
+mobile stylesheet has its own greyscale (`#161616`, `#232323`, `#1e1e1e`, `#111`
+…) that matches no Forest Dark token, plus bespoke semantic colours. Tokenizing
+it and keeping `/m` pixel-identical are contradictory, so tokenizing wins:
+Task 20 adds a theme picker to the mobile bar, and if `mobile.css` stayed
+hardcoded then `/m` would render dark grey under Catppuccin Latte and that
+picker would be decorative. Mapping:
+
+| mobile.css literal | Token |
+|---|---|
+| `#161616`, `#111`, `#141414` | `var(--bg)` |
+| `#232323`, `#1e1e1e`, `#222`, `#1a1a1a`, `#262626` | `var(--bg-2)` |
+| `#2e2e2e`, `#333` | `var(--border)` |
+| `#3a3a3a` | `var(--border-strong)` |
+| `#e6e6e6`, `#cfcfcf`, `#c8c8c8`, `#bdbdbd`, `#b6b6b6` | `var(--fg)` |
+| `#8a8a8a`, `#9a9a9a`, `#7a7a7a` | `var(--fg-dim)` |
+| `#3a2e12` / `#6b551c` (waiting row, pressed segment) | `--warn` at 18% / 45% |
+| `#2d6a4f` + `#fff` (primary button) | `var(--accent)` + `var(--accent-fg)` |
+| `#23303a` (user bubble) | `color-mix(in srgb, var(--accent) 12%, var(--bg-2))` |
+| `#3a1f1f` / `#6b2c2c` / `#f0c8c8`, `#f08c8c` | `--error` at 15% / 45% / `var(--error)` |
+| `rgba(255,255,255,.1)` (inline code) | `color-mix(in srgb, var(--fg) 10%, transparent)` |
+| `var(--accent, #6ee7b7)` | `var(--accent)` — the fallback is dead now |
+
 - [ ] **Step 3: Confirm the app is unchanged**
 
-Run: `bun run dev:web` and walk the dashboard, a project detail page (all tabs), the sessions page, and `/m`. Forest Dark should be indistinguishable from `main`.
+Run: `bun run dev:web` and walk the dashboard, a project detail page (all tabs),
+and the sessions page. Forest Dark should be indistinguishable from `main`
+there.
+
+`/m` is the deliberate exception — its greys move from the bespoke ramp to the
+token ramp. Check it looks *right*, not that it looks *the same*.
 
 - [ ] **Step 4: Run the full web suite**
 
@@ -1903,6 +1938,19 @@ Dark. Two things move on screen, both small and both deliberate:
 
 Look at the `!` badge specifically and confirm it is still readable. If it is
 not, the fix is a dedicated token, not a nudge to `--fg-faint`.
+
+**Two more known changes to confirm rather than discover:**
+
+- `.diff-add` and `.diff-del` text previously used lighter one-off tints
+  (`#86efac`, `#fca5a5`) than `--ok` / `--error`. They now use the role tokens
+  directly, so added and deleted line text matches the healthy-dot green and
+  error-banner red exactly. Deliberate — collapsing a one-off tint onto its role
+  token is the point — but look at a diff and confirm it still reads well.
+- `.caffeinate-on` moved to `--ok` while `.editor-status-toggle.active` kept
+  `--accent`, even though both mean "this toggle is on". Under Mocha the
+  caffeinate icon will be green and the editor status toggle mauve. Look at both
+  and decide whether that reads as inconsistent; if it does, move
+  `.editor-status-toggle.active` to `--ok` too.
 
 - [ ] **Step 3: Fix anything found**
 
