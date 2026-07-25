@@ -593,8 +593,6 @@ describe("Forest Dark preserves today's look", () => {
 // and every existing test still passes, while the flash the cache exists to
 // prevent silently comes back. These two assertions are that missing link.
 describe("index.html boot script contract", () => {
-  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-
   test("uses the real cache key", () => {
     expect(html).toContain(BOOT_CACHE_KEY);
   });
@@ -610,9 +608,18 @@ describe("index.html boot script contract", () => {
 The test file needs two extra imports for that block:
 
 ```ts
-import { readFileSync } from "node:fs";
+import html from "../index.html?raw";
 import { BOOT_CACHE_KEY } from "../src/lib/themes/apply";
 ```
+
+`?raw` is Vite-native and already typed by `vite/client`, which is in
+`web/tsconfig.json`'s `types` array — so this needs no `@types/node` and no
+filesystem access.
+
+**Do not** reach for `readFileSync(new URL("../index.html", import.meta.url))`.
+Vite statically rewrites that exact AST pattern into a dev-server asset URL
+(`http://localhost:3000/index.html`), and `readFileSync` then throws
+`ERR_INVALID_URL_SCHEME`. This was verified empirically during review.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -659,6 +666,11 @@ export const forestDark = buildTheme({
   overrides: {
     // CodeMirror used a distinct invalid red, not the tag red.
     synInvalid: "#ff5370",
+    // The recipe derives synProperty from `cyan`, but Forest renders property
+    // and attribute names in the same blue as functions (#82aaff). Without
+    // this, every object key, JSON key, and JSX attribute would shift to cyan
+    // when Task 8 lands. Other themes are happy with the cyan default.
+    synProperty: "#82aaff",
     // The token meter had its own violet.
     tokIn: "#6ee7b7", tokOut: "#f59e0b", tokCache: "#8b5cf6",
   },
@@ -708,6 +720,10 @@ export function currentTheme(): Theme {
 }
 
 export function setTheme(id: string): void {
+  // Ignore an unknown id rather than persisting it. The appearance picker keys
+  // its selected state on themeId(), so storing a value with no matching theme
+  // would leave every card unselected while the default renders underneath.
+  if (!THEME_BY_ID[id]) return;
   setThemeId(id);
   applyTheme(currentTheme());
 }
@@ -1890,6 +1906,18 @@ Look for white-on-white text, invisible borders, and stray dark backgrounds:
 - `/m` — session list, a session detail, the new-run form
 - A markdown file containing a mermaid diagram — the diagram must be legible on a light background
 - The new-project modal and the launcher fly-out menu
+
+**One known, accepted change to confirm rather than discover.** `--fg-faint`
+collapses two accidental near-duplicate greys — the CodeMirror gutter's `#555`
+and the `var(--muted, #888)` fallback — onto one token, `#666666` in Forest
+Dark. Two things move on screen, both small and both deliberate:
+
+- gutter line numbers get slightly *lighter* (imperceptible, ~7% luminance)
+- the `!` badge in the file tree (`.tree-badge-\!`, already at `opacity: 0.7`)
+  gets slightly *darker* — this is the more visible of the two
+
+Look at the `!` badge specifically and confirm it is still readable. If it is
+not, the fix is a dedicated token, not a nudge to `--fg-faint`.
 
 - [ ] **Step 3: Fix anything found**
 
