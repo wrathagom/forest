@@ -927,25 +927,17 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .tasks-dot-review { background: var(--warn); }
 .tasks-dot-draft { background: var(--fg-dim); }
 .tasks-dot-done { background: var(--ok); }
-.tasks-dot-abandoned { background: var(--border); }
+/* --fg-faint, not --border: .task-badge paints --bg text on this fill, and
+   --border gave 1.35:1 in Forest Dark — illegible in every theme. Also makes
+   the panel's abandoned dot visible against the pane background. */
+.tasks-dot-abandoned { background: var(--fg-faint); }
 
 /* --- Task view (main-area task tab) --- */
 .task-view { height: 100%; overflow-y: auto; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
 .task-view-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
 .task-view-title { font-size: 1rem; color: var(--fg); }
-/* The badge shares the .tasks-dot-* state classes with the panel's dot, but the
-   two need opposite treatments: the dot is a solid fill, the badge is a tinted
-   chip with role-coloured text (the same shape as .git-stat and .svc-count).
-   Text on a solid role fill cannot hold contrast across themes — `abandoned`
-   managed only 1.35:1 even in Forest Dark. `abandoned` uses --fg-faint rather
-   than the dot's --border, which is illegible as text in every theme. */
 .task-badge { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid transparent; }
-.task-badge.tasks-dot-running { background: color-mix(in srgb, var(--info) 15%, transparent); color: var(--info); border-color: color-mix(in srgb, var(--info) 35%, transparent); }
-.task-badge.tasks-dot-review { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
-.task-badge.tasks-dot-draft { background: color-mix(in srgb, var(--fg-dim) 15%, transparent); color: var(--fg-dim); border-color: color-mix(in srgb, var(--fg-dim) 35%, transparent); }
-.task-badge.tasks-dot-done { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
-.task-badge.tasks-dot-abandoned { background: color-mix(in srgb, var(--fg-faint) 15%, transparent); color: var(--fg-faint); border-color: color-mix(in srgb, var(--fg-faint) 35%, transparent); }
+  padding: 0.1rem 0.4rem; border-radius: 3px; color: var(--bg); }
 .task-view-meta { width: 100%; font-size: 0.72rem; font-family: ui-monospace, monospace; }
 .task-view-section { display: flex; flex-direction: column; gap: 0.3rem; }
 .task-view-label { color: var(--fg-dim); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.07em; }
