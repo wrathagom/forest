@@ -27,6 +27,23 @@ describe("current theme", () => {
     });
   });
 
+  test("setTheme ignores an unknown id", () => {
+    createRoot(() => {
+      setTheme("forest-dark"); // establish a known, valid state via the public API
+      setTheme("does-not-exist");
+      // Asserting on themeId()/localStorage rather than currentTheme().id is
+      // the point: currentTheme() falls back to the default no matter what
+      // themeId() holds, so it would pass even with the guard removed and
+      // would not catch a corrupted stored id. forest-dark is also today's
+      // only registered theme, so it happens to equal DEFAULT_THEME_ID — but
+      // that doesn't make this vacuous: without the guard, setThemeId writes
+      // through unconditionally, so both of these would become
+      // "does-not-exist" regardless of what the default is.
+      expect(themeId()).toBe("forest-dark");
+      expect(localStorage.getItem("forest.theme")).toBe(JSON.stringify("forest-dark"));
+    });
+  });
+
   test("an unknown stored id falls back to the default", () => {
     localStorage.setItem("forest.theme", JSON.stringify("does-not-exist"));
     createRoot(() => {
