@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
+    "@types/node": "^26.1.1",
     "jsdom": "^29.1.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.11",

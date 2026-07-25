@@ -7,6 +7,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Settings from "./pages/Settings";
 import Sessions from "./pages/Sessions";
 import Archives from "./pages/Archives";
+import { initTheme } from "./lib/themes/current";
 
 const MobileLayout = lazy(() => import("./pages/mobile/MobileLayout"));
 const MobileSessionList = lazy(() => import("./pages/mobile/SessionList"));
@@ -15,6 +16,7 @@ const MobileNewRun = lazy(() => import("./pages/mobile/NewRun"));
 
 const root = document.getElementById("root");
 if (!root) throw new Error("missing #root");
+initTheme();
 render(
   () => (
     <Router root={App}>
