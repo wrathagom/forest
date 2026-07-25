@@ -17,6 +17,10 @@ export function currentTheme(): Theme {
 }
 
 export function setTheme(id: string): void {
+  // Ignore an unknown id rather than persisting it. The appearance picker keys
+  // its selected state on themeId(), so storing a value with no matching theme
+  // would leave every card unselected while the default renders underneath.
+  if (!THEME_BY_ID[id]) return;
   setThemeId(id);
   applyTheme(currentTheme());
 }

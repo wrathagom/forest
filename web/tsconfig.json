@@ -3,7 +3,7 @@
   "compilerOptions": {
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "types": ["vite/client", "node"],
+    "types": ["vite/client"],
     "noEmit": true
   },
   "include": ["src/**/*", "tests/**/*"]

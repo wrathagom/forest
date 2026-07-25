@@ -33,6 +33,11 @@ export const forestDark = buildTheme({
   overrides: {
     // CodeMirror used a distinct invalid red, not the tag red.
     synInvalid: "#ff5370",
+    // The recipe derives synProperty from `cyan`, but Forest renders property
+    // and attribute names in the same blue as functions (#82aaff). Without
+    // this, every object key, JSON key, and JSX attribute would shift to cyan
+    // when Task 8 lands. Other themes are happy with the cyan default.
+    synProperty: "#82aaff",
     // The token meter had its own violet.
     tokIn: "#6ee7b7", tokOut: "#f59e0b", tokCache: "#8b5cf6",
   },
