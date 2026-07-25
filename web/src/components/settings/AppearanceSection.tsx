@@ -1,23 +1,21 @@
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import { THEMES } from "../../lib/themes/index";
 import { setTheme, themeId } from "../../lib/themes/current";
-import type { Theme } from "../../lib/themes/types";
+import type { Theme, ThemeScheme } from "../../lib/themes/types";
 
-// Families in registry order, split so all dark families come before light ones.
-function familyGroups(): Array<{ family: string; scheme: string; themes: Theme[] }> {
-  const groups = new Map<string, Theme[]>();
-  for (const t of THEMES) {
-    const key = `${t.family}::${t.scheme}`;
-    const list = groups.get(key);
-    if (list) list.push(t);
-    else groups.set(key, [t]);
-  }
-  return [...groups.entries()]
-    .map(([key, themes]) => {
-      const [family, scheme] = key.split("::") as [string, string];
-      return { family, scheme, themes };
-    })
-    .sort((a, b) => (a.scheme === b.scheme ? 0 : a.scheme === "dark" ? -1 : 1));
+// Two groups, dark then light: a light theme must not ambush someone scanning
+// the dark ones. Grouping by family instead produced fourteen headings for
+// sixteen themes, thirteen of them holding a single card, which read as a list
+// wearing a grid's clothes. The family moved onto the card, so families still
+// sit together (registry order is preserved within each scheme) without
+// costing a heading each.
+const SCHEME_ORDER: ThemeScheme[] = ["dark", "light"];
+
+function schemeGroups(): Array<{ scheme: ThemeScheme; themes: Theme[] }> {
+  return SCHEME_ORDER.map((scheme) => ({
+    scheme,
+    themes: THEMES.filter((t) => t.scheme === scheme),
+  })).filter((g) => g.themes.length > 0);
 }
 
 export default function AppearanceSection() {
@@ -25,13 +23,10 @@ export default function AppearanceSection() {
     <section>
       <h3>appearance</h3>
       <span class="hint">applies immediately and is remembered on this device only</span>
-      <For each={familyGroups()}>
+      <For each={schemeGroups()}>
         {(group) => (
           <div class="theme-family">
-            <div class="theme-family-name">
-              {group.family}
-              {group.scheme === "light" ? " (light)" : ""}
-            </div>
+            <div class="theme-family-name">{group.scheme}</div>
             <div class="theme-grid">
               <For each={group.themes}>
                 {(theme) => (
@@ -48,7 +43,14 @@ export default function AppearanceSection() {
                       <span style={{ background: theme.tokens.accent }} />
                       <span style={{ background: theme.tokens.ok }} />
                     </span>
-                    <span class="theme-card-name">{theme.name}</span>
+                    <span class="theme-card-label">
+                      <span class="theme-card-name">{theme.name}</span>
+                      {/* Four themes are the only member of a family named
+                          after them; "Dracula / Dracula" is worse than one line. */}
+                      <Show when={theme.family !== theme.name}>
+                        <span class="theme-card-family">{theme.family}</span>
+                      </Show>
+                    </span>
                   </button>
                 )}
               </For>

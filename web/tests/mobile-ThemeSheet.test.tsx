@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import ThemeSheet from "../src/pages/mobile/ThemeSheet";
 import { THEMES } from "../src/lib/themes/index";
+import { setTheme } from "../src/lib/themes/current";
 
 beforeEach(() => {
   localStorage.clear();
@@ -39,5 +40,44 @@ describe("mobile ThemeSheet", () => {
     fireEvent.click(screen.getByTestId("theme-sheet-backdrop"));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(localStorage.getItem("forest.theme")).toBeNull();
+  });
+
+  test("Escape closes without changing the theme", () => {
+    render(() => <ThemeSheet />);
+    fireEvent.click(screen.getByRole("button", { name: /theme/i }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(localStorage.getItem("forest.theme")).toBeNull();
+  });
+
+  test("the Escape listener does not outlive the sheet", () => {
+    render(() => <ThemeSheet />);
+    fireEvent.click(screen.getByRole("button", { name: /theme/i }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    // A second Escape with the sheet closed must not reopen it or throw.
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
+  });
+
+  // jsdom has no scrollIntoView, so stub the prototype: the sheet calls it
+  // through `?.` and would silently do nothing either way.
+  test("scrolls the active theme into view when opened", () => {
+    setTheme("solarized-light");
+    const proto = Element.prototype as unknown as Record<string, unknown>;
+    const had = "scrollIntoView" in proto;
+    const original = proto.scrollIntoView;
+    const scrolled: string[] = [];
+    proto.scrollIntoView = function (this: Element) {
+      scrolled.push(this.getAttribute("aria-label") ?? "");
+    };
+    try {
+      render(() => <ThemeSheet />);
+      fireEvent.click(screen.getByRole("button", { name: /theme/i }));
+      expect(scrolled).toEqual(["Solarized Light"]);
+    } finally {
+      if (had) proto.scrollIntoView = original;
+      else delete proto.scrollIntoView;
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { THEMES } from "../../lib/themes/index";
 import { setTheme, themeId, currentTheme } from "../../lib/themes/current";
 
@@ -7,11 +7,27 @@ import { setTheme, themeId, currentTheme } from "../../lib/themes/current";
 // default is.
 export default function ThemeSheet() {
   const [open, setOpen] = createSignal(false);
+  let list: HTMLDivElement | undefined;
 
   const pick = (id: string) => {
     setTheme(id);
     setOpen(false);
   };
+
+  createEffect(() => {
+    if (!open()) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => document.removeEventListener("keydown", onKey));
+
+    // Sixteen rows do not fit: opening while on one of the last themes would
+    // otherwise land at the top with the selection off-screen. `?.` on the
+    // method matches SessionDetail.tsx — jsdom has no scrollIntoView.
+    list?.querySelector(".m-sheet-row.active")?.scrollIntoView?.({ block: "center" });
+  });
 
   return (
     <>
@@ -30,9 +46,13 @@ export default function ThemeSheet() {
           data-testid="theme-sheet-backdrop"
           onclick={() => setOpen(false)}
         />
-        <div class="m-sheet" role="dialog" aria-modal="true" aria-label="choose a theme">
+        {/* role="dialog" without aria-modal: nothing here traps focus, and the
+            list behind the backdrop stays reachable, so claiming modality would
+            tell a screen reader something untrue. Escape and the backdrop are
+            the two ways out. */}
+        <div class="m-sheet" role="dialog" aria-label="choose a theme">
           <div class="m-sheet-title">theme</div>
-          <div class="m-sheet-list">
+          <div class="m-sheet-list" ref={list}>
             <For each={THEMES}>
               {(theme) => (
                 <button

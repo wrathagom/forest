@@ -133,16 +133,23 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 /* theme picker */
 .theme-family { margin-bottom: 1.2rem; }
 .theme-family-name { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-dim); margin-bottom: 0.4rem; }
-.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+/* grid-auto-rows: 1fr so a short last row — a card with no family line, alone
+   in its row — is the same height as every other card */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; grid-auto-rows: 1fr; }
 .theme-card {
   border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
   cursor: pointer; padding: 0; background: none; font: inherit; text-align: left;
+  /* column + flex:1 label so cards in a row stay the same height whether or
+     not they carry a family line */
+  display: flex; flex-direction: column;
 }
 .theme-card:hover { border-color: var(--fg-dim); }
 .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .theme-swatch { display: flex; height: 34px; }
 .theme-swatch span { flex: 1; }
-.theme-card-name { padding: 0.25rem 0.5rem; font-size: 0.78rem; color: var(--fg-dim); background: var(--bg-2); }
+.theme-card-label { flex: 1; padding: 0.25rem 0.5rem 0.3rem; background: var(--bg-2); }
+.theme-card-name { display: block; font-size: 0.78rem; color: var(--fg-dim); }
+.theme-card-family { display: block; font-size: 0.66rem; color: var(--fg-faint); }
 .theme-card.active .theme-card-name { color: var(--accent); }
 
 /* unsaved-changes dialog */

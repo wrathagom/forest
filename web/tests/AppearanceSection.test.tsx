@@ -16,12 +16,20 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-// The family label lives in .theme-family-name. Querying by text alone is not
-// enough: four families (Rosé Pine, Dracula, Nord, Tokyo Night) are named
-// exactly like their only theme, so getByText(family) also matches the card.
-function familyHeadings(container: HTMLElement): string[] {
+function headings(container: HTMLElement): string[] {
   return [...container.querySelectorAll(".theme-family-name")].map((el) =>
     (el.textContent ?? "").trim(),
+  );
+}
+
+// The cards under a heading, in DOM order, by the theme name on the card.
+function cardsUnder(container: HTMLElement, heading: string): string[] {
+  const group = [...container.querySelectorAll(".theme-family")].find(
+    (g) => g.querySelector(".theme-family-name")?.textContent?.trim() === heading,
+  );
+  if (!group) return [];
+  return [...group.querySelectorAll(".theme-card")].map(
+    (el) => el.getAttribute("aria-label") ?? "",
   );
 }
 
@@ -39,26 +47,49 @@ describe("AppearanceSection", () => {
     }
   });
 
-  test("groups cards by family", () => {
+  // The family used to be a heading. It now lives on the card, so it has to be
+  // visible there — otherwise regrouping by scheme would have thrown the
+  // information away rather than moved it.
+  test("shows the family on the card when it differs from the theme name", () => {
     const { container } = render(() => <AppearanceSection />);
-    const headings = familyHeadings(container);
-    for (const family of new Set(THEMES.map((t) => t.family))) {
-      expect(
-        headings.some((h) => h === family || h === `${family} (light)`),
-        `expected a group heading for ${family}, got: ${headings.join(" | ")}`,
-      ).toBe(true);
+    for (const theme of THEMES) {
+      const card = screen.getByRole("button", { name: new RegExp(`^${theme.name}$`, "i") });
+      const family = card.querySelector(".theme-card-family")?.textContent?.trim() ?? null;
+      // Rosé Pine, Dracula, Nord and Tokyo Night are the only theme in a family
+      // named after them: a card reading "Dracula / Dracula" says nothing twice.
+      expect(family, `${theme.name} family line`).toBe(
+        theme.family === theme.name ? null : theme.family,
+      );
     }
+    expect(container.querySelectorAll(".theme-card-family").length).toBe(
+      THEMES.filter((t) => t.family !== t.name).length,
+    );
   });
 
-  // Why the groups are split by scheme at all: a light theme must not ambush
-  // someone scanning the dark ones.
-  test("lists every dark family before any light one", () => {
+  // The reason for grouping at all: a light theme must not ambush someone
+  // scanning the dark ones.
+  test("groups into dark then light, and nothing else", () => {
     const { container } = render(() => <AppearanceSection />);
-    const isLight = familyHeadings(container).map((h) => h.endsWith("(light)"));
-    const firstLight = isLight.indexOf(true);
-    const lastDark = isLight.lastIndexOf(false);
-    expect(firstLight).toBeGreaterThan(-1); // there is at least one light family
-    expect(lastDark).toBeLessThan(firstLight);
+    expect(headings(container)).toEqual(["dark", "light"]);
+
+    const byName = new Map(THEMES.map((t) => [t.name, t]));
+    const schemeOf = (names: string[]) => [...new Set(names.map((n) => byName.get(n)?.scheme))];
+    expect(schemeOf(cardsUnder(container, "dark"))).toEqual(["dark"]);
+    expect(schemeOf(cardsUnder(container, "light"))).toEqual(["light"]);
+    // every theme is placed, none twice
+    expect(cardsUnder(container, "dark").length + cardsUnder(container, "light").length).toBe(
+      THEMES.length,
+    );
+  });
+
+  test("keeps registry order within a group, so families stay together", () => {
+    const { container } = render(() => <AppearanceSection />);
+    expect(cardsUnder(container, "dark")).toEqual(
+      THEMES.filter((t) => t.scheme === "dark").map((t) => t.name),
+    );
+    expect(cardsUnder(container, "light")).toEqual(
+      THEMES.filter((t) => t.scheme === "light").map((t) => t.name),
+    );
   });
 
   test("clicking a theme applies and persists it immediately", () => {
