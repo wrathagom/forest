@@ -223,6 +223,46 @@ describe("buildTheme", () => {
     expect(tokens.termFg).toBe(INPUT.fg); // untouched
   });
 
+  test("role colors default to the matching hue", () => {
+    // Most published palettes use one value for both, so a theme that omits
+    // these should fall back to green/yellow/red/blue.
+    const withoutRoles: ThemeInput = { ...INPUT };
+    delete withoutRoles.ok;
+    delete withoutRoles.warn;
+    delete withoutRoles.error;
+    delete withoutRoles.info;
+    const { tokens } = buildTheme(withoutRoles);
+    expect(tokens.ok).toBe(INPUT.green);
+    expect(tokens.warn).toBe(INPUT.yellow);
+    expect(tokens.error).toBe(INPUT.red);
+    expect(tokens.info).toBe(INPUT.blue);
+  });
+
+  test("an explicit role color wins over the hue default", () => {
+    const { tokens } = buildTheme({ ...INPUT, ok: "#123123", green: "#00ff00" });
+    expect(tokens.ok).toBe("#123123");
+    expect(tokens.synString).toBe("#00ff00"); // the hue still drives syntax
+  });
+
+  test("charts default to the eight named hues", () => {
+    const { tokens } = buildTheme(INPUT);
+    expect(tokens.chart1).toBe(INPUT.blue);
+    expect(tokens.chart2).toBe(INPUT.pink);
+    expect(tokens.chart8).toBe(INPUT.teal);
+  });
+
+  test("a charts tuple replaces the derived series", () => {
+    const charts = [
+      "#111111", "#222222", "#333333", "#444444",
+      "#555555", "#666666", "#777777", "#888888",
+    ] as const;
+    const { tokens } = buildTheme({ ...INPUT, charts });
+    expect([
+      tokens.chart1, tokens.chart2, tokens.chart3, tokens.chart4,
+      tokens.chart5, tokens.chart6, tokens.chart7, tokens.chart8,
+    ]).toEqual([...charts]);
+  });
+
   test("carries identity through", () => {
     const theme = buildTheme(INPUT);
     expect(theme.id).toBe("t");
@@ -260,25 +300,43 @@ export type ThemeInput = {
 
   // roles
   accent: string; accentFg: string;
-  ok: string; warn: string; error: string; info: string;
+
+  // Default to the theme's corresponding hue, because in most published
+  // palettes they are literally the same value — Catppuccin's `ok` IS its
+  // green. Pass one explicitly only where it differs: Forest Dark's success
+  // green (#6ee7b7) is not its syntax-string green (#c3e88d).
+  ok?: string; warn?: string; error?: string; info?: string;
 
   // named hues, used to derive syntax and chart colors
   purple: string; green: string; orange: string; blue: string;
   cyan: string; yellow: string; red: string; pink: string;
   teal: string; comment: string;
 
-  // escape hatch for themes whose palette does not fit the recipe — e.g. a
-  // family with fewer than 8 distinct hues needs explicit chart colors.
+  // Categorical chart series. Defaults to the eight named hues, which only
+  // works for palettes that publish eight distinct ones. Most families
+  // collapse at least two — Dracula's blue and cyan are the same hex — so
+  // they pass a tuple. A tuple rather than eight `chartN` override lines
+  // keeps the "8 distinct colors" requirement visible where it is authored.
+  charts?: readonly [string, string, string, string, string, string, string, string];
+
+  // Last-resort escape hatch for a single token that fits no other rule.
   overrides?: Partial<ThemeTokens>;
 };
 
 export function buildTheme(i: ThemeInput): Theme {
+  const ok = i.ok ?? i.green;
+  const warn = i.warn ?? i.yellow;
+  const error = i.error ?? i.red;
+  const info = i.info ?? i.blue;
+  const charts =
+    i.charts ?? [i.blue, i.pink, i.green, i.yellow, i.purple, i.cyan, i.orange, i.teal];
+
   const tokens: ThemeTokens = {
     bg: i.bg, bg2: i.bg2, bg3: i.bg3,
     fg: i.fg, fgDim: i.fgDim, fgFaint: i.fgFaint,
     border: i.border, borderStrong: i.borderStrong,
     accent: i.accent, accentFg: i.accentFg,
-    ok: i.ok, warn: i.warn, error: i.error, info: i.info,
+    ok, warn, error, info,
 
     synKeyword: i.purple,
     synString: i.green,
@@ -291,8 +349,8 @@ export function buildTheme(i: ThemeInput): Theme {
     synOperator: i.cyan,
     synInvalid: i.red,
 
-    chart1: i.blue, chart2: i.pink, chart3: i.green, chart4: i.yellow,
-    chart5: i.purple, chart6: i.cyan, chart7: i.orange, chart8: i.teal,
+    chart1: charts[0], chart2: charts[1], chart3: charts[2], chart4: charts[3],
+    chart5: charts[4], chart6: charts[5], chart7: charts[6], chart8: charts[7],
 
     termBg: i.bg, termFg: i.fg, termCursor: i.accent,
 
@@ -308,7 +366,7 @@ export function buildTheme(i: ThemeInput): Theme {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd web && bun run test -- theme-build`
-Expected: PASS, 5 tests
+Expected: PASS, 9 tests
 
 - [ ] **Step 5: Commit**
 
@@ -554,18 +612,27 @@ export const forestDark = buildTheme({
   border: "#2a2a2d", borderStrong: "#3a3a3d",
 
   accent: "#6ee7b7", accentFg: "#0e0e10",
-  ok: "#6ee7b7", warn: "#f59e0b", error: "#f87171", info: "#82aaff",
+
+  // Forest Dark is the one theme where the role colors genuinely differ from
+  // the syntax hues, so they are explicit: the success green is the accent
+  // green (#6ee7b7), not the string green (#c3e88d). `info` is omitted because
+  // it equals `blue` and the default already produces it.
+  ok: "#6ee7b7", warn: "#f59e0b", error: "#f87171",
 
   purple: "#c792ea", green: "#c3e88d", orange: "#f78c6c", blue: "#82aaff",
   cyan: "#89ddff", yellow: "#ffcb6b", red: "#f07178", pink: "#f472b6",
   teal: "#34d399", comment: "#546e7a",
 
+  // The exact PROFILE_PALETTE from charts/profileColors.ts, so existing charts
+  // do not shift colour when this theme is applied.
+  charts: [
+    "#60a5fa", "#f472b6", "#34d399", "#fbbf24",
+    "#a78bfa", "#22d3ee", "#fb923c", "#a3e635",
+  ],
+
   overrides: {
     // CodeMirror used a distinct invalid red, not the tag red.
     synInvalid: "#ff5370",
-    // The exact PROFILE_PALETTE, so existing charts do not shift.
-    chart1: "#60a5fa", chart2: "#f472b6", chart3: "#34d399", chart4: "#fbbf24",
-    chart5: "#a78bfa", chart6: "#22d3ee", chart7: "#fb923c", chart8: "#a3e635",
     // The token meter had its own violet.
     tokIn: "#6ee7b7", tokOut: "#f59e0b", tokCache: "#8b5cf6",
   },
