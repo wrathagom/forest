@@ -20,44 +20,51 @@ type Loaded =
 
 const POLL_MS = 2000;
 
+// CodeMirror compiles both the highlight style and the editor theme to real
+// CSS via StyleModule, so `var()` resolves normally and the editor recolors
+// itself on a theme change with no subscription and no re-mount.
 const forestHighlight = HighlightStyle.define([
-  { tag: t.keyword, color: "#c792ea" },
-  { tag: t.controlKeyword, color: "#c792ea" },
-  { tag: t.moduleKeyword, color: "#c792ea" },
-  { tag: t.definitionKeyword, color: "#c792ea" },
-  { tag: [t.string, t.special(t.string)], color: "#c3e88d" },
-  { tag: [t.number, t.bool, t.null, t.atom], color: "#f78c6c" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "#82aaff" },
-  { tag: [t.propertyName, t.attributeName], color: "#82aaff" },
-  { tag: [t.typeName, t.className, t.namespace], color: "#ffcb6b" },
-  { tag: [t.tagName], color: "#f07178" },
-  { tag: t.comment, color: "#546e7a", fontStyle: "italic" },
-  { tag: t.operator, color: "#89ddff" },
-  { tag: [t.regexp, t.escape, t.special(t.escape)], color: "#89ddff" },
-  { tag: t.heading, color: "#c792ea", fontWeight: "bold" },
-  { tag: t.link, color: "#82aaff", textDecoration: "underline" },
-  { tag: t.invalid, color: "#ff5370" },
+  { tag: t.keyword, color: "var(--syn-keyword)" },
+  { tag: t.controlKeyword, color: "var(--syn-keyword)" },
+  { tag: t.moduleKeyword, color: "var(--syn-keyword)" },
+  { tag: t.definitionKeyword, color: "var(--syn-keyword)" },
+  { tag: [t.string, t.special(t.string)], color: "var(--syn-string)" },
+  { tag: [t.number, t.bool, t.null, t.atom], color: "var(--syn-number)" },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "var(--syn-function)" },
+  { tag: [t.propertyName, t.attributeName], color: "var(--syn-property)" },
+  { tag: [t.typeName, t.className, t.namespace], color: "var(--syn-type)" },
+  { tag: [t.tagName], color: "var(--syn-tag)" },
+  { tag: t.comment, color: "var(--syn-comment)", fontStyle: "italic" },
+  { tag: t.operator, color: "var(--syn-operator)" },
+  { tag: [t.regexp, t.escape, t.special(t.escape)], color: "var(--syn-operator)" },
+  { tag: t.heading, color: "var(--syn-keyword)", fontWeight: "bold" },
+  { tag: t.link, color: "var(--syn-function)", textDecoration: "underline" },
+  { tag: t.invalid, color: "var(--syn-invalid)" },
 ]);
 
 const forestTheme: Extension = EditorView.theme(
   {
-    "&": { backgroundColor: "#0e0e10", color: "#e6e6e6", height: "100%", fontSize: "13px" },
+    "&": { backgroundColor: "var(--bg)", color: "var(--fg)", height: "100%", fontSize: "13px" },
     ".cm-content": {
       fontFamily:
         '"FiraCode Nerd Font Mono", "FiraCode Nerd Font", ui-monospace, Menlo, monospace',
-      caretColor: "#6ee7b7",
+      caretColor: "var(--accent)",
     },
     ".cm-gutters": {
-      backgroundColor: "#0e0e10",
-      color: "#555",
+      backgroundColor: "var(--bg)",
+      color: "var(--fg-faint)",
       border: "0",
-      borderRight: "1px solid #2a2a2d",
+      borderRight: "1px solid var(--border)",
     },
-    ".cm-activeLine": { backgroundColor: "rgba(255,255,255,0.02)" },
-    ".cm-activeLineGutter": { backgroundColor: "rgba(255,255,255,0.02)" },
-    ".cm-cursor": { borderLeftColor: "#6ee7b7" },
-    ".cm-selectionBackground, ::selection": { backgroundColor: "rgba(110,231,183,0.2)" },
+    ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--fg) 2%, transparent)" },
+    ".cm-activeLineGutter": { backgroundColor: "color-mix(in srgb, var(--fg) 2%, transparent)" },
+    ".cm-cursor": { borderLeftColor: "var(--accent)" },
+    ".cm-selectionBackground, ::selection": {
+      backgroundColor: "color-mix(in srgb, var(--accent) 20%, transparent)",
+    },
   },
+  // `dark: true` only selects CodeMirror's built-in dark base styles. Since
+  // every color above is a token, this no longer needs to track the theme.
   { dark: true },
 );
 
