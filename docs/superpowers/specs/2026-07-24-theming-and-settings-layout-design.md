@@ -526,10 +526,25 @@ Vitest with `@solidjs/testing-library`, matching the existing suite.
 - every theme in `THEMES` defines every `ThemeTokens` key with a valid hex — a
   runtime check alongside the compile-time one, so a bad cast cannot slip through
 - theme `id`s are unique, and `DEFAULT_THEME_ID` resolves
-- contrast floors, computed per theme: `fg`/`bg` ≥ 4.5:1, `fg-dim`/`bg` ≥ 3:1,
-  `accent`/`bg` ≥ 3:1, `ok`/`bg` ≥ 3:1, `error`/`bg` ≥ 3:1. This is what catches
-  a role mapped to the wrong palette entry in a light theme.
-- `accentFg`/`accent` ≥ 4.5:1, since accent-filled chips carry text
+- **hard contrast floors** on the pairs our *mapping* controls, computed per
+  theme: `fg`/`bg` ≥ 4.5:1, `fgDim`/`bg` ≥ 3:1, `fgFaint`/`bg` ≥ 2.2:1,
+  `accentFg`/`accent` ≥ 3.5:1. A failure here is our bug.
+
+  `fgFaint` is a deliberately de-emphasized tier (gutter numbers, the abandoned
+  task badge) that maps to each palette's own published comment tone, and
+  several palettes publish exactly one — Atom One's `mono-3` (2.32:1 / 2.47:1),
+  Nord's `#616e88` (2.43:1). Where there is no mapping choice to make, 2.2 still
+  catches a genuine collapse toward the background (nearer 1.0-1.5) without
+  rejecting a palette's only muted tone. `accentFg` is used in exactly one place
+  — bold labels on accent-filled controls — where 3:1 is the applicable WCAG
+  threshold rather than the 4.5:1 body-text one; Solarized's accents are
+  deliberately mid-luminance so no published neutral clears 4.5 against them.
+- **a gross-error floor of 2:1** on `accent`/`ok`/`warn`/`error`/`info` against
+  `bg`. Published role hues are the palette author's decision — Catppuccin
+  Latte's own green is 2.96:1 and its yellow 2.31:1 — so the test catches a role
+  mapped to the wrong palette entry (e.g. `ok` pointed at a surface color)
+  without overriding upstream design. The full role-contrast table is printed on
+  every run so a reviewer sees real numbers rather than a silent pass.
 - `applyTheme` writes all 38 custom properties, sets `color-scheme` and
   `data-theme`, and writes the boot cache
 - the boot cache round-trips: what `applyTheme` writes is what the bootstrap

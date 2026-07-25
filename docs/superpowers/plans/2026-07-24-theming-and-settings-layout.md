@@ -3642,17 +3642,21 @@ git commit -m "feat(mobile): theme picker sheet in the mobile bar"
 
 - [ ] **Step 1: Update the spec's contrast rule**
 
-The spec's §5 still states hard 3:1 floors on `accent`, `ok`, and `error`. Replace those three bullets in `docs/superpowers/specs/2026-07-24-theming-and-settings-layout-design.md` with the two-tier rule actually implemented in Task 12:
+The spec's §5 still states hard 3:1 floors on `accent`, `ok`, and `error`, and a
+4.5:1 floor on `accentFg`. Replace those two bullets in
+`docs/superpowers/specs/2026-07-24-theming-and-settings-layout-design.md` with
+the two-tier rule actually implemented in Task 12 and recorded in the **Spec
+amendment** block at the top of this plan — the floors that shipped are:
 
-```markdown
-- contrast floors on the pairs our mapping controls: `fg`/`bg` >= 4.5:1,
-  `fg-dim`/`bg` >= 3:1, `accentFg`/`accent` >= 4.5:1
-- a gross-error floor of 2:1 on `accent`/`ok`/`warn`/`error`/`info` against
-  `bg`. Published role hues are the palette author's decision — Catppuccin
-  Latte's own green is 2.96:1 and its yellow 2.31:1 — so the test catches a
-  role mapped to the wrong palette entry without overriding upstream design.
-  The full role-contrast table is printed on every run.
-```
+- **hard floors** (our mapping's responsibility): `fg`/`bg` ≥ 4.5,
+  `fgDim`/`bg` ≥ 3.0, `fgFaint`/`bg` ≥ 2.2, `accentFg`/`accent` ≥ 3.5
+- **gross-error floor of 2.0** on `accent`/`ok`/`warn`/`error`/`info` vs `bg`,
+  with the full role-contrast table printed on every run
+
+Carry across the *reasons* the amendment block gives for the two recalibrated
+numbers (`fgFaint` 2.5 → 2.2, `accentFg` 4.5 → 3.5) — a lowered floor with no
+recorded justification is indistinguishable from a floor lowered to hide a
+failure. `web/tests/theme-catalog.test.ts` is the authority on what shipped.
 
 - [ ] **Step 2: Document theming in the README**
 
@@ -3690,10 +3694,18 @@ Expected: every suite passes, including the pre-existing `BbsSettings`, `charts`
 Run: `cd server && bun test`
 Expected: passes. Nothing in this plan touches the server — a failure here means something unrelated is broken, and it should not be attributed to this work.
 
-- [ ] **Step 5: Verify the production build**
+- [ ] **Step 5: Verify the production build and the typecheck**
 
 Run: `bun run build:web`
-Expected: succeeds with no TypeScript errors.
+Expected: succeeds.
+
+`build:web` is `vite build`, which transpiles per-file with esbuild and **never
+typechecks** — a green build says nothing about TypeScript. Typecheck separately:
+
+Run: `cd web && bunx tsc --noEmit -p .`
+Expected: **no *new* errors against the 27-error baseline** — 1 in `App.tsx`, 22
+in `ProjectDetail.tsx`, and 4 across test files, all pre-existing and unrelated
+to this plan. Compare the count and the file list, not just the exit code.
 
 - [ ] **Step 6: Confirm no hardcoded colors survive**
 

@@ -64,7 +64,8 @@ Click any project card to open its detail page, which has:
 - **Terminals** — tabbed PTYs that survive browser refresh and reconnect, and
   all die when Forest stops. The WebSocket route is
   `/ws/projects/:id/sessions/:sid` (no auth — see the security note above).
-  Terminal limits and the default shell are configurable in Settings.
+  Terminal limits and the default shell are configurable under
+  **Settings → Terminals**.
 - **Files** — a file tree and editor (with image preview/zoom), showing
   git-ignored entries dimmed.
 - **Git** — branch-aware status and common actions.
@@ -79,6 +80,38 @@ Visit `/m` from a phone (over your private mesh) for a terminal-free surface: a
 list of waiting / working / recent agent sessions, a per-session reply box, and a
 "new run" form that launches a headless agent in a project. The same
 localhost / private-mesh-only boundary applies — there is no auth here either.
+
+### Settings
+
+`/settings` is a sidebar of seven sections — **appearance**, **dashboard**,
+**scan**, **terminals**, **launchers**, **integrations**, **system**. Each saves
+independently: scan, terminals, and launchers have their own save button that
+persists only that section's fields, and saving keeps you on the page rather
+than bouncing you back to the dashboard. If you navigate away with unsaved
+edits, a dialog offers save, discard, or cancel.
+
+Appearance and dashboard are per-device preferences stored in `localStorage`, so
+they apply immediately and have no save button; system is read-only.
+
+### Theming
+
+Forest ships 16 themes — Catppuccin (Latte, Frappé, Macchiato, Mocha), Rosé Pine
+and Dawn, Gruvbox Dark/Light, One Dark/Light, Solarized Dark/Light, Dracula,
+Nord, Tokyo Night, and the original Forest Dark. Pick one under
+**Settings → Appearance**, or from the swatch button in the mobile bar on `/m`.
+
+The choice is per-device (stored in `localStorage`), so your laptop and your
+phone can differ. Themes cover the app chrome, the code editor's syntax
+highlighting, charts, and mermaid diagrams.
+
+Terminal ANSI colors 0–15 are deliberately **not** themed: programs running in
+the PTY pick their own colors, and modern prompts emit 24-bit truecolor that no
+theme should override. Only the terminal's background, foreground, and cursor
+follow the theme.
+
+Adding a theme is one file under `web/src/lib/themes/` plus one line in
+`index.ts`; `buildTheme()` expands a published palette into the full token set,
+and the test suite checks completeness and contrast automatically.
 
 ## Architecture
 
@@ -107,7 +140,7 @@ Both are off / absent by default; Forest runs fully without them.
 - **[Big Beautiful Screens (BBS)](https://bigbeautifulscreens.com)** — an
   API-driven platform for real-time display dashboards and digital signage. Forest
   can optionally push a live session HUD to a BBS screen. Enable it under
-  **Settings → Big Beautiful Screens**, where you can set the **server URL** (point
+  **Settings → Integrations**, where you can set the **server URL** (point
   it at the [hosted service](https://bigbeautifulscreens.com) or your own
   self-hosted instance), the account key, and provision a screen. Disabled by
   default. To self-host, see
