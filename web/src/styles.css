@@ -149,6 +149,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .guard-dialog { background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 0; max-width: 420px; color: var(--fg); }
 .guard-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
 .guard-dialog-body { padding: 0.9rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.guard-dialog-error { color: var(--error); font-size: 0.82rem; margin: 0; }
 .guard-dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 .guard-dialog-actions button {
   background: var(--bg); color: var(--fg); border: 1px solid var(--border);
