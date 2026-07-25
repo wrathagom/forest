@@ -2178,7 +2178,7 @@ The old 304-line file becomes a shell. Its whole job is the rail, the config res
 
 ```tsx
 // web/src/pages/Settings.tsx
-import { createResource } from "solid-js";
+import { createResource, type Component } from "solid-js";
 import { A, type RouteSectionProps } from "@solidjs/router";
 import { fetchConfig } from "../api";
 import { SettingsConfigContext, type ServerConfig } from "../lib/settings-config";
@@ -2480,6 +2480,19 @@ git commit -m "feat(settings): unsaved-changes guard with save/discard/cancel"
 
 Establishes the pattern every explicit section follows: a `baseline` signal holding the last-loaded values, working signals for the fields, `dirty()` comparing the two, and `save()` moving the baseline forward.
 
+**Number inputs must reject non-finite parses.** `parseInt("")` is `NaN`, and
+because `NaN !== NaN` a single emptied field makes `dirty()` return true
+*permanently*: the save button never re-disables and the unsaved-changes guard
+blocks every subsequent navigation for the rest of the session. Saving does not
+clear it either, since the baseline stores `NaN` too — and server-side the value
+serialises to `null`, fails `typeof === "number"` in
+`server/src/routes/config.ts:58`, and is silently dropped while the UI reports
+success. Every `oninput` on a number field therefore keeps the last valid value:
+
+```tsx
+oninput={(e) => { const n = parseInt(e.currentTarget.value, 10); if (Number.isFinite(n)) setPollMs(n); }}
+```
+
 **Files:**
 - Create: `web/src/components/settings/ScanSection.tsx`, `web/src/components/settings/TerminalsSection.tsx`
 - Test: `web/tests/Settings.sections.test.tsx`
@@ -2518,7 +2531,7 @@ vi.mock("../src/projects-context", () => ({
 // NOTE: `<Router url=...>` does nothing here — `url` is a StaticRouter/SSR
 // prop, and the browser Router reads window.location. Set the location first
 // or every test renders at "/" and matches no route.
-function renderSection(Section: () => unknown) {
+function renderSection(Section: Component) {
   window.history.replaceState(null, "", "/settings/x");
   const [config, { refetch }] = createResource(async () => CONFIG);
   return render(() => (
@@ -2556,7 +2569,10 @@ describe("ScanSection", () => {
 
   test("does not navigate away after saving", async () => {
     renderSection(ScanSection);
-    fireEvent.click(await screen.findByText("save"));
+    // The save button is disabled[] until something changes, so dirty the form
+    // first - otherwise the click is a no-op and "saved" never renders.
+    fireEvent.input(await screen.findByLabelText("scan root"), { target: { value: "/tmp/other" } });
+    fireEvent.click(screen.getByRole("button", { name: "save" }));
     await waitFor(() => expect(screen.getByText(/saved/i)).toBeTruthy());
     expect(screen.getByLabelText("scan root")).toBeTruthy();
   });
@@ -2732,7 +2748,7 @@ export default function ScanSection() {
             min={1000}
             step={1000}
             value={pollMs()}
-            oninput={(e) => setPollMs(parseInt(e.currentTarget.value, 10))}
+            oninput={(e) => { const n = parseInt(e.currentTarget.value, 10); if (Number.isFinite(n)) setPollMs(n); }}
           />
         </label>
 
@@ -2878,7 +2894,7 @@ export default function TerminalsSection() {
           <input
             type="number" aria-label="max total sessions" min={1} step={1}
             value={maxTotal()}
-            oninput={(e) => setMaxTotal(parseInt(e.currentTarget.value, 10))}
+            oninput={(e) => { const n = parseInt(e.currentTarget.value, 10); if (Number.isFinite(n)) setMaxTotal(n); }}
           />
         </label>
         <label>
@@ -2886,7 +2902,7 @@ export default function TerminalsSection() {
           <input
             type="number" aria-label="max scrollback lines" min={100} step={100}
             value={maxScrollback()}
-            oninput={(e) => setMaxScrollback(parseInt(e.currentTarget.value, 10))}
+            oninput={(e) => { const n = parseInt(e.currentTarget.value, 10); if (Number.isFinite(n)) setMaxScrollback(n); }}
           />
         </label>
         <label>
