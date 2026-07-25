@@ -2090,8 +2090,9 @@ vi.mock("../src/projects-context", () => ({
 }));
 
 function renderAt(path: string) {
+  window.history.replaceState(null, "", path);
   return render(() => (
-    <Router url={path}>
+    <Router>
       <Route path="/settings" component={Settings}>
         <Route path="/" component={() => <Navigate href="/settings/appearance" />} />
         <Route path="/appearance" component={() => <div>appearance-pane</div>} />
@@ -2282,8 +2283,9 @@ function Section(props: { save: () => Promise<void>; reset: () => void }) {
 }
 
 function setup(save = vi.fn(async () => {}), reset = vi.fn()) {
+  window.history.replaceState(null, "", "/section");
   render(() => (
-    <Router url="/section">
+    <Router>
       <Route path="/section" component={() => <Section save={save} reset={reset} />} />
       <Route path="/other" component={() => <div>elsewhere</div>} />
     </Router>
@@ -2513,10 +2515,14 @@ vi.mock("../src/projects-context", () => ({
   useProjects: () => ({ projects: () => [], refetch: refetchProjects }),
 }));
 
+// NOTE: `<Router url=...>` does nothing here — `url` is a StaticRouter/SSR
+// prop, and the browser Router reads window.location. Set the location first
+// or every test renders at "/" and matches no route.
 function renderSection(Section: () => unknown) {
+  window.history.replaceState(null, "", "/settings/x");
   const [config, { refetch }] = createResource(async () => CONFIG);
   return render(() => (
-    <Router url="/settings/x">
+    <Router>
       <Route
         path="/settings/x"
         component={() => (
