@@ -190,20 +190,26 @@ export default function TerminalView(props: {
       if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
     }, 30_000);
 
-    onCleanup(() => {
-      ro.disconnect();
-      if (pingTimer) clearInterval(pingTimer);
-      if (ws && ws.readyState !== WebSocket.CLOSED) {
-        try { ws.close(1000); } catch { /* ignore */ }
-      }
-      // Dispose WebGL before term.dispose() so the GL context is released
-      // back to the browser's pool — without this, repeated tab open/close
-      // cycles eventually trip Chrome's "too many WebGL contexts" cap.
-      disposeWebgl();
-      term?.dispose();
-      term = null;
-      fit = null;
-      ws = null;
+    // Registered after the font-load await, so the ambient Owner is gone
+    // (Solid restores it to null the moment the async function yields, not
+    // when the promise resolves). A bare onCleanup() here would silently
+    // never fire — re-parent it onto the owner captured at the top.
+    runWithOwner(owner, () => {
+      onCleanup(() => {
+        ro.disconnect();
+        if (pingTimer) clearInterval(pingTimer);
+        if (ws && ws.readyState !== WebSocket.CLOSED) {
+          try { ws.close(1000); } catch { /* ignore */ }
+        }
+        // Dispose WebGL before term.dispose() so the GL context is released
+        // back to the browser's pool — without this, repeated tab open/close
+        // cycles eventually trip Chrome's "too many WebGL contexts" cap.
+        disposeWebgl();
+        term?.dispose();
+        term = null;
+        fit = null;
+        ws = null;
+      });
     });
   });
 
