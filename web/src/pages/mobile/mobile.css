@@ -5,8 +5,10 @@
   -webkit-overflow-scrolling: touch; background: var(--bg); color: var(--fg);
   font: 16px/1.45 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   -webkit-text-size-adjust: 100%; }
-.m-bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-  background: var(--bg-2); position: sticky; top: 0; z-index: 2; font-weight: 600; }
+/* space-between so the theme button sits at the right edge, opposite the
+   brand/back label */
+.m-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; background: var(--bg-2); position: sticky; top: 0; z-index: 2; font-weight: 600; }
 .m-bar a, .m-bar button.m-back { color: var(--fg); text-decoration: none; background: none; border: 0;
   font: inherit; padding: 4px 6px; cursor: pointer; min-height: 44px; }
 .m-brand { letter-spacing: .05em; text-transform: lowercase; }
@@ -68,3 +70,33 @@
   padding: 9px 11px; font-size: 13px; margin: 10px 0; }
 .m-empty { color: var(--fg-dim); text-align: center; padding: 40px 0; }
 .m-hint { color: var(--fg-dim); font-size: 11px; margin-top: 8px; }
+
+/* theme sheet */
+.m-theme-button {
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px;
+  padding: 0.25rem 0.4rem; cursor: pointer; line-height: 0; flex: 0 0 auto;
+  min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center;
+}
+.m-theme-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
+.m-sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 40; }
+.m-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
+  max-height: 70vh; overflow: auto;
+  background: var(--bg-2); border-top: 1px solid var(--border);
+  border-radius: 10px 10px 0 0; padding: 0.6rem 0 1.2rem;
+}
+.m-sheet-title {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--fg-dim); padding: 0 0.9rem 0.5rem;
+}
+.m-sheet-list { display: flex; flex-direction: column; }
+.m-sheet-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: none; border: 0; color: var(--fg); font: inherit;
+  text-align: left; padding: 0.6rem 0.9rem; cursor: pointer; min-height: 44px;
+}
+.m-sheet-row.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.m-sheet-swatch { display: flex; width: 42px; height: 18px; border-radius: 3px; overflow: hidden; border: 1px solid var(--border); flex: 0 0 auto; }
+.m-sheet-swatch span { flex: 1; }
+.m-sheet-name { flex: 1; }
+.m-sheet-family { color: var(--fg-dim); font-size: 0.75rem; }
