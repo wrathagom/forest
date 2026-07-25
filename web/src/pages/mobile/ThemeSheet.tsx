@@ -67,7 +67,12 @@ export default function ThemeSheet() {
                     <span style={{ background: theme.tokens.ok }} />
                   </span>
                   <span class="m-sheet-name">{theme.name}</span>
-                  <span class="m-sheet-family">{theme.family}</span>
+                  {/* Only when it adds information. Four themes are named after
+                      their family (Dracula, Nord, Tokyo Night, Rosé Pine), and
+                      "Dracula Dracula" reads as a bug. Matches AppearanceSection. */}
+                  <Show when={theme.family !== theme.name}>
+                    <span class="m-sheet-family">{theme.family}</span>
+                  </Show>
                 </button>
               )}
             </For>
