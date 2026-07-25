@@ -45,7 +45,9 @@ export default function TokensOverTimeChart(props: {
         for (const p of profiles) {
           const val = d.byProfile[p] ?? 0;
           const h = (val / max) * plotH;
-          segments.push({ y: baseY - acc - h, h, color: colors[p] ?? "#888" });
+          // Applied below as an inline `fill` style property, not an SVG
+          // presentation attribute, so var() resolves.
+          segments.push({ y: baseY - acc - h, h, color: colors[p] ?? "var(--fg-faint)" });
           acc += h;
         }
         const title = `${d.day}\n` + profiles
