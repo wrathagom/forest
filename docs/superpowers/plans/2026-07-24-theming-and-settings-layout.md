@@ -825,7 +825,11 @@ Ends with: `styles.css` and `mobile.css` contain no hardcoded colors, and Forest
 }
 ```
 
-Note `color-scheme: dark` is **removed** — `applyTheme` sets it per theme.
+Keep `color-scheme: dark` in the fallback block. `applyTheme` sets it per theme
+as an **inline** style on `<html>`, which beats any stylesheet `:root` rule, so
+the fallback is never in conflict — and without it a JS failure gives Forest
+Dark colours with light-mode UA scrollbars, `<select>` popups and autofill,
+contradicting the promise in the comment above.
 
 - [ ] **Step 2: Reassign positive-state selectors from `--accent` to `--ok`**
 
@@ -844,7 +848,12 @@ These are the selectors that mean "good / added / running / done", not "brand / 
 | `.sessions-dot.live` | live session dot |
 | `.session-chip-dot-working` | working session dot |
 | `.tasks-dot-done` | completed task dot |
-| `.caffeinate-on` | caffeinate active |
+
+The distinction is **state of an observed subject** (healthy, running, ahead,
+added, done) versus **a control the user turned on**. `.caffeinate-on` and
+`.editor-status-toggle.active` are the latter, so both keep `--accent` alongside
+`.tab.active` and friends — a green coffee icon in a header full of green health
+indicators would read as "system healthy", not "you enabled this".
 
 Every other `var(--accent)` usage stays as-is — those are brand and selection (`.brand-mark`, `.tab.active`, `.pin`, `.tree-file-active`, `.info-toggle`, `.launcher-*`, `.modal-actions button[type="submit"]`, `.subdir-chip`, `.markdown-body a`, `.msg-user *`, `.task-view-link`, and the rest).
 
@@ -1946,11 +1955,15 @@ not, the fix is a dedicated token, not a nudge to `--fg-faint`.
   directly, so added and deleted line text matches the healthy-dot green and
   error-banner red exactly. Deliberate — collapsing a one-off tint onto its role
   token is the point — but look at a diff and confirm it still reads well.
-- `.caffeinate-on` moved to `--ok` while `.editor-status-toggle.active` kept
-  `--accent`, even though both mean "this toggle is on". Under Mocha the
-  caffeinate icon will be green and the editor status toggle mauve. Look at both
-  and decide whether that reads as inconsistent; if it does, move
-  `.editor-status-toggle.active` to `--ok` too.
+- `.sessions-preview mark` tints from `--warn` while `.sessions-summary mark`
+  tints from `--accent` — the same search-match highlight in two colours, amber
+  vs mauve under Mocha. Pre-existing, faithfully preserved, but tokenizing makes
+  it obvious. Look at both on one page and pick one.
+- `.task-badge` changed from a solid role fill with `--bg` text to a tinted chip
+  with role-coloured text, matching `.git-ahead` / `.svc-running` / `.subdir-chip`.
+  This was a real light-theme contrast failure (done 2.96:1, review 2.31:1, and
+  abandoned 1.35:1 even in Forest Dark), but it also changes how task badges look
+  in the default theme. Confirm they still read as badges.
 
 - [ ] **Step 3: Fix anything found**
 
