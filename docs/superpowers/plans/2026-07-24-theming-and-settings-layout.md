@@ -1565,7 +1565,12 @@ import { buildTheme } from "./build";
 export const catppuccinLatte = buildTheme({
   id: "catppuccin-latte", name: "Latte", family: "Catppuccin", scheme: "light",
   bg: "#eff1f5", bg2: "#e6e9ef", bg3: "#ccd0da",
-  fg: "#4c4f69", fgDim: "#6c6f85", fgFaint: "#9ca0b0",
+  // fgFaint is overlay1, not overlay0 as the dark flavors use. On a light base
+  // the luminance direction inverts: overlay0 (#9ca0b0) is the *lightest*
+  // overlay, so it has the least contrast here — it measures 2.30:1 and fails
+  // the 2.5 floor. overlay1 clears it at 2.83:1 while staying clearly fainter
+  // than fgDim.
+  fg: "#4c4f69", fgDim: "#6c6f85", fgFaint: "#8c8fa1",
   border: "#ccd0da", borderStrong: "#bcc0cc",
   accent: "#8839ef", accentFg: "#eff1f5",
   purple: "#8839ef", green: "#40a02b", orange: "#fe640b", blue: "#1e66f5",
@@ -1649,6 +1654,19 @@ git commit -m "feat(themes): Catppuccin flavors and the catalog test harness"
 - Modify: `web/src/lib/themes/index.ts`
 
 Every family lands with the same shape, and the catalog test from Task 12 validates each one automatically as it is added.
+
+**Expect the light themes to fail `fgFaint` first, and fix the mapping, not the
+hex.** Task 12 hit this with Catppuccin Latte. On a dark background the
+"faintest" published tier is the one closest to the background, so it is the
+right choice for `fgFaint`. On a **light** background the luminance direction
+inverts: that same tier is now the *lightest* colour and therefore has the
+*least* contrast. Latte's `overlay0` measured 2.30:1 and failed the 2.5 floor;
+`overlay1` clears it at 2.83:1 while staying clearly fainter than `fgDim`.
+
+So for Rosé Pine Dawn, Gruvbox Light, One Light and Solarized Light, check
+`fgFaint` against `bg` before assuming the obvious tier is right, and step to
+the next *darker* published tone if it fails. Never nudge a published hex to
+clear a floor — if a hard floor fails, the mapping is wrong.
 
 - [ ] **Step 1: Rosé Pine**
 
