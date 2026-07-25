@@ -84,10 +84,74 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .empty { text-align: center; padding: 4rem 1rem; color: var(--fg-dim); }
 .empty button { margin-top: 1rem; background: var(--bg-2); color: var(--fg); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; }
 .pin { color: var(--accent); }
-.settings form { display: flex; flex-direction: column; gap: 0.8rem; max-width: 480px; }
-.settings label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: var(--fg-dim); }
-.settings input { background: var(--bg-2); color: var(--fg); border: 1px solid var(--border); padding: 0.4rem; border-radius: 4px; font: inherit; }
-.settings button { width: fit-content; background: var(--bg-2); color: var(--fg); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; }
+/* settings shell — rail + section pane */
+.settings-shell { display: grid; grid-template-columns: 160px 1fr; gap: 1.2rem; align-items: start; }
+.settings-rail { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 0; }
+.settings-rail a {
+  padding: 0.3rem 0.6rem; color: var(--fg-dim); text-decoration: none;
+  font-size: 0.85rem; border-left: 2px solid transparent; border-radius: 0 3px 3px 0;
+}
+.settings-rail a:hover { color: var(--fg); }
+.settings-rail a.active {
+  color: var(--accent); border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.settings-pane { min-width: 0; max-width: 900px; }
+.settings-pane h3 {
+  margin: 0 0 0.8rem; font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--fg-dim); font-weight: 600;
+}
+.settings-fields { display: flex; flex-direction: column; gap: 0.8rem; max-width: 480px; }
+.settings-fields label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: var(--fg-dim); }
+.settings-fields input {
+  background: var(--bg-2); color: var(--fg); border: 1px solid var(--border);
+  padding: 0.4rem; border-radius: 4px; font: inherit;
+}
+.settings-save { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; }
+.settings-save button {
+  background: var(--bg-2); color: var(--fg); border: 1px solid var(--border);
+  padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font: inherit;
+}
+.settings-save button[type="submit"]:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.settings-save button:disabled { opacity: 0.5; cursor: not-allowed; }
+.settings-saved { color: var(--ok); font-size: 0.8rem; }
+
+@media (max-width: 700px) {
+  .settings-shell { grid-template-columns: 1fr; gap: 0.8rem; }
+  .settings-rail {
+    flex-direction: row; overflow-x: auto; position: static;
+    border-bottom: 1px solid var(--border); padding-bottom: 0.3rem;
+  }
+  .settings-rail a { white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; border-radius: 3px 3px 0 0; }
+  .settings-rail a.active { border-left: 0; border-bottom-color: var(--accent); }
+}
+
+/* theme picker */
+.theme-family { margin-bottom: 1.2rem; }
+.theme-family-name { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-dim); margin-bottom: 0.4rem; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+.theme-card {
+  border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+  cursor: pointer; padding: 0; background: none; font: inherit; text-align: left;
+}
+.theme-card:hover { border-color: var(--fg-dim); }
+.theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-swatch { display: flex; height: 34px; }
+.theme-swatch span { flex: 1; }
+.theme-card-name { padding: 0.25rem 0.5rem; font-size: 0.78rem; color: var(--fg-dim); background: var(--bg-2); }
+.theme-card.active .theme-card-name { color: var(--accent); }
+
+/* unsaved-changes dialog */
+.guard-dialog { background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 0; max-width: 420px; color: var(--fg); }
+.guard-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+.guard-dialog-body { padding: 0.9rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.guard-dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.guard-dialog-actions button {
+  background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font: inherit;
+}
+.guard-dialog-actions button.primary { border-color: var(--accent); color: var(--accent); }
+.guard-dialog-actions button.danger:hover { border-color: var(--error); color: var(--error); }
 .app-brand { color: var(--fg); text-decoration: none; font-weight: 600; font-size: 1rem; letter-spacing: 0.05em; text-transform: lowercase; }
 .app-brand:hover { color: var(--accent); }
 .brand-mark { color: var(--accent); font-style: italic; font-weight: 700; }
