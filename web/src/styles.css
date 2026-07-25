@@ -174,7 +174,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .banner-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); border-bottom: 1px solid var(--ok); }
 .hint { color: var(--fg-dim); font-size: 0.75rem; margin-top: 0.1rem; }
 .settings-row { display: flex; gap: 0.5rem; }
-.settings-row button[type="button"] { background: transparent; }
+/* .settings-row button[type="button"] is styled with .subdir-add-row button. */
 .project-header { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--border); }
 .project-breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
 .project-name { color: var(--fg); font-weight: 600; }
@@ -309,7 +309,13 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .subdir-chip button:hover { color: var(--error); }
 .subdir-add-row { display: flex; gap: 0.3rem; align-items: center; }
 .subdir-add-row input { flex: 1; background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 0.35rem 0.5rem; border-radius: 4px; font: inherit; font-size: 0.85rem; }
-.subdir-add-row button { background: var(--bg-2); color: var(--fg); border: 1px solid var(--border); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font: inherit; font-size: 0.85rem; }
+/* The scan section's "+ add" and the launchers section's "+ add launcher" are
+   the same affordance and share one rule. Both must set border and color, not
+   just background: a button with neither falls back to the user agent's
+   `2px outset ButtonBorder` / `ButtonText`, which tracks `color-scheme` rather
+   than the theme and renders as a bevelled native control in every theme. */
+.subdir-add-row button,
+.settings-row button[type="button"] { background: var(--bg-2); color: var(--fg); border: 1px solid var(--border); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font: inherit; font-size: 0.85rem; }
 
 /* settings launchers */
 .launcher-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
