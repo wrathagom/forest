@@ -480,11 +480,21 @@ The guard covers leaving `/settings` entirely, not just switching sections.
 
 ### Appearance section
 
-A responsive grid of theme cards grouped by `family`. Each card is a four-stripe
-swatch — `bg`, `bg-3`, `accent`, `ok` — over the theme name, with the selected
-card outlined in `--accent`. Clicking applies immediately; the entire app
-recolors underneath, which is the preview. Light and dark families are visually
-separated so Latte does not ambush a user scanning dark themes.
+A responsive grid of theme cards in exactly two groups — **dark** then
+**light**. Each card is a four-stripe swatch — `bg`, `bg-3`, `accent`, `ok` —
+over the theme name, plus its family where that differs from the name. The
+selected card is outlined in `--accent`. Clicking applies immediately; the
+entire app recolors underneath, which is the preview.
+
+Grouping by `family` was the original design and was measured to fail: 16 themes
+across 9 families become 14 groups once dark and light are separated, and 13 of
+those hold exactly one card — thirteen rows of a lone 172px card stranded under
+its own heading, 1336px tall against a 900px viewport. That reproduces the
+"isn't organized very clearly" problem this redesign exists to fix.
+
+Grouping by scheme keeps the only guarantee that actually matters — a light
+theme cannot ambush someone scanning dark ones — while collapsing 14 headings to
+2 and letting the grid behave like a grid.
 
 ### Mobile
 
