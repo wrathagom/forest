@@ -25,7 +25,7 @@ These are Catppuccin Latte's own published green and yellow. Every Latte-themed 
 
 **Revised rule, used by Task 12:**
 
-- **Hard floors** on the pairs our *mapping* controls: `fg`/`bg` ≥ 4.5, `fgDim`/`bg` ≥ 3.0, `accentFg`/`accent` ≥ 4.5.
+- **Hard floors** on the pairs our *mapping* controls: `fg`/`bg` ≥ 4.5, `fgDim`/`bg` ≥ 3.0, `accentFg`/`accent` ≥ 4.5, and `fgFaint`/`bg` ≥ 2.5. The last is deliberately lower — that tier is for de-emphasized text (gutter numbers, the abandoned task badge, muted chips) — but it needs *some* floor, because the abandoned badge now depends on it.
 - **Gross-error floor of 2.0** on `accent`/`ok`/`warn`/`error`/`info` vs `bg`. This still catches the bug class that matters — a role mapped to the wrong palette entry, e.g. `ok` accidentally pointing at a surface color — without overriding upstream design decisions.
 - The test **prints** the full role-contrast table so a reviewer sees real numbers rather than a silent pass.
 
@@ -1506,6 +1506,15 @@ describe.each(THEMES.map((t) => [t.id, t] as const))("%s", (_id, theme) => {
     expect(contrast(theme.tokens.fgDim, theme.tokens.bg)).toBeGreaterThanOrEqual(3);
   });
 
+  // Lower than the fgDim floor on purpose — this tier is for deliberately
+  // de-emphasized text (gutter numbers, the abandoned task badge, muted
+  // chips). 2.5 catches a theme where it collapses into the background
+  // without rejecting legitimate published values: Dracula's #6272a4 sits
+  // at ~2.8:1.
+  test("the faint tier stays distinguishable", () => {
+    expect(contrast(theme.tokens.fgFaint, theme.tokens.bg)).toBeGreaterThanOrEqual(2.5);
+  });
+
   test("text on an accent fill clears 4.5:1", () => {
     expect(contrast(theme.tokens.accentFg, theme.tokens.accent)).toBeGreaterThanOrEqual(4.5);
   });
@@ -1959,11 +1968,19 @@ not, the fix is a dedicated token, not a nudge to `--fg-faint`.
   tints from `--accent` — the same search-match highlight in two colours, amber
   vs mauve under Mocha. Pre-existing, faithfully preserved, but tokenizing makes
   it obvious. Look at both on one page and pick one.
-- `.task-badge` changed from a solid role fill with `--bg` text to a tinted chip
-  with role-coloured text, matching `.git-ahead` / `.svc-running` / `.subdir-chip`.
-  This was a real light-theme contrast failure (done 2.96:1, review 2.31:1, and
-  abandoned 1.35:1 even in Forest Dark), but it also changes how task badges look
-  in the default theme. Confirm they still read as badges.
+- The `abandoned` task badge moved from a `--border` fill to `--fg-faint`,
+  taking it from 1.35:1 to 2.99:1 in Forest Dark. Still under 4.5, but it is a
+  deliberately de-emphasized terminal state and this is the honest win available
+  without inventing per-role foreground tokens. Confirm it is legible but still
+  reads as de-emphasized.
+
+  A tinted-chip restyle of all five badges was tried and reverted: measurement
+  showed it does not fix the light-theme ratios (both designs measure the same
+  pair, so Latte's 2.31:1 review badge is a property of Latte's own yellow) and
+  it cost Forest Dark contrast on four of five states. If badge styling should
+  match `.git-stat` / `.subdir-chip` for **consistency**, that is a real design
+  question — but it is the user's to make, not one to smuggle in under a
+  contrast justification that does not hold.
 
 - [ ] **Step 3: Fix anything found**
 
