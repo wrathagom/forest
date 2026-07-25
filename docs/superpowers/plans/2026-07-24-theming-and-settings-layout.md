@@ -1515,7 +1515,6 @@ export const catppuccinLatte = buildTheme({
   fg: "#4c4f69", fgDim: "#6c6f85", fgFaint: "#9ca0b0",
   border: "#ccd0da", borderStrong: "#bcc0cc",
   accent: "#8839ef", accentFg: "#eff1f5",
-  ok: "#40a02b", warn: "#df8e1d", error: "#d20f39", info: "#1e66f5",
   purple: "#8839ef", green: "#40a02b", orange: "#fe640b", blue: "#1e66f5",
   cyan: "#04a5e5", yellow: "#df8e1d", red: "#d20f39", pink: "#ea76cb",
   teal: "#179299", comment: "#8c8fa1",
@@ -1527,7 +1526,6 @@ export const catppuccinFrappe = buildTheme({
   fg: "#c6d0f5", fgDim: "#a5adce", fgFaint: "#737994",
   border: "#414559", borderStrong: "#51576d",
   accent: "#ca9ee6", accentFg: "#232634",
-  ok: "#a6d189", warn: "#e5c890", error: "#e78284", info: "#8caaee",
   purple: "#ca9ee6", green: "#a6d189", orange: "#ef9f76", blue: "#8caaee",
   cyan: "#99d1db", yellow: "#e5c890", red: "#e78284", pink: "#f4b8e4",
   teal: "#81c8be", comment: "#838ba7",
@@ -1539,7 +1537,6 @@ export const catppuccinMacchiato = buildTheme({
   fg: "#cad3f5", fgDim: "#a5adcb", fgFaint: "#6e738d",
   border: "#363a4f", borderStrong: "#494d64",
   accent: "#c6a0f6", accentFg: "#181926",
-  ok: "#a6da95", warn: "#eed49f", error: "#ed8796", info: "#8aadf4",
   purple: "#c6a0f6", green: "#a6da95", orange: "#f5a97f", blue: "#8aadf4",
   cyan: "#91d7e3", yellow: "#eed49f", red: "#ed8796", pink: "#f5bde6",
   teal: "#8bd5ca", comment: "#8087a2",
@@ -1551,7 +1548,6 @@ export const catppuccinMocha = buildTheme({
   fg: "#cdd6f4", fgDim: "#a6adc8", fgFaint: "#6c7086",
   border: "#313244", borderStrong: "#45475a",
   accent: "#cba6f7", accentFg: "#11111b",
-  ok: "#a6e3a1", warn: "#f9e2af", error: "#f38ba8", info: "#89b4fa",
   purple: "#cba6f7", green: "#a6e3a1", orange: "#fab387", blue: "#89b4fa",
   cyan: "#89dceb", yellow: "#f9e2af", red: "#f38ba8", pink: "#f5c2e7",
   teal: "#94e2d5", comment: "#7f849c",
@@ -1615,14 +1611,13 @@ export const rosePine = buildTheme({
   fg: "#e0def4", fgDim: "#908caa", fgFaint: "#6e6a86",
   border: "#26233a", borderStrong: "#403d52",
   accent: "#c4a7e7", accentFg: "#191724",
-  ok: "#9ccfd8", warn: "#f6c177", error: "#eb6f92", info: "#31748f",
   purple: "#c4a7e7", green: "#9ccfd8", orange: "#f6c177", blue: "#31748f",
   cyan: "#9ccfd8", yellow: "#f6c177", red: "#eb6f92", pink: "#ebbcba",
   teal: "#31748f", comment: "#6e6a86",
-  overrides: {
-    chart1: "#31748f", chart2: "#eb6f92", chart3: "#9ccfd8", chart4: "#f6c177",
-    chart5: "#c4a7e7", chart6: "#ebbcba", chart7: "#908caa", chart8: "#6e6a86",
-  },
+  charts: [
+    "#31748f", "#eb6f92", "#9ccfd8", "#f6c177",
+    "#c4a7e7", "#ebbcba", "#908caa", "#6e6a86",
+  ],
 });
 
 export const rosePineDawn = buildTheme({
@@ -1631,14 +1626,13 @@ export const rosePineDawn = buildTheme({
   fg: "#575279", fgDim: "#797593", fgFaint: "#9893a5",
   border: "#dfdad9", borderStrong: "#cecacd",
   accent: "#907aa9", accentFg: "#faf4ed",
-  ok: "#56949f", warn: "#ea9d34", error: "#b4637a", info: "#286983",
   purple: "#907aa9", green: "#56949f", orange: "#ea9d34", blue: "#286983",
   cyan: "#56949f", yellow: "#ea9d34", red: "#b4637a", pink: "#d7827e",
   teal: "#286983", comment: "#9893a5",
-  overrides: {
-    chart1: "#286983", chart2: "#b4637a", chart3: "#56949f", chart4: "#ea9d34",
-    chart5: "#907aa9", chart6: "#d7827e", chart7: "#797593", chart8: "#9893a5",
-  },
+  charts: [
+    "#286983", "#b4637a", "#56949f", "#ea9d34",
+    "#907aa9", "#d7827e", "#797593", "#9893a5",
+  ],
 });
 ```
 
@@ -1654,14 +1648,13 @@ export const gruvboxDark = buildTheme({
   fg: "#ebdbb2", fgDim: "#bdae93", fgFaint: "#928374",
   border: "#3c3836", borderStrong: "#504945",
   accent: "#83a598", accentFg: "#1d2021",
-  ok: "#b8bb26", warn: "#fabd2f", error: "#fb4934", info: "#83a598",
   purple: "#d3869b", green: "#b8bb26", orange: "#fe8019", blue: "#83a598",
   cyan: "#8ec07c", yellow: "#fabd2f", red: "#fb4934", pink: "#d3869b",
   teal: "#8ec07c", comment: "#928374",
-  overrides: {
-    chart1: "#83a598", chart2: "#d3869b", chart3: "#b8bb26", chart4: "#fabd2f",
-    chart5: "#8ec07c", chart6: "#fe8019", chart7: "#fb4934", chart8: "#928374",
-  },
+  charts: [
+    "#83a598", "#d3869b", "#b8bb26", "#fabd2f",
+    "#8ec07c", "#fe8019", "#fb4934", "#928374",
+  ],
 });
 
 export const gruvboxLight = buildTheme({
@@ -1670,14 +1663,13 @@ export const gruvboxLight = buildTheme({
   fg: "#3c3836", fgDim: "#665c54", fgFaint: "#928374",
   border: "#ebdbb2", borderStrong: "#d5c4a1",
   accent: "#076678", accentFg: "#fbf1c7",
-  ok: "#79740e", warn: "#b57614", error: "#9d0006", info: "#076678",
   purple: "#8f3f71", green: "#79740e", orange: "#af3a03", blue: "#076678",
   cyan: "#427b58", yellow: "#b57614", red: "#9d0006", pink: "#8f3f71",
   teal: "#427b58", comment: "#928374",
-  overrides: {
-    chart1: "#076678", chart2: "#8f3f71", chart3: "#79740e", chart4: "#b57614",
-    chart5: "#427b58", chart6: "#af3a03", chart7: "#9d0006", chart8: "#7c6f64",
-  },
+  charts: [
+    "#076678", "#8f3f71", "#79740e", "#b57614",
+    "#427b58", "#af3a03", "#9d0006", "#7c6f64",
+  ],
 });
 ```
 
@@ -1695,14 +1687,13 @@ export const oneDark = buildTheme({
   fg: "#abb2bf", fgDim: "#828997", fgFaint: "#5c6370",
   border: "#3e4451", borderStrong: "#4b5263",
   accent: "#c678dd", accentFg: "#21252b",
-  ok: "#98c379", warn: "#e5c07b", error: "#e06c75", info: "#61afef",
   purple: "#c678dd", green: "#98c379", orange: "#d19a66", blue: "#61afef",
   cyan: "#56b6c2", yellow: "#e5c07b", red: "#e06c75", pink: "#c678dd",
   teal: "#56b6c2", comment: "#5c6370",
-  overrides: {
-    chart1: "#61afef", chart2: "#c678dd", chart3: "#98c379", chart4: "#e5c07b",
-    chart5: "#56b6c2", chart6: "#d19a66", chart7: "#e06c75", chart8: "#828997",
-  },
+  charts: [
+    "#61afef", "#c678dd", "#98c379", "#e5c07b",
+    "#56b6c2", "#d19a66", "#e06c75", "#828997",
+  ],
 });
 
 export const oneLight = buildTheme({
@@ -1711,14 +1702,13 @@ export const oneLight = buildTheme({
   fg: "#383a42", fgDim: "#696c77", fgFaint: "#a0a1a7",
   border: "#e5e5e6", borderStrong: "#d4d4d5",
   accent: "#a626a4", accentFg: "#fafafa",
-  ok: "#50a14f", warn: "#c18401", error: "#e45649", info: "#4078f2",
   purple: "#a626a4", green: "#50a14f", orange: "#986801", blue: "#4078f2",
   cyan: "#0184bc", yellow: "#c18401", red: "#e45649", pink: "#a626a4",
   teal: "#0184bc", comment: "#a0a1a7",
-  overrides: {
-    chart1: "#4078f2", chart2: "#a626a4", chart3: "#50a14f", chart4: "#c18401",
-    chart5: "#0184bc", chart6: "#986801", chart7: "#e45649", chart8: "#696c77",
-  },
+  charts: [
+    "#4078f2", "#a626a4", "#50a14f", "#c18401",
+    "#0184bc", "#986801", "#e45649", "#696c77",
+  ],
 });
 ```
 
@@ -1743,14 +1733,13 @@ export const solarizedDark = buildTheme({
   fg: "#93a1a1", fgDim: "#839496", fgFaint: "#586e75",
   border: "#073642", borderStrong: "#586e75",
   accent: A.blue, accentFg: "#002b36",
-  ok: A.green, warn: A.yellow, error: A.red, info: A.blue,
   purple: A.violet, green: A.green, orange: A.orange, blue: A.blue,
   cyan: A.cyan, yellow: A.yellow, red: A.red, pink: A.magenta,
   teal: A.cyan, comment: "#586e75",
-  overrides: {
-    chart1: A.blue, chart2: A.magenta, chart3: A.green, chart4: A.yellow,
-    chart5: A.violet, chart6: A.cyan, chart7: A.orange, chart8: A.red,
-  },
+  charts: [
+    A.blue, A.magenta, A.green, A.yellow,
+    A.violet, A.cyan, A.orange, A.red,
+  ],
 });
 
 export const solarizedLight = buildTheme({
@@ -1759,14 +1748,13 @@ export const solarizedLight = buildTheme({
   fg: "#586e75", fgDim: "#657b83", fgFaint: "#93a1a1",
   border: "#eee8d5", borderStrong: "#93a1a1",
   accent: A.blue, accentFg: "#fdf6e3",
-  ok: A.green, warn: A.yellow, error: A.red, info: A.blue,
   purple: A.violet, green: A.green, orange: A.orange, blue: A.blue,
   cyan: A.cyan, yellow: A.yellow, red: A.red, pink: A.magenta,
   teal: A.cyan, comment: "#93a1a1",
-  overrides: {
-    chart1: A.blue, chart2: A.magenta, chart3: A.green, chart4: A.yellow,
-    chart5: A.violet, chart6: A.cyan, chart7: A.orange, chart8: A.red,
-  },
+  charts: [
+    A.blue, A.magenta, A.green, A.yellow,
+    A.violet, A.cyan, A.orange, A.red,
+  ],
 });
 ```
 
@@ -1784,14 +1772,13 @@ export const dracula = buildTheme({
   fg: "#f8f8f2", fgDim: "#afb0b0", fgFaint: "#6272a4",
   border: "#44475a", borderStrong: "#6272a4",
   accent: "#bd93f9", accentFg: "#21222c",
-  ok: "#50fa7b", warn: "#f1fa8c", error: "#ff5555", info: "#8be9fd",
   purple: "#bd93f9", green: "#50fa7b", orange: "#ffb86c", blue: "#8be9fd",
   cyan: "#8be9fd", yellow: "#f1fa8c", red: "#ff5555", pink: "#ff79c6",
   teal: "#50fa7b", comment: "#6272a4",
-  overrides: {
-    chart1: "#8be9fd", chart2: "#ff79c6", chart3: "#50fa7b", chart4: "#f1fa8c",
-    chart5: "#bd93f9", chart6: "#ffb86c", chart7: "#ff5555", chart8: "#6272a4",
-  },
+  charts: [
+    "#8be9fd", "#ff79c6", "#50fa7b", "#f1fa8c",
+    "#bd93f9", "#ffb86c", "#ff5555", "#6272a4",
+  ],
 });
 ```
 
@@ -1807,14 +1794,13 @@ export const nord = buildTheme({
   fg: "#eceff4", fgDim: "#d8dee9", fgFaint: "#616e88",
   border: "#434c5e", borderStrong: "#4c566a",
   accent: "#88c0d0", accentFg: "#2e3440",
-  ok: "#a3be8c", warn: "#ebcb8b", error: "#bf616a", info: "#81a1c1",
   purple: "#b48ead", green: "#a3be8c", orange: "#d08770", blue: "#81a1c1",
   cyan: "#88c0d0", yellow: "#ebcb8b", red: "#bf616a", pink: "#b48ead",
   teal: "#8fbcbb", comment: "#616e88",
-  overrides: {
-    chart1: "#81a1c1", chart2: "#b48ead", chart3: "#a3be8c", chart4: "#ebcb8b",
-    chart5: "#88c0d0", chart6: "#d08770", chart7: "#bf616a", chart8: "#8fbcbb",
-  },
+  charts: [
+    "#81a1c1", "#b48ead", "#a3be8c", "#ebcb8b",
+    "#88c0d0", "#d08770", "#bf616a", "#8fbcbb",
+  ],
 });
 ```
 
@@ -1830,14 +1816,13 @@ export const tokyoNight = buildTheme({
   fg: "#c0caf5", fgDim: "#a9b1d6", fgFaint: "#565f89",
   border: "#292e42", borderStrong: "#3b4261",
   accent: "#bb9af7", accentFg: "#16161e",
-  ok: "#9ece6a", warn: "#e0af68", error: "#f7768e", info: "#7aa2f7",
   purple: "#bb9af7", green: "#9ece6a", orange: "#ff9e64", blue: "#7aa2f7",
   cyan: "#7dcfff", yellow: "#e0af68", red: "#f7768e", pink: "#bb9af7",
   teal: "#1abc9c", comment: "#565f89",
-  overrides: {
-    chart1: "#7aa2f7", chart2: "#bb9af7", chart3: "#9ece6a", chart4: "#e0af68",
-    chart5: "#7dcfff", chart6: "#ff9e64", chart7: "#f7768e", chart8: "#1abc9c",
-  },
+  charts: [
+    "#7aa2f7", "#bb9af7", "#9ece6a", "#e0af68",
+    "#7dcfff", "#ff9e64", "#f7768e", "#1abc9c",
+  ],
 });
 ```
 
