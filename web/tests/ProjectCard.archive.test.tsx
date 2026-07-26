@@ -26,39 +26,71 @@ const base: ProjectRow = {
 function renderCard(project: ProjectRow, onChange = () => {}) {
   return render(() => (
     <Router>
-      <Route path="/" component={() => <ProjectCard project={project} onChange={onChange} />} />
+      <Route path="/" component={() => (
+        <ProjectCard
+          project={project}
+          preset="status"
+          colorBy="git"
+          groups={[]}
+          onChange={onChange}
+        />
+      )} />
     </Router>
   ));
 }
 
+/** Actions live behind the menu now, so every interaction opens it first. */
+function openMenu(container: HTMLElement) {
+  fireEvent.click(container.querySelector(".card-menu-trigger") as HTMLElement);
+}
+
 describe("ProjectCard archive affordance", () => {
-  test("visible card shows an archive button that hides the project", async () => {
+  test("visible card offers archive, which hides the project", async () => {
     patchProject.mockResolvedValue({ ok: true });
     const onChange = vi.fn();
-    renderCard(base, onChange);
-    fireEvent.click(screen.getByTitle("archive"));
+    const { container } = renderCard(base, onChange);
+    openMenu(container);
+    fireEvent.click(screen.getByText("archive"));
     await waitFor(() => expect(patchProject).toHaveBeenCalledWith("abc", { hidden: true }));
     await waitFor(() => expect(onChange).toHaveBeenCalled());
   });
 
-  test("hidden card shows an archived badge and a restore button that un-hides", async () => {
+  test("hidden card shows an archived tag and offers restore, which un-hides", async () => {
     patchProject.mockResolvedValue({ ok: true });
-    const archived: ProjectRow = { ...base, hidden: true };
-    renderCard(archived);
+    const { container } = renderCard({ ...base, hidden: true });
     expect(screen.getByText("archived")).toBeTruthy();
-    fireEvent.click(screen.getByTitle("restore"));
+    openMenu(container);
+    fireEvent.click(screen.getByText("restore"));
     await waitFor(() => expect(patchProject).toHaveBeenCalledWith("abc", { hidden: false }));
   });
 
-  test("hidden card does not show pin or archive buttons", () => {
-    renderCard({ ...base, hidden: true });
-    expect(screen.queryByTitle("archive")).toBeNull();
-    expect(screen.queryByTitle("pin")).toBeNull();
+  test("hidden card offers neither archive nor pin", () => {
+    const { container } = renderCard({ ...base, hidden: true });
+    openMenu(container);
+    expect(screen.queryByText("archive")).toBeNull();
+    expect(screen.queryByText("pin")).toBeNull();
+    expect(screen.queryByText("unpin")).toBeNull();
   });
 
-  test("an archived project does not show the pinned star", () => {
+  test("an archived project shows no pinned star anywhere", () => {
     const { container } = renderCard({ ...base, pinned: true, hidden: true });
     expect(container.querySelector(".pin")).toBeNull();
     expect(screen.getByText("archived")).toBeTruthy();
+  });
+
+  test("visible card offers pin, which pins the project", async () => {
+    patchProject.mockResolvedValue({ ok: true });
+    const { container } = renderCard(base);
+    openMenu(container);
+    fireEvent.click(screen.getByText("pin"));
+    await waitFor(() => expect(patchProject).toHaveBeenCalledWith("abc", { pinned: true }));
+  });
+
+  test("refresh calls the refresh endpoint", async () => {
+    refreshProject.mockResolvedValue({ ok: true });
+    const { container } = renderCard(base);
+    openMenu(container);
+    fireEvent.click(screen.getByText("refresh"));
+    await waitFor(() => expect(refreshProject).toHaveBeenCalledWith("abc"));
   });
 });
