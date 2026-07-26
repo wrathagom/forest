@@ -6,6 +6,20 @@
     <title>forest</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <script>
+      // Applies the last-used background/foreground before first paint. The
+      // full token set lands when the module bundle evaluates; this only
+      // prevents a light/dark flash on load. Written by applyTheme().
+      try {
+        var b = JSON.parse(localStorage.getItem("forest.theme.boot") || "null");
+        if (b && b.bg && b.fg && b.scheme) {
+          var s = document.documentElement.style;
+          s.setProperty("--bg", b.bg);
+          s.setProperty("--fg", b.fg);
+          s.setProperty("color-scheme", b.scheme);
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

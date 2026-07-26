@@ -76,10 +76,10 @@ export default function BbsSettings() {
             </div>
 
             <Show when={c().status.lastError}>
-              <p style={{ color: "#c0392b" }}>Last publish error: {c().status.lastError}</p>
+              <p style={{ color: "var(--error)" }}>Last publish error: {c().status.lastError}</p>
             </Show>
-            <Show when={msg()}><p style={{ color: "#2e7d32" }}>{msg()}</p></Show>
-            <Show when={err()}><p style={{ color: "#c0392b" }}>{err()}</p></Show>
+            <Show when={msg()}><p style={{ color: "var(--ok)" }}>{msg()}</p></Show>
+            <Show when={err()}><p style={{ color: "var(--error)" }}>{err()}</p></Show>
           </div>
         )}
       </Show>

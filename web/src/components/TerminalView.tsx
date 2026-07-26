@@ -1,9 +1,24 @@
-import { onCleanup, onMount } from "solid-js";
-import { Terminal } from "@xterm/xterm";
+import { createEffect, getOwner, onCleanup, onMount, runWithOwner } from "solid-js";
+import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
+import { currentTheme } from "../lib/themes/current";
+import type { Theme } from "../lib/themes/types";
+
+// xterm renders to canvas/WebGL and parses literal color strings, so it cannot
+// read CSS custom properties — these have to be real values from the registry.
+// Only background/foreground/cursor. ANSI 0-15 are deliberately left to
+// xterm's defaults: programs in the PTY pick their own colors, and modern
+// prompts emit 24-bit truecolor that no theme should override.
+export function xtermTheme(theme: Theme): ITheme {
+  return {
+    background: theme.tokens.termBg,
+    foreground: theme.tokens.termFg,
+    cursor: theme.tokens.termCursor,
+  };
+}
 
 type ServerFrame =
   | { type: "scrollback"; data: string }
@@ -43,6 +58,11 @@ export default function TerminalView(props: {
   };
 
   onMount(async () => {
+    // Captured before the first await: Solid's owner is only in scope
+    // synchronously, so a computation created after an await would never be
+    // disposed. Same pattern as FileEditor.
+    const owner = getOwner();
+
     // xterm.js measures the font in a canvas at terminal-open time. If the
     // browser hasn't loaded the font yet, the measurement uses the fallback
     // and Nerd Font glyphs never render even after the family becomes
@@ -65,11 +85,7 @@ export default function TerminalView(props: {
       // glyphs as fallback characters.
       fontFamily: '"FiraCode Nerd Font Mono", "FiraCode Nerd Font", ui-monospace, Menlo, monospace',
       fontSize: 13,
-      theme: {
-        background: "#0e0e10",
-        foreground: "#e6e6e6",
-        cursor: "#6ee7b7",
-      },
+      theme: xtermTheme(currentTheme()),
       // xterm parses OSC 8 hyperlink escapes and applies link styling
       // regardless, but the click handler only runs if linkHandler is set.
       // Without this, CLIs that emit OSC 8 (claude, gh, eza, fd, ...) render
@@ -87,6 +103,14 @@ export default function TerminalView(props: {
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
     term.open(host);
+
+    // currentTheme() reads the themeId signal, so this re-runs on every change.
+    runWithOwner(owner, () => {
+      createEffect(() => {
+        const t = currentTheme();
+        if (term) term.options.theme = xtermTheme(t);
+      });
+    });
 
     // WebGL renderer must load after term.open(); it builds its glyph atlas
     // from the live DOM. WebGL handles in-place row redraws (Ink-style status
@@ -166,20 +190,26 @@ export default function TerminalView(props: {
       if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
     }, 30_000);
 
-    onCleanup(() => {
-      ro.disconnect();
-      if (pingTimer) clearInterval(pingTimer);
-      if (ws && ws.readyState !== WebSocket.CLOSED) {
-        try { ws.close(1000); } catch { /* ignore */ }
-      }
-      // Dispose WebGL before term.dispose() so the GL context is released
-      // back to the browser's pool — without this, repeated tab open/close
-      // cycles eventually trip Chrome's "too many WebGL contexts" cap.
-      disposeWebgl();
-      term?.dispose();
-      term = null;
-      fit = null;
-      ws = null;
+    // Registered after the font-load await, so the ambient Owner is gone
+    // (Solid restores it to null the moment the async function yields, not
+    // when the promise resolves). A bare onCleanup() here would silently
+    // never fire — re-parent it onto the owner captured at the top.
+    runWithOwner(owner, () => {
+      onCleanup(() => {
+        ro.disconnect();
+        if (pingTimer) clearInterval(pingTimer);
+        if (ws && ws.readyState !== WebSocket.CLOSED) {
+          try { ws.close(1000); } catch { /* ignore */ }
+        }
+        // Dispose WebGL before term.dispose() so the GL context is released
+        // back to the browser's pool — without this, repeated tab open/close
+        // cycles eventually trip Chrome's "too many WebGL contexts" cap.
+        disposeWebgl();
+        term?.dispose();
+        term = null;
+        fit = null;
+        ws = null;
+      });
     });
   });
 
