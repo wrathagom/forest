@@ -163,6 +163,16 @@ describe("detailRows", () => {
     expect(byLabel["run"]).toContain("web");
   });
 
+  test("names a process with no listening ports, without a trailing separator", () => {
+    // A background worker binds nothing. This is the other half of the run-row
+    // ternary, which the ports-bearing fixture above never reaches.
+    const base = project().snapshot!;
+    const p = project({ snapshot: { ...base,
+      services: { docker: [], processes: [{ pid: 1, command: "worker", cwd: "/p", ports: [] }] } } });
+    const run = detailRows(p, NOW).find((r) => r.label === "run");
+    expect(run?.value).toBe("worker");
+  });
+
   test("omits the commit row when there is no commit", () => {
     expect(detailRows(project(), NOW).map((r) => r.label)).not.toContain("commit");
   });
