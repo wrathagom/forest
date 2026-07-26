@@ -2252,11 +2252,23 @@ import { currentTheme } from "../lib/themes/current";
 import { dashboardColorBy, dashboardPreset } from "../lib/preferences";
 ```
 
-3. Add a derived groups list next to the other derivations:
+3. Add a derived groups list next to the other derivations. **It must cover
+   every project that can actually be rendered, not just `visible()`:**
 
 ```tsx
-const groups = () => groupsOf(visible());
+// Search results merge visible + archived (see searchProjects), so a group
+// that exists only on an archived project must still be in this list.
+// bandColor() resolves a group to a hue by its index here and silently
+// returns the neutral band when the group is absent — so computing this over
+// visible() alone would make archived search hits mysteriously lose their
+// color, indistinguishable from a genuinely ungrouped project.
+const groups = () => groupsOf([...visible(), ...archived()]);
 ```
+
+> **Found in Task 3's code review.** The reviewer flagged that `hueFor`
+> returns neutral silently for a group missing from `groups`, and suggested a
+> dev-time warning inside `colorBy`. The real defect is here in the caller, not
+> in `colorBy` — so this is fixed at the source and `hueFor` stays as-is.
 
 4. Pass the new props to all three `<ProjectGrid …>` call sites (pinned, all,
    results):
