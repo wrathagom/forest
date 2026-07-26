@@ -47,12 +47,29 @@ export type LegendEntry = { label: string; swatch: string };
 
 const DAY = 86_400_000;
 
-/** Distinct, sorted group names. Sorted so a group's hue never shifts when
- *  the project list reorders. */
+/**
+ * Distinct, sorted group names, primarily case-insensitively for a nicer
+ * display order, with a case-sensitive tiebreak so the comparator is a total
+ * order — required because the source `Set` is deduped case-sensitively, so
+ * e.g. "Work" and "work" survive as two separate entries that the primary
+ * comparator treats as equal. Without the tiebreak, `Array.sort`'s stability
+ * would let their relative order fall back to `Set` insertion order, which
+ * tracks project-list order — so two same-cased-differently groups could
+ * swap positions (and hues) whenever the project list reorders.
+ *
+ * This guarantees each *individual* group keeps a stable position relative
+ * to the others already in the list. It does not guarantee a group's hue is
+ * stable forever: hue is assigned by position (see `hueFor`'s "group"
+ * branch), so inserting a new group that sorts earlier shifts every later
+ * group's index, and therefore its hue, by one.
+ */
 export function groupsOf(projects: ProjectRow[]): string[] {
   const set = new Set<string>();
   for (const p of projects) if (p.group) set.add(p.group);
-  return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return [...set].sort(
+    (a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }) || (a < b ? -1 : a > b ? 1 : 0),
+  );
 }
 
 /** The five heat steps, hottest first. A single-hue sequential ramp off the
@@ -99,21 +116,34 @@ function hueFor(
   }
 
   if (dim === "services") {
+    // Unlike "git", errors don't outrank a running service here — a project
+    // can have a live container and a logged error at the same time, and the
+    // two dimensions are answering different questions. Deliberate.
     const running = snap.services.docker.some((d) => d.state === "running");
     const procs = snap.services.processes.length > 0;
     return running || procs ? t.ok : null;
   }
 
-  // heat
-  const activity = lastActivity(p);
-  if (activity === 0) return null;
-  const age = now - activity;
-  const ramp = heatRamp(theme);
-  if (age < DAY) return ramp[0]!;
-  if (age < 7 * DAY) return ramp[1]!;
-  if (age < 30 * DAY) return ramp[2]!;
-  if (age < 90 * DAY) return ramp[3]!;
-  return ramp[4]!;
+  if (dim === "heat") {
+    const activity = lastActivity(p);
+    if (activity === 0) return null;
+    const age = now - activity;
+    const ramp = heatRamp(theme);
+    if (age < DAY) return ramp[0]!;
+    if (age < 7 * DAY) return ramp[1]!;
+    if (age < 30 * DAY) return ramp[2]!;
+    if (age < 90 * DAY) return ramp[3]!;
+    return ramp[4]!;
+  }
+
+  // Exhaustive guard, unreachable: every branch above returns for its
+  // dimension, so by here `dim` has narrowed to `never`. If a seventh
+  // dimension is ever added to the union without a matching branch above,
+  // this assignment fails to compile — the same guarantee legend()'s switch
+  // gets for free from TypeScript's exhaustiveness checking, just spelled
+  // out explicitly since an if-chain isn't checked the way a switch is.
+  const exhaustive: never = dim;
+  return exhaustive;
 }
 
 /**

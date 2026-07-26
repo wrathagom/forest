@@ -68,6 +68,16 @@ describe("bandColor — heat", () => {
   test("never scanned is neutral, not the coldest step", () => {
     expect(bandColor(project({ snapshot: null }), "heat", [], theme, NOW).bg).toBe(k.bg3);
   });
+
+  test("a snapshot with lastEdit null and no commit is neutral (distinct from no snapshot)", () => {
+    // A different code path than `snapshot: null`: lastActivity reaches this
+    // via `snap.lastEdit ?? 0` and `snap.git.lastCommit?.timestamp ?? 0`
+    // both falling back to 0, not via hueFor's `if (!snap) return null;` guard.
+    const p = project({ snapshot: { ...project().snapshot!, lastEdit: null } });
+    const band = bandColor(p, "heat", [], theme, NOW);
+    expect(band.bg).toBe(k.bg3);
+    expect(band.neutral).toBe(true);
+  });
 });
 
 describe("bandColor — services and agents", () => {
@@ -83,6 +93,19 @@ describe("bandColor — services and agents", () => {
 
   test("a listening process is ok", () => {
     const p = project({ snapshot: { ...project().snapshot!, services: { docker: [], processes: [{ pid: 1, command: "vite", cwd: "/p", ports: [5173] }] } } });
+    expect(bandColor(p, "services", [], theme, NOW).bg).toBe(k.ok);
+  });
+
+  test("a running container still reads ok even with logged errors (unlike git)", () => {
+    // Deliberate divergence from "git": "services" answers "is anything
+    // running", not "is anything wrong", so it doesn't consult snap.errors.
+    const p = project({
+      snapshot: {
+        ...project().snapshot!,
+        services: { docker: [{ name: "web", state: "running", from: "compose" }], processes: [] },
+        errors: ["docker down"],
+      },
+    });
     expect(bandColor(p, "services", [], theme, NOW).bg).toBe(k.ok);
   });
 
@@ -102,12 +125,6 @@ describe("bandColor — group", () => {
   test("each group gets a distinct chart hue", () => {
     const seen = groups.map((g) => bandColor(project({ group: g }), "group", groups, theme, NOW).bg);
     expect(new Set(seen).size).toBe(3);
-  });
-
-  test("the same group is stable across calls", () => {
-    const a = bandColor(project({ group: "Work" }), "group", groups, theme, NOW).bg;
-    const b = bandColor(project({ group: "Work" }), "group", groups, theme, NOW).bg;
-    expect(a).toBe(b);
   });
 
   test("ungrouped is neutral", () => {
@@ -159,6 +176,23 @@ describe("groupsOf", () => {
     const rows = [project({ group: "Work" }), project({ group: null }), project({ group: "Personal" }), project({ group: "Work" })];
     expect(groupsOf(rows)).toEqual(["Personal", "Work"]);
   });
+
+  test("case-differing groups get a total order, stable across insertion order", () => {
+    // "Work" and "work" are distinct entries (the Set dedupes case-sensitively)
+    // but compare equal under the case-insensitive primary comparator. Without
+    // a tiebreak, Array.sort's stability would let their relative order fall
+    // back to Set insertion order — i.e. to project-list order — so the two
+    // could swap positions (and therefore hues, via hueFor's "group" branch)
+    // whenever the project list reorders. The tiebreak fixes their order
+    // regardless of which one appears first in the input.
+    const order1 = groupsOf([
+      project({ group: "Alpha" }), project({ group: "Work" }), project({ group: "work" }),
+    ]);
+    const order2 = groupsOf([
+      project({ group: "Alpha" }), project({ group: "work" }), project({ group: "Work" }),
+    ]);
+    expect(order1).toEqual(order2);
+  });
 });
 
 describe("legend", () => {
@@ -175,7 +209,22 @@ describe("legend", () => {
       .toEqual(["Personal", "Work", "ungrouped"]);
   });
 
-  test("heat lists its five buckets", () => {
-    expect(legend("heat", [], theme)).toHaveLength(5);
+  test("heat lists its five buckets, hottest first, matching the ramp order", () => {
+    expect(legend("heat", [], theme).map((e) => e.label))
+      .toEqual(["today", "week", "month", "quarter", "older"]);
+  });
+
+  test("services lists running vs idle", () => {
+    expect(legend("services", [], theme)).toEqual([
+      { label: "running", swatch: k.ok },
+      { label: "idle", swatch: k.bg3 },
+    ]);
+  });
+
+  test("agents lists agents vs none", () => {
+    expect(legend("agents", [], theme)).toEqual([
+      { label: "agents", swatch: k.info },
+      { label: "none", swatch: k.bg3 },
+    ]);
   });
 });
