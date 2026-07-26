@@ -1577,6 +1577,19 @@ git add web/src/components/CardMenu.tsx web/tests/CardMenu.test.tsx
 git commit -m "feat(card): add the always-visible card actions menu"
 ```
 
+> **Added during execution — keyboard handling.** The component above is the
+> shipped structure, but code review found the stated rationale for
+> always-visible-and-click ("hover excludes keyboard and touch") only half held:
+> there was no Escape to close, and activating an item unmounted the focused
+> button via `<Show>`, dropping focus to `<body>` so the user Tabbed from the top
+> of the page again. Both were closed in a follow-up commit — Escape closes and
+> returns focus to the trigger, and firing an item also returns focus there.
+>
+> Deliberately **not** added: `role="menu"` / `role="menuitem"` / arrow-key roving
+> focus. Native `<button>`s plus `aria-expanded` make this a disclosure of
+> buttons rather than an ARIA menu widget, which is the simpler correct pattern
+> here.
+
 ---
 
 ### Task 8: Rewrite `ProjectCard`
