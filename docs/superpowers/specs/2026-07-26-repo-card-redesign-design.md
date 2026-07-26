@@ -13,9 +13,10 @@ project. Four things are wrong with it:
   a status dot, a group tag, a pin star, an archived tag, and three permanently
   visible action buttons. `multi-agent-profiles-and-launchers` becomes
   `multi-agent-profiles-…`, losing the part that identifies it.
-- **Rows stretch to the tallest card.** `.grid` uses the default
-  `align-items: stretch`, so one project with an issues list pads out its two
-  row-mates with empty space.
+- **Nothing uses the slack.** `.grid` uses the default `align-items: stretch`,
+  so a row is as tall as its noisiest project — and the shorter cards get that
+  height as unexplained empty space at the bottom. Equal heights are kept (§5.5),
+  but the space is put to work rather than left blank.
 - **Color means exactly one thing.** The dot is always git-or-error status.
   There is no way to ask "what did I leave running?" or "what have I not touched
   in months?"
@@ -26,7 +27,8 @@ project. Four things are wrong with it:
 
 ## Goals
 
-- A card whose height reflects how much is actually happening on that project.
+- Tidy rows — every card in a row the same height — with row height driven by
+  content, and the resulting slack used for alignment rather than left empty.
 - A full-width colored title band, where the color is a dimension the user picks.
 - Toolbar view presets, so the dashboard can serve triage, launching, and
   ambient monitoring without committing to one.
@@ -42,8 +44,8 @@ project. Four things are wrong with it:
   Different feature.
 - **Per-project card configuration.** Presets are global to the dashboard.
 - **Mobile (`/m`).** A separate surface with its own session-oriented list.
-- **Masonry.** Cards size to content, but rows still reserve the tallest card's
-  height. True masonry is a layout change with its own trade-offs.
+- **Masonry / per-card heights.** Cards in a row match the tallest; only row
+  height is content-driven. Explicitly chosen over ragged per-card heights (§5.5).
 
 ## Decisions
 
@@ -59,7 +61,8 @@ project. Four things are wrong with it:
 | Legend | Always shown in the toolbar |
 | Content control | Three view presets: `compact`, `status`, `detail` (§3) |
 | Preset + color-by storage | `localStorage`, per-device, via `preferences.ts` |
-| Card height | `align-items: start` — cards size to content |
+| Card height | Uniform within a row; row height content-driven (§5.5) |
+| Slack in short cards | Chip row pinned to the card floor via `margin-top: auto` (§5.5) |
 
 ## 1. Card anatomy
 
@@ -68,10 +71,15 @@ project. Four things are wrong with it:
 │ forest-public              [Personal] [☰]   │  ← band: --k bg, derived fg
 ├─────────────────────────────────────────────┤
 │ task/i-want-ot-redesign-the-cards           │  ← branch, truncates from LEFT
-│ [+4] [↑2] [2⚙] [:5173] [:52810]  3m         │  ← chip row, wraps
 │ ⚠ docker: docker unreachable                │  ← only when errors non-empty
+│                                             │  ← slack lives here (§5.5)
+│ [+4] [↑2] [2⚙] [:5173] [:52810]  3m         │  ← chip row, pinned to floor
 └─────────────────────────────────────────────┘
 ```
+
+Top-down order is band → branch → errors → *slack* → chips. Errors sit high,
+directly under the branch, because they are the most urgent thing on the card;
+the chip row is pushed to the floor so it aligns across the row (§5.5).
 
 **Band.** Background `--k`, foreground `--kfg`, both set as inline custom
 properties on the card element by `colorBy.ts`. Fixed
@@ -216,19 +224,35 @@ this month" under `heat`. Swatch plus label per state, from `legend(dim, groups)
 | Preset | Body |
 |---|---|
 | `compact` | One dim line: `branch · git summary · age`. No chips. |
-| `status` *(default)* | Branch line, one wrapping chip row, issues line. |
+| `status` *(default)* | Branch line, errors, then the chip row on the floor. |
 | `detail` | Labelled rows: branch+git, commit message + age, edited, named services. |
 
 `lib/dashboard-view.ts` holds the preset definitions and the pure chip-derivation
-functions. A row or chip is omitted entirely when it has nothing to say — that,
-plus `align-items: start`, is what makes height track content. An idle clean
-project is two rows tall; a busy one is four or five.
+functions. A row or chip is omitted entirely when it has nothing to say — that
+omission is what drives row height. An idle clean project contributes two rows;
+a busy one four or five.
 
-Chips in `status`: dirty `+N`, ahead `↑N`, behind `↓N`, container running/stopped
-counts, process count, distinct listening ports, `🤖 N`, relative age.
+**Chips in `status`,** in order: dirty `+N`, ahead `↑N`, behind `↓N`, container
+running/stopped counts, process count, distinct listening ports, `🤖 N`, relative
+age. Verbose wording (`2 processes`, `1 running`) over glyphs — reviewed against
+a terse variant and rejected as too much to learn for the density won.
+
+**No `clean` chip.** Today's card renders `clean` whenever the tree is clean;
+absence of `+N` already carries that, and printing it spends a chip on the
+default state. This is a deliberate behavior change from the current card.
+
+**Ports** get one chip each rather than one combined chip. A project with seven
+listening ports therefore contributes a tall row; accepted, because 2–3 ports is
+the normal case and separate chips read better there.
+
+**Relative age** renders bare (`3m`), borderless and unlabelled — the only naked
+value on the card.
 
 `detail` surfaces the three fields the current card ignores: `lastCommit.message`,
-`lastEdit` as distinct from commit recency, and container/process *names*.
+`lastEdit` as distinct from commit recency, and container/process *names*. The
+commit message is **clamped to 2 lines** with an ellipsis; real merge subjects
+(e.g. a dependabot `Merge pull request #142 from …` line) otherwise wrap to three
+lines and dominate the card.
 
 ## 4. The actions menu
 
@@ -303,6 +327,43 @@ Measured across 7 cards in the approved mockup, all single-valued:
 | Title vertical offset from band center | `0` |
 | Toolbar control heights | `28px`, one shared top edge |
 
+### 5.5 Row heights, and where the slack goes
+
+Cards in a row are **uniform in height**; row height is driven by the row's
+tallest card. That is the grid's default `align-items: stretch`, so the card
+simply must not opt out of it. For the body to absorb the extra height:
+
+```css
+.card      { display: flex; flex-direction: column; }   /* band + body */
+.card-band { flex: 0 0 auto; }
+.card-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+.card-chips{ margin-top: auto; }                        /* pinned to the floor */
+```
+
+`margin-top: auto` on the chip row is the whole mechanism. It moves the slack
+*above* the chips instead of below them, so **every card in a row lands its chip
+row on one shared baseline** — the empty space becomes horizontal alignment you
+can scan across. Errors stay high, directly under the branch.
+
+Two alternatives were built and measured against this one: leaving content
+top-aligned (slack reads as unexplained emptiness — a quiet card looks like it
+failed to load), and centering the body (nothing aligns to anything, and the
+branch line floats at a different height on every card). All three produce
+*identical* heights, so this choice costs nothing.
+
+Measured, 3 cards per row, deliberately lopsided content:
+
+| | row 1 | row 2 |
+|---|---|---|
+| Card heights within the row | `107.96px`, single-valued | `64.95px`, single-valued |
+
+Row 2 holds three quiet projects and is 60% shorter than row 1 — uniform within
+a row, content-driven between rows, which is the intent.
+
+**The accepted cost.** One noisy project pads out its row-mates, and it scales
+with column count: at 3 columns a tall card affects 2 others, at 4 it would
+affect 3. This is a deliberate trade for a tidier grid, not an oversight.
+
 ## 6. Pinned is conveyed by position
 
 Dropping the pin star is only sound if position always conveys pinned. The
@@ -322,7 +383,7 @@ each partition. One change, and the invariant holds everywhere.
 | `lib/dashboard-view.ts` | new | Preset definitions + chip derivation. Pure. |
 | `components/CardMenu.tsx` | new | `☰` button + popover. |
 | `components/ProjectCard.tsx` | rewrite | Band, right cluster, body-by-preset. |
-| `components/ProjectGrid.tsx` | edit | Thread preset through; `align-items: start`. |
+| `components/ProjectGrid.tsx` | edit | Thread preset + color-by through to cards. |
 | `pages/Dashboard.tsx` | edit | Preset control + color-by select + legend. |
 | `lib/preferences.ts` | edit | `dashboardPreset`, `dashboardColorBy` signals. |
 | `lib/project-list.ts` | edit | Hoist pinned in `searchProjects`. |
@@ -342,10 +403,15 @@ stay thin and the logic is unit-testable without rendering.
 - **Band contrast floor** — for all 16 themes × every band state (including all
   five heat steps and all 8 group hues), `contrast(fg, bg) >= 4.5`, using the
   existing `tests/helpers/contrast.ts`. This is the test that makes §2.1 safe.
-- `dashboard-view` — chip derivation per preset; empty rows omitted.
+- `dashboard-view` — chip derivation per preset; empty rows omitted; no `clean`
+  chip is ever emitted; one chip per distinct port.
 - `CardMenu` — opens on click, closes on outside click, items fire their
   callbacks, `archive`/`restore` swap on `hidden`.
 - `project-list` — `searchProjects` returns pinned first.
+- **Card structure for §5.5** — assert the chip row carries `margin-top: auto`
+  and that the card and body are column flex containers. jsdom does not do
+  layout, so this checks the *mechanism* rather than resulting pixel heights;
+  the geometry itself was verified in-browser and is recorded in §5.4 and §5.5.
 
 **Rewritten.** Several assertions in `tests/ProjectCard.test.tsx` break *by
 design* and should be rewritten rather than patched:
@@ -368,3 +434,7 @@ design* and should be rewritten rather than patched:
   specifically to keep it from becoming the thing it replaced.
 - **Preset names are guesses.** `compact` / `status` / `detail` may not survive
   contact with use. They are localStorage values, so renaming is cheap.
+- **One noisy project inflates its whole row** (§5.5). Accepted for a tidier
+  grid, and it worsens with column count. The `compact` preset is the escape
+  hatch: with no chip row and no errors block, every card is the same two lines,
+  so rows cannot inflate at all.
