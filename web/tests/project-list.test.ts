@@ -120,3 +120,50 @@ describe("searchProjects", () => {
     expect(out.map((p) => p.name)).toEqual(["busy", "idle"]);
   });
 });
+
+describe("searchProjects — pinned first", () => {
+  test("hoists pinned matches above unpinned ones", () => {
+    const out = searchProjects(
+      [proj({ name: "alpha" }), proj({ name: "alpha-two", pinned: true })],
+      [],
+      "alpha",
+      "name",
+    );
+    expect(out.map((p) => p.name)).toEqual(["alpha-two", "alpha"]);
+  });
+
+  test("applies the chosen sort within the pinned and unpinned partitions", () => {
+    const out = searchProjects(
+      [
+        proj({ name: "zeta", pinned: true }),
+        proj({ name: "alpha", pinned: true }),
+        proj({ name: "yankee" }),
+        proj({ name: "bravo" }),
+      ],
+      [],
+      "",
+      "name",
+    );
+    expect(out.map((p) => p.name)).toEqual(["alpha", "zeta", "bravo", "yankee"]);
+  });
+
+  test("still merges archived results", () => {
+    const out = searchProjects(
+      [proj({ name: "match-visible" })],
+      [proj({ name: "match-archived" })],
+      "match",
+      "name",
+    );
+    expect(out.map((p) => p.name).sort()).toEqual(["match-archived", "match-visible"]);
+  });
+
+  test("a pinned archived project still sorts first", () => {
+    const out = searchProjects(
+      [proj({ name: "match-a" })],
+      [proj({ name: "match-b", pinned: true })],
+      "match",
+      "name",
+    );
+    expect(out[0]!.name).toBe("match-b");
+  });
+});

@@ -32,7 +32,13 @@ export function matchesQuery(p: ProjectRow, query: string): boolean {
   return p.name.toLowerCase().includes(q);
 }
 
-/** Merge visible + archived, keep name matches, and sort. Used while searching. */
+/**
+ * Merge visible + archived, keep name matches, and sort. Used while searching.
+ *
+ * Pinned projects sort first. The default dashboard view renders pinned in its
+ * own section, so position is what conveys "pinned" now that the card has no
+ * star; partitioning here keeps that true in search results too.
+ */
 export function searchProjects(
   visible: ProjectRow[],
   archived: ProjectRow[],
@@ -40,5 +46,7 @@ export function searchProjects(
   sort: ProjectSort,
 ): ProjectRow[] {
   const merged = [...visible, ...archived].filter((p) => matchesQuery(p, query));
-  return sortProjects(merged, sort);
+  const pinned = sortProjects(merged.filter((p) => p.pinned), sort);
+  const rest = sortProjects(merged.filter((p) => !p.pinned), sort);
+  return [...pinned, ...rest];
 }
