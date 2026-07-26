@@ -1441,12 +1441,25 @@ describe("CardMenu", () => {
     expect(onParent).not.toHaveBeenCalled();
   });
 
-  test("opening the menu does not leave a document listener behind on unmount", () => {
-    const { open, unmount } = setup();
-    open();
-    unmount();
-    // If onCleanup did not remove the listener this would throw on a stale ref.
-    expect(() => fireEvent.click(document.body)).not.toThrow();
+  test("removes the document click listener it registered, on unmount", () => {
+    // Solid delegates click to document too, and never removes that one — so
+    // assert that *a* handler added during render is later removed, rather than
+    // that every click listener disappears.
+    const addSpy = vi.spyOn(document, "addEventListener");
+    const removeSpy = vi.spyOn(document, "removeEventListener");
+    try {
+      const { unmount } = setup();
+      const added = addSpy.mock.calls.filter((c) => c[0] === "click").map((c) => c[1]);
+      expect(added.length).toBeGreaterThan(0);
+
+      unmount();
+
+      const removed = removeSpy.mock.calls.filter((c) => c[0] === "click").map((c) => c[1]);
+      expect(added.some((h) => removed.includes(h))).toBe(true);
+    } finally {
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    }
   });
 });
 ```
