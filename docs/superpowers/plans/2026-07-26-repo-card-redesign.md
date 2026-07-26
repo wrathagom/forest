@@ -234,8 +234,23 @@ describe("readableOn", () => {
     expect(out).toBe("#000000");
   });
 
-  test("falls back to white for a very dark hue", () => {
-    expect(readableOn("#101014", LIGHT.bg, LIGHT.fg)).toBe("#ffffff");
+  test("falls back to white when both native tones miss and the hue sits under the crossover", () => {
+    // #6c6c6c has L≈0.150, just below the 0.179 crossover. Against DARK,
+    // bg is 3.67:1 and fg is 4.21:1 — both miss the floor — and white
+    // (5.25:1) beats black (4.00:1).
+    expect(readableOn("#6c6c6c", DARK.bg, DARK.fg)).toBe("#ffffff");
+  });
+
+  test("falls back to black when the hue sits just above the crossover", () => {
+    // #767676, L≈0.181. bg 4.25:1 and fg 3.64:1 both miss; now black
+    // (4.62:1) edges out white (4.54:1). The mirror of the test above.
+    expect(readableOn("#767676", DARK.bg, DARK.fg)).toBe("#000000");
+  });
+
+  test("falls back to white in a light theme too", () => {
+    // #747474, L≈0.175. LIGHT.bg is 4.33:1 and LIGHT.fg only 1.05:1, so both
+    // miss; white wins at 4.67:1 over black's 4.49:1.
+    expect(readableOn("#747474", LIGHT.bg, LIGHT.fg)).toBe("#ffffff");
   });
 
   test("always clears 4.5:1, even at the black/white crossover luminance", () => {
@@ -296,7 +311,16 @@ export function readableOn(hue: string, bg: string, fg: string): string {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd web && bun run test -- tests/colorBy.readableOn.test.ts`
-Expected: PASS (5 tests).
+Expected: PASS (7 tests).
+
+> **Corrected during execution.** This step originally asserted
+> `readableOn("#101014", LIGHT.bg, LIGHT.fg) === "#ffffff"`, which is
+> unsatisfiable: a light theme's near-white `bg` scores ~17.6:1 against a
+> near-black hue, so it clears the floor and the fallback branch is never
+> reached. The white fallback is only reachable in the L ≈ 0.138–0.178 band just
+> under the 0.179 crossover — under DARK for greys `#686868`–`#757575`, under
+> LIGHT for `#727272`–`#757575`. The three replacement tests above cover white
+> fallback, black fallback, and light-theme fallback with measured values.
 
 - [ ] **Step 5: Commit**
 
