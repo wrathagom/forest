@@ -18,6 +18,7 @@ export type CardMenuProps = {
 export default function CardMenu(props: CardMenuProps) {
   const [open, setOpen] = createSignal(false);
   let rootRef: HTMLSpanElement | undefined;
+  let triggerRef: HTMLButtonElement | undefined;
 
   // The `contains` guard is load-bearing, not defensive. Solid delegates click
   // to the document, so a click inside the menu has *already* reached document
@@ -41,16 +42,31 @@ export default function CardMenu(props: CardMenuProps) {
         e.stopPropagation();
         setOpen(false);
         run();
+        // The item that was just clicked is about to unmount (it's inside the
+        // `<Show>`), which would otherwise drop focus to <body>. Send it back
+        // to the trigger — the place the user came from — instead.
+        triggerRef?.focus();
       }}
     >
       {label}
     </button>
   );
 
+  // Escape is the only keyboard affordance this "disclosure of buttons"
+  // pattern needs beyond native <button> + Tab: without it, the only way out
+  // is tabbing back to the trigger and re-toggling it.
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      triggerRef?.focus();
+    }
+  };
+
   return (
-    <span class="card-menu" ref={rootRef} onclick={swallow}>
+    <span class="card-menu" ref={rootRef} onclick={swallow} onkeydown={onKeyDown}>
       <button
         class="card-menu-trigger"
+        ref={triggerRef}
         title="more"
         aria-label="more"
         aria-expanded={open()}

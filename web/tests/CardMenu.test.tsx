@@ -21,6 +21,14 @@ function setup(over: Partial<Props> = {}) {
   return { ...utils, props, open };
 }
 
+// Direct children of the popover, in DOM order, with the rule collapsed to a
+// marker so ordering (including its position relative to the rule) is a
+// single flat array comparison.
+const popoverStructure = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll(".card-menu-popover > *")).map((el) =>
+    el.classList.contains("card-menu-rule") ? "—" : el.textContent,
+  );
+
 describe("CardMenu", () => {
   test("renders a single always-visible trigger", () => {
     const { container } = setup();
@@ -54,6 +62,21 @@ describe("CardMenu", () => {
     expect(b.getByText("unpin")).toBeTruthy();
   });
 
+  test("pin and unpin both fire onTogglePin", () => {
+    // The two tests above only check the rendered label — they'd pass even
+    // if pin were miswired to onToggleArchive. Assert the callback directly.
+    const a = setup({ pinned: false });
+    a.open();
+    fireEvent.click(a.getByText("pin"));
+    expect(a.props.onTogglePin).toHaveBeenCalledTimes(1);
+    a.unmount();
+
+    const b = setup({ pinned: true });
+    b.open();
+    fireEvent.click(b.getByText("unpin"));
+    expect(b.props.onTogglePin).toHaveBeenCalledTimes(1);
+  });
+
   test("shows restore instead of archive when hidden", () => {
     const { open, getByText, queryByText } = setup({ hidden: true });
     open();
@@ -76,6 +99,13 @@ describe("CardMenu", () => {
     fireEvent.click(getByText("refresh"));
     expect(props.onRefresh).toHaveBeenCalledTimes(1);
     expect(queryByText("refresh")).toBeNull();
+  });
+
+  test("open fires onOpen", () => {
+    const { props, open, getByText } = setup();
+    open();
+    fireEvent.click(getByText("open"));
+    expect(props.onOpen).toHaveBeenCalledTimes(1);
   });
 
   test("archive fires onToggleArchive", () => {
@@ -113,6 +143,45 @@ describe("CardMenu", () => {
     ));
     fireEvent.click(container.querySelector(".card-menu-trigger") as HTMLElement);
     expect(onParent).not.toHaveBeenCalled();
+  });
+
+  test("orders items open, refresh, copy path, a rule, pin, then archive last", () => {
+    // "archive is last and separated by a rule" is a deliberate design
+    // decision (a semi-destructive action earns a second step). This fails
+    // if archive moves above the rule, or anywhere but last.
+    const { open, container } = setup();
+    open();
+    expect(popoverStructure(container)).toEqual([
+      "open", "refresh", "copy path", "—", "pin", "archive",
+    ]);
+  });
+
+  test("when hidden, orders items without pin but still separates restore with the rule", () => {
+    const { open, container } = setup({ hidden: true });
+    open();
+    expect(popoverStructure(container)).toEqual([
+      "open", "refresh", "copy path", "—", "restore",
+    ]);
+  });
+
+  test("Escape closes the menu and returns focus to the trigger", () => {
+    const { open, queryByText, container } = setup();
+    open();
+    expect(queryByText("refresh")).toBeTruthy();
+    const trigger = container.querySelector(".card-menu-trigger") as HTMLElement;
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(queryByText("refresh")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  test("activating an item returns focus to the trigger instead of dropping it", () => {
+    // The item unmounts (it's inside the `<Show>`) the instant it's clicked,
+    // which would otherwise drop focus to <body> and lose the user's place.
+    const { open, getByText, container } = setup();
+    open();
+    fireEvent.click(getByText("refresh"));
+    const trigger = container.querySelector(".card-menu-trigger");
+    expect(document.activeElement).toBe(trigger);
   });
 
   test("removes the document click listener it registered, on unmount", () => {
