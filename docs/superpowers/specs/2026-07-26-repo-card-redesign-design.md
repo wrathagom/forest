@@ -115,20 +115,33 @@ guard at `ProjectCard.tsx:40`.
 
 ## 2. Color by
 
-A `web/src/lib/colorBy.ts` module owns all six dimensions. It reads token hexes
-from `currentTheme()` rather than CSS variables, following the precedent set by
-`components/charts/profileColors.ts` — that is what makes consumers recolor on a
-theme change, and it keeps the values usable from contexts a CSS variable would
-not reach.
+A `web/src/lib/colorBy.ts` module owns all six dimensions. It works in token
+hexes rather than CSS variables, following the precedent set by
+`components/charts/profileColors.ts` — that is what keeps the values usable from
+contexts a CSS variable would not reach, and what lets a derived color be fed
+back into a contrast calculation.
 
 ```ts
 export type ColorByDimension = "git" | "heat" | "services" | "agents" | "group" | "none";
 
-export type BandColor = { bg: string; fg: string };
+// `neutral` means "no signal in this dimension". The card needs it as an explicit
+// flag rather than comparing `bg` to `bg3`, because `bg` is a resolved hex by the
+// time it reaches the DOM — a CSS attribute selector could never match it.
+export type BandColor = { bg: string; fg: string; neutral: boolean };
 
-export function bandColor(p: ProjectRow, dim: ColorByDimension, groups: string[]): BandColor;
-export function legend(dim: ColorByDimension, groups: string[]): { label: string; swatch: string }[];
+export function bandColor(
+  p: ProjectRow, dim: ColorByDimension, groups: string[], theme: Theme, now: number,
+): BandColor;
+export function legend(
+  dim: ColorByDimension, groups: string[], theme: Theme,
+): { label: string; swatch: string }[];
+export function groupsOf(projects: ProjectRow[]): string[];
 ```
+
+`theme` and `now` are parameters rather than ambient reads, which is what makes
+these unit-testable without mocking a clock or a signal. The card passes
+`currentTheme()`, which reads `themeId()` — so the band still recolors reactively
+when the theme changes.
 
 **No new `ThemeTokens` keys.** Everything derives from the existing 38.
 
@@ -152,6 +165,22 @@ This matters because role hues in this repo are allowed to be low-contrast
 against their own background: the existing catalog test floors them at 2.0:1,
 noting Catppuccin Latte's green at 2.96:1 and its yellow at 2.31:1. Those hues
 are fine as *marks* but cannot be assumed readable as *fills*.
+
+**The rule is applied to every band surface, including the neutral one** (§2.6) —
+there is exactly one code path, so the proof covers all of them.
+
+**Verified across all 16 themes** (role hues, all 5 heat steps, all 8 group hues,
+and the neutral surface):
+
+| | worst pair | where |
+|---|---|---|
+| Hue bands | **4.532:1** | `dracula.error` `#ff5555` → `#282a36` |
+| Neutral band | **4.581:1** | `one-dark` |
+
+The margin over 4.5 is thin — 0.032 at worst — so the test asserts `>= 4.5`
+exactly and any future theme whose palette breaks it will fail loudly. Themes
+where at least one state falls back to absolute black/white are the expected
+majority, most heavily Solarized Light (17 states) and Rosé Pine Dawn (13).
 
 ### 2.2 `git` — the default
 
@@ -210,8 +239,21 @@ neutral band. Not a status — a way to make a long grid spatially learnable.
 
 ### 2.6 `none` and the neutral band
 
-`--k: var(--bg-3)`, `--kfg: var(--fg)`, plus a separator. See §5 for why that
-separator is an inset shadow and not a border.
+The neutral band's surface is the theme's `bg3`, and its foreground goes through
+the **same `readableOn` rule as every hue** (§2.1) rather than being hardcoded to
+`fg`. This is not gold-plating — it was measured:
+
+| Neutral foreground | Worst case | |
+|---|---|---|
+| `fg` on `bg3` | 4.392:1 (solarized-light) | ✗ under the floor |
+| `fg` on `bg2` | 4.392:1 (solarized-light) | ✗ under the floor |
+| `readableOn(bg3)` | **4.581:1** (one-dark) | ✓ |
+
+Solarized Light is the one theme where the neutral band falls back to absolute
+black. Every other theme keeps a theme-native tone.
+
+A separator distinguishes the band from the card body beneath it; see §5.3 for
+why it is an inset shadow rather than a border.
 
 ### 2.7 Legend
 
@@ -382,6 +424,8 @@ each partition. One change, and the invariant holds everywhere.
 | `lib/colorBy.ts` | new | Band colors + legend. Pure, theme-reading. |
 | `lib/dashboard-view.ts` | new | Preset definitions + chip derivation. Pure. |
 | `components/CardMenu.tsx` | new | `☰` button + popover. |
+| `components/DashboardToolbar.tsx` | new | The toolbar row, extracted from `Dashboard.tsx` so it tests without the projects resource. |
+| `lib/contrast.ts` | new | WCAG luminance/contrast/mix, moved out of `tests/helpers/` so `src/` can use it. |
 | `components/ProjectCard.tsx` | rewrite | Band, right cluster, body-by-preset. |
 | `components/ProjectGrid.tsx` | edit | Thread preset + color-by through to cards. |
 | `pages/Dashboard.tsx` | edit | Preset control + color-by select + legend. |
