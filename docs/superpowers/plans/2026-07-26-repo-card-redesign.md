@@ -2481,12 +2481,32 @@ automated guard.
 .card-menu-rule { border-top: 1px solid var(--border); margin: 0.18rem 0.1rem; }
 ```
 
-Delete the old `.card-head`, `.card-meta`, `.card-section`, `.services`,
-`.svc-*`, `.ports`, `.port-chip`, `.group-tag`, `.card-name`, `.pin`, `.dot`,
-`.dot-ok`, `.dot-warn`, `.dot-error`, `.git-stat`, `.git-clean`, `.git-dirty`,
-`.git-ahead`, `.git-behind` rules — they have no remaining consumers. Verify with
-`grep -rn "svc-count\|port-chip\|git-stat\|card-meta\|dot-ok" web/src` returning
-nothing before deleting.
+**Delete only the rules that are genuinely dead.** The dead ones are
+`.card-head`, `.card-meta`, `.card-section`, `.card-name`, `.pin`, and
+`.card-actions`.
+
+> **Corrected during execution — do NOT bulk-delete by line range.** This step
+> originally listed `.services`, `.svc-*`, `.ports`, `.port-chip`, `.group-tag`,
+> `.dot`, `.dot-*`, `.git-stat` and `.git-*` for deletion and asserted a grep
+> would return nothing. That assertion was wrong — most of them are live,
+> consumed by components outside the card system:
+>
+> | Rule | Live consumer |
+> |---|---|
+> | `.services`, `.svc-*`, `.ports`, `.port-chip` | `ServiceList.tsx` — dies in Task 11, not here |
+> | `.group-tag` | `ProjectHeader.tsx` |
+> | `.git-stat`, `.git-*`, `.branch` | `ProjectHeader.tsx` **and** `FileTreePanel.tsx` |
+> | `.dot`, `.dot-ok`, `.dot-warn` | `ContainersPanel.tsx` |
+> | `.label` | `ScanSection.tsx` |
+> | `.empty` | `EmptyState.tsx` |
+>
+> A literal line-range replace would have broken the project-detail page, the
+> containers panel, scan settings and the empty state.
+>
+> **Grep is not sufficient on its own here.** `ContainersPanel.tsx` builds its
+> class as `` `dot dot-${state === "running" ? "ok" : "warn"}` ``, so the literal
+> string `dot-ok` appears nowhere in the source and a naive grep reports it dead.
+> Read the call sites, don't just grep for the literal.
 
 - [ ] **Step 2: Replace the toolbar block at `web/src/styles.css:981-985`**
 
