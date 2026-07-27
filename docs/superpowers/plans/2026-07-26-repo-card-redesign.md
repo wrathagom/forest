@@ -39,6 +39,7 @@
 | `web/src/components/ProjectGrid.tsx` | modify | Thread preset + color-by to cards. |
 | `web/src/components/ServiceList.tsx` | delete | Only consumer was `ProjectCard`. |
 | `web/src/pages/Dashboard.tsx` | modify | Preset control, color-by select, legend. |
+| `web/src/pages/Archives.tsx` | modify | **Second `ProjectGrid` consumer, missed in planning.** Must pass the new required props or every archived card renders an empty body. |
 | `web/src/styles.css` | modify | `--control-h`, `--icon-btn`, band, chips, equal-height flex, toolbar fix. |
 | `README.md` | modify | Document the presets and color-by. |
 
@@ -2318,8 +2319,16 @@ const groups = () => groupsOf([...visible(), ...archived()]);
 Run: `bun run test:web`
 Expected: PASS.
 
-Run: `bun run build:web`
-Expected: succeeds with no TypeScript errors.
+Run: `bun run build:web` and `cd web && bunx tsc --noEmit`
+Expected: the build succeeds, and `tsc` reports no *new* errors.
+
+> **`build:web` does not type-check.** `web/vite.config.ts` has no type-checking
+> plugin and `build` is a bare `vite build`, so Vite transpiles with esbuild and
+> never runs `tsc`. A missing required prop compiles clean and fails only at
+> runtime — which is exactly how `Archives.tsx` was nearly shipped rendering
+> empty card bodies. Always pair the build with `tsc --noEmit`, and compare
+> against a baseline: there is pre-existing unrelated debt in `App.tsx`,
+> `ProjectDetail.tsx` and several test files.
 
 - [ ] **Step 8: Commit**
 
@@ -2687,7 +2696,12 @@ git commit -m "docs: document dashboard presets, color-by and the card menu"
 - [ ] Run `bun run test:web` — all pass.
 - [ ] Run `bun run test:server` — all pass (nothing here touches the server, so
       this is a regression check).
-- [ ] Run `bun run build:web` — succeeds with no TypeScript errors.
+- [ ] Run `bun run build:web` — succeeds.
+- [ ] Run `cd web && bunx tsc --noEmit` — no *new* errors versus the pre-existing
+      baseline. This is the real type gate; `build:web` uses esbuild and never
+      type-checks (see Task 9).
+- [ ] Confirm both `ProjectGrid` consumers render bodies: the dashboard **and**
+      `/archives`. The archives page was missed in planning.
 - [ ] Re-run the Task 10 Step 4 browser assertions one final time.
 - [ ] Spot-check three themes: Forest Dark, Solarized Light, Catppuccin Latte.
 - [ ] Cycle all six color-by dimensions and all three presets in the browser.
