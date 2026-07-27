@@ -18,7 +18,9 @@ function project(over: Partial<ProjectRow> = {}): ProjectRow {
     ...over,
   };
 }
-const withGit = (g: Partial<ProjectRow["snapshot"]["git"]>) => {
+// NonNullable, because `snapshot` is `Snapshot | null` and indexing straight
+// into it is a type error.
+const withGit = (g: Partial<NonNullable<ProjectRow["snapshot"]>["git"]>) => {
   const base = project().snapshot!;
   return project({ snapshot: { ...base, git: { ...base.git, ...g } } });
 };
