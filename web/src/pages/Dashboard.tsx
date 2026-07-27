@@ -2,11 +2,14 @@ import { Show, createSignal, createResource } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useProjects } from "../projects-context";
 import ProjectGrid from "../components/ProjectGrid";
+import DashboardToolbar from "../components/DashboardToolbar";
 import EmptyState from "../components/EmptyState";
 import NewProjectModal from "../components/NewProjectModal";
 import { createProject, fetchConfig, fetchProjects } from "../api";
-import { sortProjects, searchProjects, type ProjectSort } from "../lib/project-list";
-import { dashboardSort, setDashboardSort } from "../lib/preferences";
+import { sortProjects, searchProjects } from "../lib/project-list";
+import { dashboardSort, dashboardColorBy, dashboardPreset } from "../lib/preferences";
+import { groupsOf } from "../lib/colorBy";
+import { currentTheme } from "../lib/themes/current";
 
 export default function Dashboard() {
   const { projects, refetch } = useProjects();
@@ -28,6 +31,14 @@ export default function Dashboard() {
   const archived = () => archivedRes()?.projects ?? [];
   const results = () => searchProjects(visible(), archived(), query(), dashboardSort());
 
+  // Search results merge visible + archived (see searchProjects), so a group
+  // that exists only on an archived project must still be in this list.
+  // bandColor() resolves a group to a hue by its index here and silently
+  // returns the neutral band when the group is absent — so computing this over
+  // visible() alone would make archived search hits mysteriously lose their
+  // color, indistinguishable from a genuinely ungrouped project.
+  const groups = () => groupsOf([...visible(), ...archived()]);
+
   const onChange = () => {
     refetch();
     refetchArchived();
@@ -36,24 +47,7 @@ export default function Dashboard() {
   return (
     <div class="page">
       <Show when={!empty()}>
-        <div class="dashboard-toolbar">
-          <input
-            class="search-input"
-            type="search"
-            placeholder="search projects…"
-            value={query()}
-            oninput={(e) => setQuery(e.currentTarget.value)}
-          />
-          <select
-            class="sort-select"
-            value={dashboardSort()}
-            onchange={(e) => setDashboardSort(e.currentTarget.value as ProjectSort)}
-          >
-            <option value="recent">recent</option>
-            <option value="running">running</option>
-            <option value="name">name</option>
-          </select>
-        </div>
+        <DashboardToolbar query={query()} onQuery={setQuery} groups={groups()} theme={currentTheme()} />
       </Show>
 
       <Show
@@ -74,21 +68,39 @@ export default function Dashboard() {
                   <span>pinned</span>
                   <button class="section-add" onclick={() => setShowModal(true)} title="new project">+</button>
                 </h2>
-                <ProjectGrid projects={pinned()} onChange={onChange} />
+                <ProjectGrid
+                  projects={pinned()}
+                  preset={dashboardPreset()}
+                  colorBy={dashboardColorBy()}
+                  groups={groups()}
+                  onChange={onChange}
+                />
               </Show>
               <Show when={others().length > 0}>
                 <h2 class="section-title">
                   <span>all</span>
                   <button class="section-add" onclick={() => setShowModal(true)} title="new project">+</button>
                 </h2>
-                <ProjectGrid projects={others()} onChange={onChange} />
+                <ProjectGrid
+                  projects={others()}
+                  preset={dashboardPreset()}
+                  colorBy={dashboardColorBy()}
+                  groups={groups()}
+                  onChange={onChange}
+                />
               </Show>
             </>
           }
         >
           <h2 class="section-title"><span>results</span></h2>
           <Show when={results().length > 0} fallback={<div class="muted">no projects match "{query()}"</div>}>
-            <ProjectGrid projects={results()} onChange={onChange} />
+            <ProjectGrid
+              projects={results()}
+              preset={dashboardPreset()}
+              colorBy={dashboardColorBy()}
+              groups={groups()}
+              onChange={onChange}
+            />
           </Show>
         </Show>
       </Show>
