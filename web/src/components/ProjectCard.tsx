@@ -1,118 +1,127 @@
-import { Show } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { ProjectRow } from "../api";
 import { refreshProject, patchProject } from "../api";
-import RelativeTime from "./RelativeTime";
-import ServiceList from "./ServiceList";
+import CardMenu from "./CardMenu";
+import { bandColor, type ColorByDimension } from "../lib/colorBy";
+import {
+  compactLine, detailRows, statusChips, type ViewPreset,
+} from "../lib/dashboard-view";
+import { currentTheme } from "../lib/themes/current";
 
-export default function ProjectCard(props: { project: ProjectRow; onChange: () => void }) {
+export default function ProjectCard(props: {
+  project: ProjectRow;
+  preset: ViewPreset;
+  colorBy: ColorByDimension;
+  groups: string[];
+  onChange: () => void;
+}) {
   const nav = useNavigate();
 
-  const status = (): "ok" | "warn" | "error" => {
-    const s = props.project.snapshot;
-    if (!s) return "warn";
-    if (s.errors.length > 0) return "error";
-    if (s.git.dirty) return "warn";
-    return "ok";
-  };
+  // currentTheme() reads themeId(), so the band recolors on a theme change.
+  // Memoized so bg/fg/neutral come from one evaluation rather than three —
+  // this is read once for the class and twice more inside the style object.
+  const band = createMemo(() =>
+    bandColor(props.project, props.colorBy, props.groups, currentTheme(), Date.now()));
 
-  const onRefresh = async (e: MouseEvent) => {
-    e.stopPropagation();
+  const open = () => nav(`/projects/${encodeURIComponent(props.project.id)}`);
+
+  const onRefresh = async () => {
     await refreshProject(props.project.id);
     props.onChange();
   };
-
-  const onPin = async (e: MouseEvent) => {
-    e.stopPropagation();
+  const onTogglePin = async () => {
     await patchProject(props.project.id, { pinned: !props.project.pinned });
     props.onChange();
   };
-
-  const onArchive = async (e: MouseEvent) => {
-    e.stopPropagation();
+  const onToggleArchive = async () => {
     await patchProject(props.project.id, { hidden: !props.project.hidden });
     props.onChange();
   };
+  const onCopyPath = () => {
+    void navigator.clipboard?.writeText(props.project.path);
+  };
 
   const onCardClick = (e: MouseEvent) => {
-    // Bail if the click landed inside an action button.
-    const target = e.target as HTMLElement;
-    if (target.closest(".card-actions")) return;
-    nav(`/projects/${encodeURIComponent(props.project.id)}`);
+    // CardMenu stops its own clicks, so anything arriving here is the body.
+    if ((e.target as HTMLElement).closest(".card-menu")) return;
+    open();
   };
 
   return (
-    <div class={`card status-${status()} card-clickable`} onclick={onCardClick}>
-      <div class="card-head">
-        <div class="card-title">
-          <span class={`dot dot-${status()}`} />
-          <span class="card-name">{props.project.name}</span>
+    <div class="card card-clickable" onclick={onCardClick}>
+      <div
+        class={`card-band${band().neutral ? " neutral" : ""}`}
+        style={{ "--k": band().bg, "--kfg": band().fg }}
+      >
+        <span class="card-title" title={props.project.name}>{props.project.name}</span>
+        <span class="card-band-right">
+          <Show when={props.project.hidden}>
+            <span class="card-band-tag archived" title="archived">archived</span>
+          </Show>
           <Show when={props.project.group}>
-            <span class="group-tag" title="inferred from sub-directory under scan root">
+            <span class="card-band-tag" title="inferred from sub-directory under scan root">
               {props.project.group}
             </span>
           </Show>
-          <Show when={props.project.pinned && !props.project.hidden}><span class="pin" title="pinned">★</span></Show>
-          <Show when={props.project.hidden}>
-            <span class="archived-tag" title="archived">archived</span>
-          </Show>
-        </div>
-        <div class="card-actions">
-          <button onclick={onRefresh} title="refresh">⟳</button>
-          <Show
-            when={!props.project.hidden}
-            fallback={<button onclick={onArchive} title="restore">restore</button>}
-          >
-            <button onclick={onPin} title="pin">{props.project.pinned ? "unpin" : "pin"}</button>
-            <button onclick={onArchive} title="archive">archive</button>
-          </Show>
-        </div>
+          <CardMenu
+            pinned={props.project.pinned}
+            hidden={props.project.hidden}
+            onOpen={open}
+            onRefresh={onRefresh}
+            onCopyPath={onCopyPath}
+            onTogglePin={onTogglePin}
+            onToggleArchive={onToggleArchive}
+          />
+        </span>
       </div>
-      <Show when={props.project.snapshot} fallback={<div class="muted">no snapshot yet</div>}>
-        {(snap) => (
-          <>
-            <div class="card-meta">
-              <span class="branch">{snap().git.branch ?? "detached"}</span>
-              <Show
-                when={snap().git.dirty}
-                fallback={<span class="git-stat git-clean">clean</span>}
-              >
-                <span class="git-stat git-dirty">+{snap().git.changed}</span>
-              </Show>
-              <Show when={snap().git.ahead > 0}>
-                <span class="git-stat git-ahead" title="commits ahead of upstream">↑{snap().git.ahead}</span>
-              </Show>
-              <Show when={snap().git.behind > 0}>
-                <span class="git-stat git-behind" title="commits behind upstream">↓{snap().git.behind}</span>
-              </Show>
-              <Show when={snap().git.lastCommit}>
-                <span class="muted">·</span>
-                <RelativeTime ms={snap().git.lastCommit!.timestamp} />
-              </Show>
-            </div>
-            <Show when={props.project.liveAgents && props.project.liveAgents.length > 0}>
-              <span
-                class="agent-badge"
-                title={props.project.liveAgents.map((a) => `${a.count} ${a.agent}`).join(", ")}
-              >
-                🤖 {props.project.liveAgents.reduce((n, a) => n + a.count, 0)}
-              </span>
-            </Show>
-            <div class="card-section">
-              <span class="label">services</span>
-              <ServiceList services={snap().services} liveSessions={props.project.liveSessions} />
-            </div>
-            <Show when={snap().errors.length > 0}>
-              <div class="card-section warn">
-                <span class="label">issues</span>
-                <ul>
-                  {snap().errors.map((e) => <li>{e}</li>)}
-                </ul>
-              </div>
-            </Show>
-          </>
-        )}
-      </Show>
+
+      <div class="card-body">
+        <Show when={props.preset === "compact"}>
+          <div class="card-line">{compactLine(props.project, Date.now())}</div>
+        </Show>
+
+        <Show when={props.preset === "status"}>
+          <Show
+            when={props.project.snapshot}
+            fallback={<div class="card-line faint">not scanned yet</div>}
+          >
+            {(snap) => (
+              <>
+                <div class="card-branch">{snap().git.branch ?? "detached"}</div>
+                <Show when={snap().errors.length > 0}>
+                  <ul class="card-errors">
+                    <For each={snap().errors}>{(e) => <li>{e}</li>}</For>
+                  </ul>
+                </Show>
+                <div class="card-chips">
+                  <For each={statusChips(props.project, Date.now())}>
+                    {(c) => <span class={`chip chip-${c.tone}`} title={c.title}>{c.label}</span>}
+                  </For>
+                </div>
+              </>
+            )}
+          </Show>
+        </Show>
+
+        <Show when={props.preset === "detail"}>
+          <Show
+            when={props.project.snapshot}
+            fallback={<div class="card-line faint">not scanned yet</div>}
+          >
+            <dl class="card-rows">
+              <For each={detailRows(props.project, Date.now())}>
+                {(row) => (
+                  <>
+                    <dt>{row.label}</dt>
+                    <dd class={row.label === "commit" ? "clamp-2" : undefined}>{row.value}</dd>
+                  </>
+                )}
+              </For>
+            </dl>
+          </Show>
+        </Show>
+      </div>
     </div>
   );
 }
