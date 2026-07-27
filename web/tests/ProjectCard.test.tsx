@@ -1,6 +1,6 @@
-import { render, screen } from "@solidjs/testing-library";
+import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, test } from "vitest";
-import { Router, Route } from "@solidjs/router";
+import { MemoryRouter as Router, Route, useParams } from "@solidjs/router";
 import ProjectCard from "../src/components/ProjectCard";
 import type { ProjectRow } from "../src/api";
 import { THEME_BY_ID } from "../src/lib/themes/index";
@@ -16,6 +16,13 @@ const base: ProjectRow = {
   },
 };
 
+// A sentinel on the detail route lets navigation tests assert on the actual
+// routed outcome (a real route change) rather than on whether a handler ran.
+function DetailSentinel() {
+  const params = useParams();
+  return <div data-testid="detail-sentinel">{params.id}</div>;
+}
+
 function renderCard(project: ProjectRow, over: { preset?: any; colorBy?: any; groups?: string[] } = {}) {
   return render(() => (
     <Router>
@@ -28,6 +35,7 @@ function renderCard(project: ProjectRow, over: { preset?: any; colorBy?: any; gr
           onChange={() => {}}
         />
       )} />
+      <Route path="/projects/:id" component={DetailSentinel} />
     </Router>
   ));
 }
@@ -49,6 +57,7 @@ describe("ProjectCard — band", () => {
   test("colors the band ok when clean and error when errors exist", () => {
     const clean = renderCard(base);
     expect(band(clean.container).style.getPropertyValue("--k")).toBe(k.ok);
+    expect(band(clean.container).classList.contains("neutral")).toBe(false);
     clean.unmount();
 
     const bad = renderCard({ ...base, snapshot: { ...base.snapshot!, errors: ["docker unreachable"] } });
@@ -73,6 +82,18 @@ describe("ProjectCard — band", () => {
   test("always renders the actions menu trigger", () => {
     const { container } = renderCard(base);
     expect(container.querySelector(".card-menu-trigger")).toBeTruthy();
+  });
+
+  test("keeps the right-cluster order fixed: archived tag, group tag, then the menu — so the ☰ never shifts", () => {
+    const { container } = renderCard({ ...base, hidden: true, group: "Personal" });
+    const right = container.querySelector(".card-band-right") as HTMLElement;
+    const kids = Array.from(right.children);
+    expect(kids).toHaveLength(3);
+    expect(kids[0]?.textContent).toBe("archived");
+    expect(kids[0]?.className).toContain("archived");
+    expect(kids[1]?.textContent).toBe("Personal");
+    expect(kids[1]?.className).not.toContain("archived");
+    expect(kids[2]?.querySelector(".card-menu-trigger")).toBeTruthy();
   });
 });
 
@@ -141,6 +162,21 @@ describe("ProjectCard — other presets", () => {
     expect(container.textContent).toContain("commit");
     expect(container.textContent).toContain("fix: a thing");
   });
+
+  test("clamps only the commit row to two lines", () => {
+    const { container } = renderCard({
+      ...base,
+      snapshot: { ...base.snapshot!, git: { ...base.snapshot!.git,
+        lastCommit: { sha: "a", message: "fix: a thing", timestamp: Date.now() - 3_600_000 } } },
+    }, { preset: "detail" });
+    const clamped = container.querySelector(".card-rows dd.clamp-2");
+    expect(clamped?.textContent).toContain("fix: a thing");
+
+    const dds = Array.from(container.querySelectorAll(".card-rows dd"));
+    const nonCommitDds = dds.filter((d) => d !== clamped);
+    expect(nonCommitDds.length).toBeGreaterThan(0);
+    for (const d of nonCommitDds) expect(d.className).not.toContain("clamp-2");
+  });
 });
 
 describe("ProjectCard — no snapshot", () => {
@@ -148,5 +184,45 @@ describe("ProjectCard — no snapshot", () => {
     const { container } = renderCard({ ...base, snapshot: null });
     expect(container.textContent).toContain("not scanned yet");
     expect(band(container).style.getPropertyValue("--k")).toBe(k.bg3);
+    expect(band(container).classList.contains("neutral")).toBe(true);
+  });
+});
+
+// MemoryRouter resolves a navigation asynchronously (the affirmative test
+// below needs `waitFor` to observe it), so a synchronous check right after
+// `fireEvent.click` in the negative tests would trivially pass whether or not
+// the guard worked — it just wouldn't have happened *yet* either way. Flush
+// the same async window before asserting absence, so a broken guard is
+// actually caught.
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+describe("ProjectCard — navigation", () => {
+  test("clicking the card body navigates to the project detail route", async () => {
+    const { container, queryByTestId } = renderCard(base);
+    fireEvent.click(container.querySelector(".card-body") as HTMLElement);
+    await waitFor(() => expect(queryByTestId("detail-sentinel")?.textContent).toBe("abc"));
+  });
+
+  test("clicking the menu trigger does not navigate", async () => {
+    const { container, queryByTestId } = renderCard(base);
+    fireEvent.click(container.querySelector(".card-menu-trigger") as HTMLElement);
+    await flush();
+    expect(queryByTestId("detail-sentinel")).toBeNull();
+  });
+
+  test("clicking the popover's own padding (not a button) does not navigate", async () => {
+    const { container, queryByTestId } = renderCard(base);
+    fireEvent.click(container.querySelector(".card-menu-trigger") as HTMLElement); // open
+    fireEvent.click(container.querySelector(".card-menu-popover") as HTMLElement);
+    await flush();
+    expect(queryByTestId("detail-sentinel")).toBeNull();
+  });
+
+  test("clicking the menu's rule divider does not navigate", async () => {
+    const { container, queryByTestId } = renderCard(base);
+    fireEvent.click(container.querySelector(".card-menu-trigger") as HTMLElement); // open
+    fireEvent.click(container.querySelector(".card-menu-rule") as HTMLElement);
+    await flush();
+    expect(queryByTestId("detail-sentinel")).toBeNull();
   });
 });

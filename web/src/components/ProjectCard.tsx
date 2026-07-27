@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { ProjectRow } from "../api";
 import { refreshProject, patchProject } from "../api";
@@ -19,8 +19,10 @@ export default function ProjectCard(props: {
   const nav = useNavigate();
 
   // currentTheme() reads themeId(), so the band recolors on a theme change.
-  const band = () =>
-    bandColor(props.project, props.colorBy, props.groups, currentTheme(), Date.now());
+  // Memoized so bg/fg/neutral come from one evaluation rather than three —
+  // this is read once for the class and twice more inside the style object.
+  const band = createMemo(() =>
+    bandColor(props.project, props.colorBy, props.groups, currentTheme(), Date.now()));
 
   const open = () => nav(`/projects/${encodeURIComponent(props.project.id)}`);
 
