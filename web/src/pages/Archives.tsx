@@ -1,6 +1,8 @@
 import { Show, createResource } from "solid-js";
 import ProjectGrid from "../components/ProjectGrid";
 import { fetchProjects } from "../api";
+import { groupsOf } from "../lib/colorBy";
+import { dashboardPreset, dashboardColorBy } from "../lib/preferences";
 
 export default function Archives() {
   const [res, { refetch }] = createResource(() => fetchProjects("archived"));
@@ -13,7 +15,13 @@ export default function Archives() {
         <Show when={list().length > 0}><span class="muted">{list().length}</span></Show>
       </h2>
       <Show when={list().length > 0} fallback={<div class="muted">no archived projects</div>}>
-        <ProjectGrid projects={list()} onChange={() => refetch()} />
+        <ProjectGrid
+          projects={list()}
+          preset={dashboardPreset()}
+          colorBy={dashboardColorBy()}
+          groups={groupsOf(list())}
+          onChange={() => refetch()}
+        />
       </Show>
     </div>
   );
