@@ -106,9 +106,12 @@ to you — the **color by** dropdown in the dashboard toolbar switches between:
 - **group** — a stable hue per group, for spatially clustering a long grid
 - **none** — a neutral band for everyone
 
-A legend next to the dropdown decodes whichever dimension is active, which
-matters because the same four role colors are reused across dimensions — amber
-means "dirty" under **git** and "edited this month" under **heat**.
+A legend next to the dropdown decodes whichever dimension is active. It earns
+its place because a color doesn't mean the same thing everywhere: **git**,
+**services** and **agents** all draw on the same handful of role colors, so green
+means "clean" under one and "something is running" under another. **heat** and
+**group** don't use the role colors at all — heat is a five-step ramp off the
+theme's accent, and group draws from the chart palette.
 
 Band text colors are *derived*, not authored: for each hue Forest picks whichever
 of the theme's own foreground/background tones clears WCAG 4.5:1, falling back to

@@ -1082,7 +1082,11 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .caffeinate-menu { position: absolute; right: 0; top: calc(100% + 0.3rem); background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.25rem; display: flex; flex-direction: column; min-width: 8rem; z-index: 10; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
 .caffeinate-menu-item { background: none; color: var(--fg); border: 0; text-align: left; padding: 0.3rem 0.5rem; font: inherit; font-size: 0.82rem; cursor: pointer; border-radius: 3px; white-space: nowrap; }
 .caffeinate-menu-item:hover { background: var(--bg); color: var(--accent); }
-.dashboard-toolbar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+/* Wraps rather than clips. The legend grows with the number of groups, and
+   without wrapping it pushed past the right edge — where body{overflow:hidden}
+   made it unrecoverable, taking the color key with it. Measured with a 6-group
+   legend: content reached 990px in a 900px viewport. */
+.dashboard-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
 /* One height for every control in the row. box-sizing + explicit height +
    line-height:1 is what makes an <input> and a <select> agree. */
 .dashboard-toolbar > * { height: var(--control-h); box-sizing: border-box; }
@@ -1095,7 +1099,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 }
 .dashboard-toolbar input:focus,
 .dashboard-toolbar select:focus { outline: none; border-color: var(--accent); }
-.dashboard-toolbar .search-input { flex: 1; min-width: 0; }
+/* A floor, not min-width:0 — the search box was collapsing to 20px (unusable)
+   before anything else in the row gave way. Below the floor it wraps instead. */
+.dashboard-toolbar .search-input { flex: 1 1 12rem; min-width: 10rem; }
 /* appearance:none stops the UA imposing its own select metrics; the chevron is
    drawn with two gradients so no asset is needed. */
 .dashboard-toolbar select {
@@ -1117,13 +1123,15 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .preset-btn.active {
   color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg));
 }
-.legend {
-  display: flex; align-items: center; gap: 0.45rem; margin-left: auto;
-  font-size: 0.68rem; color: var(--fg-dim);
+/* Overrides the row's fixed height for this one child: with many groups the
+   legend needs to wrap onto more than one line rather than overflow. */
+.dashboard-toolbar .legend {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.2rem 0.45rem;
+  margin-left: auto; font-size: 0.68rem; color: var(--fg-dim);
+  height: auto; min-height: var(--control-h);
 }
 .legend-entry { display: inline-flex; align-items: center; gap: 0.24rem; }
 .legend-swatch { width: 9px; height: 9px; border-radius: 2px; display: block; }
-.archived-tag { font-size: 0.65rem; padding: 0.05rem 0.45rem; border-radius: 3px; background: var(--bg-2); color: var(--fg-dim); border: 1px solid var(--border); text-transform: lowercase; letter-spacing: 0.04em; line-height: 1.5; }
 
 /* --- Session summary (atop the transcript) --- */
 .session-summary,

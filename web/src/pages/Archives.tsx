@@ -3,10 +3,19 @@ import ProjectGrid from "../components/ProjectGrid";
 import { fetchProjects } from "../api";
 import { groupsOf } from "../lib/colorBy";
 import { dashboardPreset, dashboardColorBy } from "../lib/preferences";
+import { useProjects } from "../projects-context";
 
 export default function Archives() {
   const [res, { refetch }] = createResource(() => fetchProjects("archived"));
   const list = () => res()?.projects ?? [];
+
+  // Group hues are assigned by index into this list, so it has to be derived
+  // from the same set of projects the dashboard uses — otherwise a group would
+  // be one colour here and a different one there, which defeats the point of
+  // colouring by group. The visible list comes free from the app-wide context
+  // (already loaded and polling), so this costs no extra request.
+  const { projects } = useProjects();
+  const groups = () => groupsOf([...(projects()?.projects ?? []), ...list()]);
 
   return (
     <div class="page">
@@ -19,7 +28,7 @@ export default function Archives() {
           projects={list()}
           preset={dashboardPreset()}
           colorBy={dashboardColorBy()}
-          groups={groupsOf(list())}
+          groups={groups()}
           onChange={() => refetch()}
         />
       </Show>

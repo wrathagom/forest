@@ -2,8 +2,10 @@ import { render, waitFor } from "@solidjs/testing-library";
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
 import { Router, Route } from "@solidjs/router";
 import Archives from "../src/pages/Archives";
-import { setDashboardPreset } from "../src/lib/preferences";
+import { setDashboardPreset, setDashboardColorBy } from "../src/lib/preferences";
 import type { ProjectRow } from "../src/api";
+import { ProjectsContext } from "../src/projects-context";
+import { THEME_BY_ID } from "../src/lib/themes/index";
 
 const fetchProjects = vi.fn();
 // Archives renders ProjectGrid -> ProjectCard, which imports patchProject and
@@ -38,11 +40,18 @@ const archivedProject: ProjectRow = {
   },
 };
 
-function renderArchives() {
+// Archives reads the visible-project list from the app-wide context so its
+// group hues match the dashboard's. In the app that provider lives in App.tsx,
+// which <Router root={App}> wraps around every route; here it has to be stood
+// up by hand or useProjects() throws.
+function renderArchives(visible: ProjectRow[] = []) {
+  const projects = (() => ({ projects: visible, scanRoot: null, pollIntervalMs: 10_000 })) as never;
   return render(() => (
-    <Router>
-      <Route path="/" component={Archives} />
-    </Router>
+    <ProjectsContext.Provider value={{ projects, refetch: () => {} }}>
+      <Router>
+        <Route path="/" component={Archives} />
+      </Router>
+    </ProjectsContext.Provider>
   ));
 }
 
@@ -61,5 +70,29 @@ describe("Archives", () => {
       expect(container.querySelector(".card-chips")).toBeTruthy();
       expect(container.querySelector(".card-chips")?.children.length).toBeGreaterThan(0);
     });
+  });
+
+  test("group hues account for visible projects, so they match the dashboard", async () => {
+    // Group hue is the group's *index* into the group list, so the list has to
+    // span the same projects the dashboard uses. Here "aaa" exists only among
+    // visible projects and sorts first, which must push the archived "zzz"
+    // project onto the second chart hue. Scoping the list to archived projects
+    // alone would put "zzz" at index 0 and colour it differently here than on
+    // the dashboard — the bug this guards.
+    setDashboardColorBy("group");
+    const visible: ProjectRow = { ...archivedProject, id: "vis", name: "vis", hidden: false, group: "aaa" };
+    const archived: ProjectRow = { ...archivedProject, group: "zzz" };
+    fetchProjects.mockResolvedValue({ projects: [archived], scanRoot: null, pollIntervalMs: 10_000 });
+
+    const { container } = renderArchives([visible]);
+    const theme = THEME_BY_ID["forest-dark"]!;
+
+    await waitFor(() => {
+      const band = container.querySelector(".card-band") as HTMLElement;
+      expect(band).toBeTruthy();
+      // index 1 of the chart palette, because "aaa" occupies index 0
+      expect(band.style.getPropertyValue("--k")).toBe(theme.tokens.chart2);
+    });
+    setDashboardColorBy("git");
   });
 });
