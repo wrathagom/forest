@@ -93,6 +93,48 @@ edits, a dialog offers save, discard, or cancel.
 Appearance and dashboard are per-device preferences stored in `localStorage`, so
 they apply immediately and have no save button; system is read-only.
 
+### Dashboard cards
+
+Each project card leads with a colored title band. What the color *means* is up
+to you — the **color by** dropdown in the dashboard toolbar switches between:
+
+- **git** — clean / dirty / has errors (the default)
+- **heat** — how recently the project was touched, today through months, as a
+  five-step ramp off the theme's accent
+- **services** — whether anything is running (a container or a listening process)
+- **agents** — whether an agent session is live in the project
+- **group** — a stable hue per group, for spatially clustering a long grid
+- **none** — a neutral band for everyone
+
+A legend next to the dropdown decodes whichever dimension is active, which
+matters because the same four role colors are reused across dimensions — amber
+means "dirty" under **git** and "edited this month" under **heat**.
+
+Band text colors are *derived*, not authored: for each hue Forest picks whichever
+of the theme's own foreground/background tones clears WCAG 4.5:1, falling back to
+absolute black or white when neither does. That fallback is always sufficient —
+for any color, the better of black and white is at least 4.58:1 — so the band
+stays readable in all 16 themes without a per-theme table. A test enforces the
+floor across every theme and every band state.
+
+Alongside it, a **compact / status / detail** control sets how much each card
+shows:
+
+| Preset | Shows |
+|---|---|
+| `compact` | One dim line: branch, git summary, age |
+| `status` | Branch, any issues, then a wrapping row of git and service chips |
+| `detail` | Labelled rows, including the last commit *message*, file-edit recency separate from commit recency, and named containers and processes |
+
+Cards in a row share a height, and the chip row sits on the card's floor, so the
+chips line up across the row; the row itself is as tall as its busiest project.
+
+Per-card actions — open, refresh, copy path, pin, archive — live in the **☰** menu
+in the band. There's no pin star: pinned projects sort into their own section (and
+sort first in search results), so position is what tells you.
+
+Both the preset and the color-by choice are per-device, in `localStorage`.
+
 ### Theming
 
 Forest ships 16 themes — Catppuccin (Latte, Frappé, Macchiato, Mocha), Rosé Pine
