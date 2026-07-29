@@ -305,6 +305,38 @@ describe("FileTreePanel", () => {
     expect(await screen.findByText(/feat/)).toBeTruthy();
   });
 
+  // The rendered tree merges two independently-sourced lists (the server tree and
+  // whatever lazy expansion returned), so a path can arrive from both — e.g. content
+  // under an expanded ignored dir becomes tracked and shows up in the next poll.
+  // One row per path, with the children attached to it.
+  test("a path present in both the server tree and a lazy fetch renders once", async () => {
+    mockChildren.mockResolvedValue({
+      entries: [
+        { path: ".worktrees/feat", type: "dir", size: null, gitStatus: "!" },
+        { path: ".worktrees/feat/notes.md", type: "file", size: 10, gitStatus: "!" },
+      ],
+    });
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={[
+          ...ignoredTree,
+          { path: ".worktrees/feat", type: "dir", size: null, gitStatus: null },
+        ]}
+        highlightedPaths={[]}
+        onOpenFile={() => {}}
+        onOpenDiff={() => {}}
+        onOpenFileRight={() => {}}
+      />
+    ));
+    fireEvent.click(screen.getByText(/^[▸▾]\s+\.worktrees$/));
+    await screen.findByText(/feat/);
+    expect(screen.getAllByText(/^[▸▾]\s+feat$/)).toHaveLength(1);
+
+    fireEvent.click(screen.getByText(/^[▸▾]\s+feat$/));
+    expect(await screen.findByText("notes.md")).toBeTruthy();
+  });
+
   test("a failed lazy load shows a retry row that re-fetches", async () => {
     mockChildren.mockRejectedValueOnce(new Error("nope"));
     render(() => (

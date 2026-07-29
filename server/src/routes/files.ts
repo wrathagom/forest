@@ -179,10 +179,12 @@ async function buildTree(
   ignored: IgnoredEntries,
 ): Promise<TreeEntry[]> {
   const dirs = new Set<string>();
-  for (const f of files) {
-    const parts = f.split("/");
+  // Adds the proper-prefix parents of a path, never the path itself.
+  const addParentDirs = (p: string) => {
+    const parts = p.split("/");
     for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/"));
-  }
+  };
+  for (const f of files) addParentDirs(f);
   // In practice `ls-files --others --exclude-standard` already surfaces
   // untracked non-ignored files. This is a defensive fold-in for edge cases
   // (e.g., files surfaced by porcelain but absent from ls-files because of
@@ -194,36 +196,53 @@ async function buildTree(
       if (code === "?" && !fileSet.has(p)) {
         extra.push(p);
         fileSet.add(p);
-        const parts = p.split("/");
-        for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/"));
+        addParentDirs(p);
       }
     }
     if (extra.length > 0) files = [...files, ...extra];
   }
 
+  // Dirs derived from live (tracked / status-surfaced) content. An ignored dir
+  // that also holds live content stays a normal dir rather than collapsing to a
+  // leaf. Snapshotted before the ignored fold-ins so those can't feed it.
+  const liveDirs = new Set(dirs);
+
+  // Fold ignored directories in as leaves — don't recurse into them.
+  //
+  // `--directory` output is NOT disjoint: git reports an entirely-ignored
+  // directory alongside the ignored paths nested inside it (e.g. both `docs/`
+  // and `docs/superpowers/`). Sorting puts a parent ahead of its children, so
+  // once a dir is claimed as an ignored leaf every nested entry is redundant —
+  // it duplicates what lazy expansion returns, and folding it in would re-add
+  // the parent to `dirs`, emitting that dir twice (once plain, once "!").
+  const ignoredLeaves = new Set<string>();
+  const underIgnoredLeaf = (p: string) => {
+    const parts = p.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      if (ignoredLeaves.has(parts.slice(0, i).join("/"))) return true;
+    }
+    return false;
+  };
+  const ignoredDirsOnly: string[] = [];
+  for (const p of [...ignored.dirs].sort()) {
+    // A dir with live content wins — it has children to render.
+    if (liveDirs.has(p) || underIgnoredLeaf(p)) continue;
+    ignoredLeaves.add(p);
+    ignoredDirsOnly.push(p);
+    // Parents only: the dir itself is emitted separately with gitStatus "!".
+    addParentDirs(p);
+  }
+
   // Fold ignored files in. Tracked / status-surfaced files take precedence —
-  // we only add ignored entries that aren't already known.
+  // we only add ignored entries that aren't already known — and files inside an
+  // ignored leaf are left to lazy expansion along with the rest of its contents.
   const knownFiles = new Set(files);
   const ignoredFilesOnly: string[] = [];
   for (const p of ignored.files) {
-    if (knownFiles.has(p)) continue;
+    if (knownFiles.has(p) || underIgnoredLeaf(p)) continue;
     ignoredFilesOnly.push(p);
     knownFiles.add(p);
-    const parts = p.split("/");
-    for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/"));
-  }
-
-  // Fold ignored directories in as leaves — don't recurse into them. If a tracked
-  // path already derived this dir, that wins (the dir has live content elsewhere).
-  const trackedDirsSnapshot = new Set(dirs);
-  const ignoredDirsOnly: string[] = [];
-  for (const p of ignored.dirs) {
-    if (trackedDirsSnapshot.has(p)) continue;
-    ignoredDirsOnly.push(p);
-    // Add proper-prefix parents so the path renders, but not the dir itself —
-    // it will be emitted separately with gitStatus "!".
-    const parts = p.split("/");
-    for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/"));
+    addParentDirs(p);
   }
 
   const entries: TreeEntry[] = [];

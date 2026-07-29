@@ -26,7 +26,14 @@ function buildTree(entries: TreeEntry[]): Node {
     return a.path.localeCompare(b.path);
   });
 
+  // The entry list merges the server tree with lazily-fetched children, so the same
+  // path can arrive from both sources. Render it once: first wins, which is the
+  // server entry (it sorts ahead of lazy ones and carries the real git status).
+  const seen = new Set<string>();
+
   for (const e of sorted) {
+    if (seen.has(e.path)) continue;
+    seen.add(e.path);
     const parts = e.path.split("/");
     const name = parts[parts.length - 1]!;
     const parentPath = parts.slice(0, -1).join("/");

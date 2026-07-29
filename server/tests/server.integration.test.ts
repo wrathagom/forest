@@ -1209,6 +1209,89 @@ describe("GET /api/projects/:id/tree (with ignored files)", () => {
   });
 });
 
+// Real `git ls-files --others --ignored --exclude-standard --directory` output is
+// NOT disjoint: an entirely-ignored directory is reported alongside the ignored
+// paths nested inside it (e.g. both `docs/` and `docs/superpowers/`). Folding the
+// nested entry in used to re-add `docs` to the plain-dir set after the ignored-dir
+// check had already claimed it, emitting `docs` twice in the tree.
+describe("GET /api/projects/:id/tree (nested ignored entries)", () => {
+  let s7: ReturnType<typeof startServer>;
+  let url7: string;
+  let projRoot7: string;
+  let pid7: string;
+
+  beforeAll(() => {
+    projRoot7 = mkdtempSync(join(tmpdir(), "forest-tree-nested-ignored-"));
+    mkdirSync(join(projRoot7, "docs", "superpowers"), { recursive: true });
+    mkdirSync(join(projRoot7, ".pytest_cache", "v"), { recursive: true });
+    wf(join(projRoot7, "README.md"), "# hi");
+    wf(join(projRoot7, "docs/superpowers/plan.md"), "# plan");
+    wf(join(projRoot7, ".pytest_cache/CACHEDIR.TAG"), "tag");
+
+    pid7 = upsertProject(db, { path: projRoot7, name: "treenestedignored" });
+    upsertSnapshot(db, pid7, emptySnapshot());
+
+    const fakeRunGit: RunGit = async (args) => {
+      if (args[0] === "ls-files" && args.includes("--ignored")) {
+        return {
+          stdout: ".pytest_cache/\n.pytest_cache/CACHEDIR.TAG\n.pytest_cache/v/\ndocs/\ndocs/superpowers/\n",
+          stderr: "",
+          code: 0,
+        };
+      }
+      if (args[0] === "ls-files") {
+        return { stdout: "README.md\n", stderr: "", code: 0 };
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    };
+
+    s7 = startServer({
+      port: 0,
+      db,
+      loop,
+      log,
+      routes: [...projectRoutes(), ...projectFilesRoutes({ runGit: fakeRunGit })],
+    });
+    url7 = `http://${s7.hostname}:${s7.port}`;
+  });
+
+  afterAll(() => s7.stop(true));
+
+  test("an ignored dir listed alongside its nested ignored paths is emitted once", async () => {
+    const r = await fetch(`${url7}/api/projects/${pid7}/tree`);
+    expect(r.status).toBe(200);
+    const body = await r.json();
+    const docs = body.entries.filter((e: any) => e.path === "docs");
+    expect(docs).toHaveLength(1);
+    expect(docs[0].type).toBe("dir");
+    expect(docs[0].gitStatus).toBe("!");
+  });
+
+  test("paths nested inside an ignored dir are left to lazy expansion", async () => {
+    const r = await fetch(`${url7}/api/projects/${pid7}/tree`);
+    const body = await r.json();
+    const paths = body.entries.map((e: any) => e.path);
+    expect(paths).not.toContain("docs/superpowers");
+    expect(paths).not.toContain(".pytest_cache/v");
+    expect(paths).not.toContain(".pytest_cache/CACHEDIR.TAG");
+  });
+
+  test("an ignored dir whose only content is ignored files stays a '!' leaf", async () => {
+    const r = await fetch(`${url7}/api/projects/${pid7}/tree`);
+    const body = await r.json();
+    const cache = body.entries.filter((e: any) => e.path === ".pytest_cache");
+    expect(cache).toHaveLength(1);
+    expect(cache[0].gitStatus).toBe("!");
+  });
+
+  test("no path is emitted twice", async () => {
+    const r = await fetch(`${url7}/api/projects/${pid7}/tree`);
+    const body = await r.json();
+    const paths = body.entries.map((e: any) => e.path);
+    expect(paths).toHaveLength(new Set(paths).size);
+  });
+});
+
 describe("GET /api/projects/:id/tree?path= (lazy children)", () => {
   let s6: ReturnType<typeof startServer>;
   let url6: string;
