@@ -58,9 +58,30 @@ describe("Vault.tokensByProject", () => {
     const v = seedTwoProjects(db);
     const rows = v.tokensByProject();
     expect(rows.map((r) => r.projectId)).toEqual(["p2", "p1", null]);
-    expect(rows[0]).toEqual({ projectId: "p2", projectName: "Project Two", input: 1000, output: 0, cache: 0, sessions: 1 });
-    expect(rows[1]).toEqual({ projectId: "p1", projectName: "Project One", input: 110, output: 55, cache: 200, sessions: 2 });
-    expect(rows[2]).toEqual({ projectId: null, projectName: "unassigned", input: 1, output: 0, cache: 0, sessions: 1 });
+    expect(rows[0]).toEqual({ projectId: "p2", projectName: "Project Two", input: 1000, output: 0, cache: 0, sessions: 1, byProfile: { unassigned: { input: 1000, output: 0, cache: 0 } } });
+    expect(rows[1]).toEqual({ projectId: "p1", projectName: "Project One", input: 110, output: 55, cache: 200, sessions: 2, byProfile: { unassigned: { input: 110, output: 55, cache: 200 } } });
+    expect(rows[2]).toEqual({ projectId: null, projectName: "unassigned", input: 1, output: 0, cache: 0, sessions: 1, byProfile: { unassigned: { input: 1, output: 0, cache: 0 } } });
+  });
+
+  test("splits each project's tokens by profile so the account filter can apply", () => {
+    const db = openDb(":memory:");
+    const now = Date.now();
+    db.query(
+      "INSERT INTO projects (id, path, name, pinned, hidden, created_at, updated_at) VALUES (?, ?, ?, 0, 0, ?, ?)",
+    ).run("px", "/tmp/px", "Project X", now, now);
+    const v = new Vault(db);
+    v.upsertSession({ session_id: "x-work", agent: "claude", cwd: "/tmp/px", project_id: "px", last_activity: 2, profile: "work", source: "scan" });
+    v.upsertSession({ session_id: "x-pers", agent: "claude", cwd: "/tmp/px", project_id: "px", last_activity: 1, profile: "personal", source: "scan" });
+    v.upsertMessages([msg("x-work", "xw", 2, { input: 100, output: 10, cacheRead: 7 })], []);
+    v.upsertMessages([msg("x-pers", "xp", 1, { input: 5, output: 1 })], []);
+
+    const row = v.tokensByProject().find((r) => r.projectId === "px")!;
+    expect(row.byProfile).toEqual({
+      work: { input: 100, output: 10, cache: 7 },
+      personal: { input: 5, output: 1, cache: 0 },
+    });
+    // the flat totals stay the all-accounts sum
+    expect({ input: row.input, output: row.output, cache: row.cache }).toEqual({ input: 105, output: 11, cache: 7 });
   });
 });
 
@@ -154,8 +175,8 @@ describe("Vault.tokensOverTime", () => {
 
     const out = v.tokensOverTime({ days: 7 });
     expect(out).toHaveLength(7);
-    expect(out[6]).toEqual({ day: dayKey(today), input: 100, output: 10, cache: 0, byProfile: { unassigned: 110 } });
-    expect(out[5]).toEqual({ day: dayKey(today - dayMs), input: 0, output: 0, cache: 205, byProfile: { unassigned: 205 } });
+    expect(out[6]).toEqual({ day: dayKey(today), input: 100, output: 10, cache: 0, byProfile: { unassigned: { input: 100, output: 10, cache: 0 } } });
+    expect(out[5]).toEqual({ day: dayKey(today - dayMs), input: 0, output: 0, cache: 205, byProfile: { unassigned: { input: 0, output: 0, cache: 205 } } });
     expect(out[0]).toEqual({ day: dayKey(today - 6 * dayMs), input: 0, output: 0, cache: 0, byProfile: {} });
     // the 40-days-ago message must not appear anywhere
     expect(out.some((p) => p.input === 999)).toBe(false);
@@ -163,6 +184,16 @@ describe("Vault.tokensOverTime", () => {
 });
 
 describe("Vault.tokensOverTime byProfile", () => {
+  test("splits each day's per-profile tokens by type, so both filters can apply", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    const today = utcMidnightToday();
+    v.upsertSession({ session_id: "tt1", agent: "claude", cwd: "/a", last_activity: today, profile: "work", source: "scan" });
+    v.upsertMessages([msg("tt1", "m1", today + 1000, { input: 10, output: 5, cacheCreate: 2, cacheRead: 3 })], []);
+    const todayPoint = v.tokensOverTime({ days: 7 }).at(-1)!;
+    expect(todayPoint.byProfile).toEqual({ work: { input: 10, output: 5, cache: 5 } });
+  });
+
   test("splits each day's tokens by profile; empty map on inactive days", () => {
     const db = openDb(":memory:");
     const v = new Vault(db);
@@ -174,7 +205,10 @@ describe("Vault.tokensOverTime byProfile", () => {
     const out = v.tokensOverTime({ days: 7 });
     const todayPoint = out[out.length - 1]!;
     expect(todayPoint.day).toBe(dayKey(today));
-    expect(todayPoint.byProfile).toEqual({ personal: 15, work: 100 });
+    expect(todayPoint.byProfile).toEqual({
+      personal: { input: 10, output: 5, cache: 0 },
+      work: { input: 100, output: 0, cache: 0 },
+    });
     expect(out[0]!.byProfile).toEqual({});
   });
 });

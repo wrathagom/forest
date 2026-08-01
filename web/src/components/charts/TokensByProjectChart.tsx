@@ -1,5 +1,5 @@
 import { For, Show, createMemo } from "solid-js";
-import type { TokensByProjectRow } from "../../api";
+import type { TokenBucket, TokensByProjectRow } from "../../api";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -11,18 +11,32 @@ export default function TokensByProjectChart(props: {
   data: TokensByProjectRow[];
   onSelectProject?: (projectId: string | null) => void;
   series?: { input: boolean; output: boolean; cache: boolean };
+  profiles?: string[];
 }) {
   const view = createMemo(() => {
     const s = props.series ?? { input: true, output: true, cache: true };
-    const visTotal = (r: TokensByProjectRow) => (s.input ? r.input : 0) + (s.output ? r.output : 0) + (s.cache ? r.cache : 0);
-    const max = Math.max(1, ...props.data.map(visTotal));
+    // `profiles` is the visible account list; without one, no account filter is
+    // in play and the flat all-accounts totals are the honest source.
+    const profiles = props.profiles;
+    const ZERO = { input: 0, output: 0, cache: 0 };
+    const typed = (r: TokensByProjectRow): TokenBucket =>
+      profiles
+        ? profiles.reduce((acc, p) => {
+            const b = r.byProfile[p] ?? ZERO;
+            return { input: acc.input + b.input, output: acc.output + b.output, cache: acc.cache + b.cache };
+          }, { ...ZERO })
+        : r;
+    const visTotal = (b: TokenBucket) => (s.input ? b.input : 0) + (s.output ? b.output : 0) + (s.cache ? b.cache : 0);
+    const max = Math.max(1, ...props.data.map((r) => visTotal(typed(r))));
     return props.data.map((r) => {
-      const total = visTotal(r);
-      const iv = s.input ? r.input : 0;
-      const ov = s.output ? r.output : 0;
-      const cv = s.cache ? r.cache : 0;
+      const t = typed(r);
+      const total = visTotal(t);
+      const iv = s.input ? t.input : 0;
+      const ov = s.output ? t.output : 0;
+      const cv = s.cache ? t.cache : 0;
       return {
         r,
+        t,
         total,
         widthPct: (total / max) * 100,
         inPct: total ? (iv / total) * 100 : 0,
@@ -39,7 +53,7 @@ export default function TokensByProjectChart(props: {
           {(v) => (
             <div
               class={`tbp-row ${props.onSelectProject ? "tbp-clickable" : ""}`}
-              title={`${v.r.projectName}\n${v.r.sessions} session${v.r.sessions === 1 ? "" : "s"}\ninput ${fmt(v.r.input)} · output ${fmt(v.r.output)} · cache ${fmt(v.r.cache)}`}
+              title={`${v.r.projectName}\n${v.r.sessions} session${v.r.sessions === 1 ? "" : "s"}\ninput ${fmt(v.t.input)} · output ${fmt(v.t.output)} · cache ${fmt(v.t.cache)}`}
               onclick={() => props.onSelectProject?.(v.r.projectId)}
             >
               <span class="tbp-label">{v.r.projectName}</span>
