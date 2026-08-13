@@ -2,6 +2,7 @@ import { createResource, onCleanup, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { fetchLiveSessions, type LiveSessionRow } from "../api";
 import RelativeTime from "./RelativeTime";
+import { agentIcon } from "../lib/agents";
 
 // A chip is clickable only if its session belongs to a known project — the session
 // reader lives under the project route, so a session whose cwd maps to no project
@@ -13,7 +14,7 @@ const isLiveForestSession = (s: LiveSessionRow): boolean => !!s.ptySessionId && 
 const isClosed = (s: LiveSessionRow): boolean => s.endedAt !== null;
 
 function chipTitle(s: LiveSessionRow): string {
-  const parts = [s.lastUserMsg ?? s.agentSessionId];
+  const parts = [`${s.agent}: ${s.lastUserMsg ?? s.agentSessionId}`];
   if (s.branch) parts.push(`branch: ${s.branch}`);
   if (s.worktreeLabel && s.worktreeLabel !== "main") parts.push(`worktree: ${s.worktreeLabel}`);
   if (!s.projectId) parts.push("(no project — not clickable)");
@@ -58,6 +59,7 @@ export default function SessionBar() {
               onClick={() => onChipClick(s)}
             >
               <span class={`session-chip-dot session-chip-dot-${isClosed(s) ? "closed" : s.state}`} />
+              <span class="session-chip-agent" aria-hidden="true">{agentIcon(s.agent)}</span>
               <Show when={s.profile && s.profile !== "default"}>
                 <span class="session-profile-badge">{s.profile}</span>
               </Show>
