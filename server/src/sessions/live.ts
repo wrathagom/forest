@@ -1,6 +1,8 @@
 export type LiveState = "working" | "waiting" | "stale";
+export type AgentKind = "claude" | "codex";
 
 export type LiveEntry = {
+  agent: AgentKind;
   agentSessionId: string;
   parentSessionId: string | null;
   projectId: string | null;
@@ -136,6 +138,7 @@ export class LiveAgentSessions {
     let endedAt: number | null = u.event === "sessionend" ? u.at : null;
     if (u.event === "userpromptsubmit") this.undismiss(u.agentSessionId);
     const entry: LiveEntry = {
+      agent: "claude",
       agentSessionId: u.agentSessionId,
       parentSessionId: u.parentSessionId ?? prev?.parentSessionId ?? null,
       projectId: u.projectId ?? prev?.projectId ?? null,
@@ -199,6 +202,7 @@ export class LiveAgentSessions {
     const at = a.at ?? Date.now();
     const prev = this.entries.get(a.agentSessionId);
     this.entries.set(a.agentSessionId, {
+      agent: "claude",
       agentSessionId: a.agentSessionId,
       parentSessionId: prev?.parentSessionId ?? null,
       projectId: a.projectId,
