@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, spyOn } from "bun:test";
 import { parseCodexRollout } from "../src/sessions/codex-scanner";
 
 const rollout = [
@@ -105,6 +105,7 @@ describe("buildCodexEntry", () => {
 
 import { scanCodexSessions } from "../src/sessions/codex-scanner";
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
+import * as fsNode from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -152,5 +153,44 @@ describe("scanCodexSessions", () => {
       apply: () => calls++,
     });
     expect(calls).toBe(0);
+  });
+
+  test("an unreadable subdirectory is skipped, not fatal to the rest of the scan", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-sessions-"));
+    const goodDay = join(root, "2026", "08", "12");
+    mkdirSync(goodDay, { recursive: true });
+    writeFileSync(join(goodDay, "rollout-ok.jsonl"), JSON.stringify({
+      timestamp: "2026-08-12T14:23:46.513Z", type: "session_meta",
+      payload: { session_id: "ok-1", cwd: "/w/proj", timestamp: "2026-08-12T14:23:46.513Z" },
+    }));
+
+    // A directory that exists at listing time but throws when Codex (or a raced
+    // deletion) makes it unreadable mid-scan — the guard must skip it, not abort.
+    const brokenDir = join(root, "broken");
+    mkdirSync(brokenDir, { recursive: true });
+
+    const realReaddirSync = fsNode.readdirSync;
+    const spy = spyOn(fsNode, "readdirSync").mockImplementation(((...args: unknown[]) => {
+      if (args[0] === brokenDir) throw new Error("EACCES: permission denied, scandir");
+      return (realReaddirSync as (...a: unknown[]) => unknown)(...args);
+    }) as typeof fsNode.readdirSync);
+
+    try {
+      const applied: string[] = [];
+      expect(() =>
+        scanCodexSessions({
+          sessionsRoot: root,
+          now: Date.now(),
+          liveWindowMs: 30 * 60_000,
+          projects: [{ id: "proj", path: "/w/proj" }],
+          projectName: () => "Proj",
+          liveCodexTerminals: [],
+          apply: (e) => applied.push(e.agentSessionId),
+        }),
+      ).not.toThrow();
+      expect(applied).toContain("ok-1");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

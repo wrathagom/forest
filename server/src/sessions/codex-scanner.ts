@@ -129,7 +129,13 @@ export type ScanCodexDeps = {
 
 /** Recursively collect *.jsonl paths under `dir`. */
 function collectJsonl(dir: string, out: string[]): void {
-  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return; // unreadable or raced-away dir — skip this subtree, keep scanning the rest
+  }
+  for (const ent of entries) {
     const full = join(dir, ent.name);
     if (ent.isDirectory()) collectJsonl(full, out);
     else if (ent.isFile() && ent.name.endsWith(".jsonl")) out.push(full);
