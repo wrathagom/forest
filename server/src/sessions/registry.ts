@@ -83,6 +83,11 @@ export class SessionRegistry {
     return this.sessions.get(id);
   }
 
+  /** Every live session, across all projects. */
+  list(): Session[] {
+    return [...this.sessions.values()];
+  }
+
   listByProject(projectId: string): Session[] {
     const out: Session[] = [];
     for (const s of this.sessions.values()) if (s.projectId === projectId) out.push(s);
