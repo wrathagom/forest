@@ -1,3 +1,5 @@
+import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { classifyCwd } from "./scanner";
 import type { CodexScanEntry, LiveState } from "./live";
 
@@ -113,4 +115,55 @@ export function buildCodexEntry(
     lastEventAt: parsed.lastEventAt,
     lastUserMsg: parsed.lastUserMsg,
   };
+}
+
+export type ScanCodexDeps = {
+  sessionsRoot: string;
+  now: number;
+  liveWindowMs: number;
+  projects: Array<{ id: string; path: string }>;
+  projectName: (id: string) => string | null;
+  liveCodexTerminals: CodexTerminal[];
+  apply: (e: CodexScanEntry) => void;
+};
+
+/** Recursively collect *.jsonl paths under `dir`. */
+function collectJsonl(dir: string, out: string[]): void {
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, ent.name);
+    if (ent.isDirectory()) collectJsonl(full, out);
+    else if (ent.isFile() && ent.name.endsWith(".jsonl")) out.push(full);
+  }
+}
+
+export function scanCodexSessions(deps: ScanCodexDeps): void {
+  if (!existsSync(deps.sessionsRoot)) return;
+  const files: string[] = [];
+  collectJsonl(deps.sessionsRoot, files);
+  const cutoff = deps.now - deps.liveWindowMs;
+  for (const full of files) {
+    let mtime: number;
+    try {
+      mtime = statSync(full).mtimeMs;
+    } catch {
+      continue;
+    }
+    if (mtime < cutoff) continue; // a live rollout stays fresh; old ones age out
+    let text: string;
+    try {
+      text = readFileSync(full, "utf8");
+    } catch {
+      continue;
+    }
+    const parsed = parseCodexRollout(text);
+    if (!parsed.ok) continue;
+    deps.apply(
+      buildCodexEntry(parsed, {
+        now: deps.now,
+        projects: deps.projects,
+        projectName: deps.projectName,
+        liveCodexTerminals: deps.liveCodexTerminals,
+      }),
+    );
+  }
 }

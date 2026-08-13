@@ -102,3 +102,55 @@ describe("buildCodexEntry", () => {
     expect(e.ptySessionId).toBe("new");
   });
 });
+
+import { scanCodexSessions } from "../src/sessions/codex-scanner";
+import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+describe("scanCodexSessions", () => {
+  test("parses recent rollouts and skips stale files", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-sessions-"));
+    const day = join(root, "2026", "08", "12");
+    mkdirSync(day, { recursive: true });
+
+    const fresh = join(day, "rollout-fresh.jsonl");
+    writeFileSync(fresh, JSON.stringify({
+      timestamp: "2026-08-12T14:23:46.513Z", type: "session_meta",
+      payload: { session_id: "fresh-1", cwd: "/w/proj", timestamp: "2026-08-12T14:23:46.513Z" },
+    }));
+
+    const stale = join(day, "rollout-stale.jsonl");
+    writeFileSync(stale, JSON.stringify({
+      timestamp: "2020-01-01T00:00:00.000Z", type: "session_meta",
+      payload: { session_id: "stale-1", cwd: "/w/proj", timestamp: "2020-01-01T00:00:00.000Z" },
+    }));
+    const old = new Date("2020-01-01T00:00:00.000Z");
+    utimesSync(stale, old, old);
+
+    const applied: string[] = [];
+    scanCodexSessions({
+      sessionsRoot: root,
+      now: Date.now(),
+      liveWindowMs: 30 * 60_000,
+      projects: [{ id: "proj", path: "/w/proj" }],
+      projectName: () => "Proj",
+      liveCodexTerminals: [],
+      apply: (e) => applied.push(e.agentSessionId),
+    });
+
+    expect(applied).toContain("fresh-1");
+    expect(applied).not.toContain("stale-1");
+  });
+
+  test("missing sessions root is a no-op", () => {
+    let calls = 0;
+    scanCodexSessions({
+      sessionsRoot: "/no/such/dir/at/all",
+      now: Date.now(), liveWindowMs: 1000,
+      projects: [], projectName: () => null, liveCodexTerminals: [],
+      apply: () => calls++,
+    });
+    expect(calls).toBe(0);
+  });
+});
