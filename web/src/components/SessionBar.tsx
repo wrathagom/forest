@@ -12,14 +12,23 @@ const hasProject = (s: LiveSessionRow): boolean => !!s.projectId;
 const isLiveForestSession = (s: LiveSessionRow): boolean => !!s.ptySessionId && s.endedAt === null;
 // A closed session — its Forest PTY has exited (SessionEnd). External sessions have no endedAt.
 const isClosed = (s: LiveSessionRow): boolean => s.endedAt !== null;
+// A Codex chip is actionable only while its terminal is live in Forest — Codex
+// sessions are never written to the vault, so there is no transcript to open once
+// the terminal closes. Claude chips stay openable (their transcript persists).
+const canOpen = (s: LiveSessionRow): boolean =>
+  hasProject(s) && (s.agent !== "codex" || isLiveForestSession(s));
 
 function chipTitle(s: LiveSessionRow): string {
   const parts = [`${s.agent}: ${s.lastUserMsg ?? s.agentSessionId}`];
   if (s.branch) parts.push(`branch: ${s.branch}`);
   if (s.worktreeLabel && s.worktreeLabel !== "main") parts.push(`worktree: ${s.worktreeLabel}`);
-  if (!s.projectId) parts.push("(no project — not clickable)");
-  else if (!s.ptySessionId) parts.push("(running outside Forest — click to view)");
-  else if (isClosed(s)) parts.push("(closed — click to view)");
+  if (!canOpen(s)) {
+    parts.push(s.agent === "codex" ? "(codex — closed, not clickable)" : "(no project — not clickable)");
+  } else if (!s.ptySessionId) {
+    parts.push("(running outside Forest — click to view)");
+  } else if (isClosed(s)) {
+    parts.push("(closed — click to view)");
+  }
   return parts.join("\n");
 }
 
@@ -35,7 +44,7 @@ export default function SessionBar() {
   const rows = () => (sessions.error ? [] : sessions() ?? []);
 
   const onChipClick = (s: LiveSessionRow) => {
-    if (!s.projectId) return; // inert — no project route to open under
+    if (!canOpen(s)) return; // inert — nothing to open (esp. a closed Codex chip)
     if (isLiveForestSession(s)) {
       // its terminal is still open — focus it
       navigate(`/projects/${encodeURIComponent(s.projectId)}?term=${encodeURIComponent(s.ptySessionId!)}`);
@@ -53,9 +62,9 @@ export default function SessionBar() {
           {(s) => (
             <button
               type="button"
-              class={`session-chip session-chip-${s.state}${hasProject(s) ? "" : " session-chip-inert"}`}
+              class={`session-chip session-chip-${s.state}${canOpen(s) ? "" : " session-chip-inert"}`}
               title={chipTitle(s)}
-              disabled={!hasProject(s)}
+              disabled={!canOpen(s)}
               onClick={() => onChipClick(s)}
             >
               <span class={`session-chip-dot session-chip-dot-${isClosed(s) ? "closed" : s.state}`} />

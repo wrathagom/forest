@@ -14,6 +14,7 @@ import SessionBar from "../src/components/SessionBar";
 
 // Default factory row: a live Forest-launched session (has a ptySessionId, no endedAt).
 const liveRow = (over: Partial<LiveSessionRow> = {}) => ({
+  agent: "claude",
   agentSessionId: "abcdef12-3456-7890-aaaa-bbbbbbbbbbbb",
   parentSessionId: null,
   projectId: "p1",
@@ -115,6 +116,40 @@ test("a session with no project is inert (shown but not clickable)", async () =>
   await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
   expect(container.querySelectorAll(".session-chip-inert")).toHaveLength(1);
   for (const chip of container.querySelectorAll(".session-chip")) fireEvent.click(chip);
+  expect(navigate).not.toHaveBeenCalled();
+});
+
+test("clicking a live Codex chip navigates to ?term= (focuses its terminal)", async () => {
+  fetchLiveSessions.mockResolvedValue({
+    sessions: [liveRow({ agent: "codex", agentSessionId: "cx-1", ptySessionId: "pty-cx" })],
+  });
+  const { container } = render(() => <SessionBar />);
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
+  const chip = container.querySelector(".session-chip")!;
+  expect(chip.classList.contains("session-chip-inert")).toBe(false);
+  expect(chip.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(chip);
+  expect(navigate).toHaveBeenCalledWith("/projects/p1?term=pty-cx");
+});
+
+test("a closed Codex chip is inert (no dead transcript reader)", async () => {
+  fetchLiveSessions.mockResolvedValue({
+    sessions: [
+      liveRow({
+        agent: "codex",
+        agentSessionId: "cx-2",
+        ptySessionId: null,
+        endedAt: Date.now() - 1_000,
+        state: "stale",
+      }),
+    ],
+  });
+  const { container } = render(() => <SessionBar />);
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
+  const chip = container.querySelector(".session-chip")!;
+  expect(chip.classList.contains("session-chip-inert")).toBe(true);
+  expect(chip.hasAttribute("disabled")).toBe(true);
+  fireEvent.click(chip);
   expect(navigate).not.toHaveBeenCalled();
 });
 
