@@ -43,6 +43,22 @@ export type LiveUpdate = {
   launchedVia?: "mobile" | null;
 };
 
+/** A Codex rollout snapshot from the disk scanner. Codex has no hooks, so the
+ *  scanner computes state/endedAt itself and overwrites the entry each tick. */
+export type CodexScanEntry = {
+  agentSessionId: string;
+  cwd: string;
+  projectId: string | null;
+  projectName: string | null;
+  worktreeLabel: string | null;
+  ptySessionId: string | null;
+  state: LiveState;
+  endedAt: number | null;
+  startedAt: number;
+  lastEventAt: number;
+  lastUserMsg: string | null;
+};
+
 export type LiveDeps = {
   endedRetentionMs?: number; // default 30 min
   idleAfterMs?: number; // default 15 min
@@ -157,6 +173,32 @@ export class LiveAgentSessions {
     };
     this.entries.set(u.agentSessionId, entry);
     this.notify({ event: u.event, agentSessionId: u.agentSessionId });
+  }
+
+  /** Upsert a Codex session discovered by the disk scanner. Keyed by the Codex
+   *  session_id (a UUID distinct from any Claude id), so it never collides with
+   *  hook-driven entries. Codex is global: no profile, no parent. */
+  applyCodexScan(e: CodexScanEntry): void {
+    const prev = this.entries.get(e.agentSessionId);
+    this.entries.set(e.agentSessionId, {
+      agent: "codex",
+      agentSessionId: e.agentSessionId,
+      parentSessionId: null,
+      projectId: e.projectId,
+      projectName: e.projectName,
+      cwd: e.cwd || prev?.cwd || "",
+      worktreeLabel: e.worktreeLabel,
+      branch: null,
+      profile: null,
+      ptySessionId: e.ptySessionId,
+      state: e.state,
+      endedAt: e.endedAt,
+      startedAt: prev?.startedAt ?? e.startedAt,
+      lastEventAt: e.lastEventAt,
+      lastUserMsg: e.lastUserMsg,
+      launchedVia: null,
+    });
+    this.notify({ event: "codexscan", agentSessionId: e.agentSessionId });
   }
 
   markEndedByPty(ptySessionId: string, at: number = Date.now()): void {
