@@ -12,7 +12,7 @@ function cfg(over: Partial<BbsConfig> = {}): BbsConfig {
 }
 function entry(over: Partial<LiveEntry> = {}): LiveEntry {
   return {
-    agentSessionId: "s1", parentSessionId: null, projectId: null, projectName: "forest",
+    agent: "claude", agentSessionId: "s1", parentSessionId: null, projectId: null, projectName: "forest",
     cwd: "/x", worktreeLabel: null, branch: null, profile: null, ptySessionId: null,
     state: "working", endedAt: null, startedAt: 0, lastEventAt: 0, lastUserMsg: null, launchedVia: null, ...over,
   };

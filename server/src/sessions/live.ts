@@ -252,6 +252,7 @@ export class LiveAgentSessions {
       cwd: a.cwd || prev?.cwd || "",
       worktreeLabel: a.worktreeLabel,
       branch: a.branch,
+      profile: null,
       ptySessionId: null,
       state: "working",
       endedAt: null,
