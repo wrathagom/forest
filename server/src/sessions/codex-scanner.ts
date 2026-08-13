@@ -1,3 +1,6 @@
+import { classifyCwd } from "./scanner";
+import type { CodexScanEntry, LiveState } from "./live";
+
 export type ParsedCodexRollout =
   | {
       ok: true;
@@ -60,4 +63,54 @@ export function parseCodexRollout(text: string): ParsedCodexRollout {
   if (!sessionId) return { ok: false };
   if (lastEventAt === 0) lastEventAt = startedAt;
   return { ok: true, sessionId, cwd, startedAt, lastEventAt, lastUserMsg };
+}
+
+export type CodexTerminal = { ptySessionId: string; cwd: string; startedAt: number };
+
+export type BuildCodexCtx = {
+  now: number;
+  projects: Array<{ id: string; path: string }>;
+  projectName: (id: string) => string | null;
+  liveCodexTerminals: CodexTerminal[];
+};
+
+const WORKING_WINDOW_MS = 30_000; // fresh write ⇒ actively working
+const ACTIVE_WINDOW_MS = 60_000; // recent but no terminal ⇒ still live, inert
+
+export function buildCodexEntry(
+  parsed: Extract<ParsedCodexRollout, { ok: true }>,
+  ctx: BuildCodexCtx,
+): CodexScanEntry {
+  const { projectId, worktreeLabel } = classifyCwd(parsed.cwd, ctx.projects);
+  const match = ctx.liveCodexTerminals
+    .filter((t) => t.cwd === parsed.cwd)
+    .sort((a, b) => b.startedAt - a.startedAt)[0];
+
+  const idle = ctx.now - parsed.lastEventAt;
+  let state: LiveState;
+  let endedAt: number | null;
+  if (match) {
+    state = idle < WORKING_WINDOW_MS ? "working" : "waiting";
+    endedAt = null;
+  } else if (idle < ACTIVE_WINDOW_MS) {
+    state = "waiting";
+    endedAt = null;
+  } else {
+    state = "stale";
+    endedAt = parsed.lastEventAt;
+  }
+
+  return {
+    agentSessionId: parsed.sessionId,
+    cwd: parsed.cwd,
+    projectId,
+    projectName: projectId ? ctx.projectName(projectId) : null,
+    worktreeLabel,
+    ptySessionId: match?.ptySessionId ?? null,
+    state,
+    endedAt,
+    startedAt: parsed.startedAt,
+    lastEventAt: parsed.lastEventAt,
+    lastUserMsg: parsed.lastUserMsg,
+  };
 }
