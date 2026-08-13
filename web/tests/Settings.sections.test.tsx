@@ -89,6 +89,25 @@ describe("ScanSection", () => {
     await waitFor(() => expect(screen.getByText(/^saved/i)).toBeTruthy());
     expect(screen.getByLabelText("scan root")).toBeTruthy();
   });
+
+  test("scan now runs discover without patching config", async () => {
+    renderSection(ScanSection);
+    const scan = await screen.findByRole("button", { name: "scan now" });
+    fireEvent.click(scan);
+
+    await waitFor(() => expect(runDiscover).toHaveBeenCalledOnce());
+    expect(refetchProjects).toHaveBeenCalled();
+    expect(patchConfig).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/discovered 3 repos/i)).toBeTruthy());
+  });
+
+  test("scan now is enabled with no edits but disabled once dirty", async () => {
+    renderSection(ScanSection);
+    const scan = await screen.findByRole("button", { name: "scan now" });
+    expect((scan as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.input(screen.getByLabelText("scan root"), { target: { value: "/tmp/other" } });
+    expect((scan as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 
 describe("TerminalsSection", () => {

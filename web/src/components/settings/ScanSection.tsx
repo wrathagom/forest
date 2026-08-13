@@ -18,6 +18,7 @@ export default function ScanSection() {
   const [newSubdir, setNewSubdir] = createSignal("");
   const [subdirError, setSubdirError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const [scanning, setScanning] = createSignal(false);
   const [saved, setSaved] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -82,6 +83,23 @@ export default function ScanSection() {
       throw err; // propagate so the guard does not navigate away on failure
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Re-scan the last-saved root without touching config. Useful when new repos
+  // appear on disk and nothing in the form has changed, so save() is disabled.
+  const scanNow = async () => {
+    setScanning(true);
+    setError(null);
+    setSaved(null);
+    try {
+      const result = await runDiscover();
+      await refetchProjects();
+      setSaved(`discovered ${result.count ?? 0} repos under ${result.root ?? scanRoot()}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -180,8 +198,16 @@ export default function ScanSection() {
         </div>
 
         <div class="settings-save">
-          <button type="submit" disabled={saving() || !dirty()}>
+          <button type="submit" disabled={saving() || scanning() || !dirty()}>
             {saving() ? "saving" : "save"}
+          </button>
+          <button
+            type="button"
+            onclick={() => void scanNow()}
+            disabled={saving() || scanning() || dirty()}
+            title={dirty() ? "save first to scan with your changes" : "re-scan the current root for new repos"}
+          >
+            {scanning() ? "scanning" : "scan now"}
           </button>
           <Show when={saved() && !dirty()}><span class="settings-saved">{saved()}</span></Show>
         </div>
