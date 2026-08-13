@@ -5,6 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { currentTheme } from "../lib/themes/current";
+import { openUrl } from "../lib/openUrl";
 import type { Theme } from "../lib/themes/types";
 
 // xterm renders to canvas/WebGL and parses literal color strings, so it cannot
@@ -92,7 +93,7 @@ export default function TerminalView(props: {
       // styled links that do nothing on click.
       linkHandler: {
         activate: (_event, uri) => {
-          window.open(uri, "_blank", "noopener,noreferrer");
+          openUrl(uri);
         },
       },
       allowProposedApi: true,
@@ -101,7 +102,10 @@ export default function TerminalView(props: {
     });
     fit = new FitAddon();
     term.loadAddon(fit);
-    term.loadAddon(new WebLinksAddon());
+    // Bare `https://…` in the output is linkified by this addon, which is a
+    // separate path from the OSC 8 linkHandler above and comes with its own
+    // opener. Hand it the same one so both kinds of link behave identically.
+    term.loadAddon(new WebLinksAddon((_event, uri) => { openUrl(uri); }));
     term.open(host);
 
     // currentTheme() reads the themeId signal, so this re-runs on every change.
