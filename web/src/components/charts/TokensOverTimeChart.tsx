@@ -1,5 +1,5 @@
 import { For, Show, createMemo } from "solid-js";
-import type { TokensOverTimePoint } from "../../api";
+import type { TokenBucket, TokensOverTimePoint } from "../../api";
 
 const W = 720;
 const H = 180;
@@ -24,50 +24,64 @@ export default function TokensOverTimeChart(props: {
   const view = createMemo(() => {
     const data = props.data;
     const mode = props.mode ?? "type";
+    const s = props.series ?? { input: true, output: true, cache: true };
+    // `profiles` is the *visible* account list. Without one there is no account
+    // filter in play, so the flat all-accounts totals are the honest source.
+    const profiles = props.profiles;
     const plotW = W - M.left - M.right;
     const plotH = H - M.top - M.bottom;
     const slot = plotW / Math.max(1, data.length);
     const barW = Math.max(1, slot * 0.7);
     const baseY = M.top + plotH;
 
+    const ZERO = { input: 0, output: 0, cache: 0 };
+    const visible = (b: TokenBucket) => (s.input ? b.input : 0) + (s.output ? b.output : 0) + (s.cache ? b.cache : 0);
+    // Each day's totals with the account filter applied but the type split kept,
+    // so the type segments below can still be drawn from it.
+    const typed = (d: TokensOverTimePoint): TokenBucket =>
+      profiles
+        ? profiles.reduce((acc, p) => {
+            const b = d.byProfile[p] ?? ZERO;
+            return { input: acc.input + b.input, output: acc.output + b.output, cache: acc.cache + b.cache };
+          }, { ...ZERO })
+        : d;
+
     let max = 1;
     let bars: Bar[] = [];
 
     if (mode === "profile") {
-      const profiles = props.profiles ?? [];
+      const list = profiles ?? [];
       const colors = props.colors ?? {};
-      const totals = data.map((d) => profiles.reduce((sum, p) => sum + (d.byProfile[p] ?? 0), 0));
-      max = Math.max(1, ...totals);
+      max = Math.max(1, ...data.map((d) => list.reduce((sum, p) => sum + visible(d.byProfile[p] ?? ZERO), 0)));
       bars = data.map((d, i) => {
         const x = M.left + i * slot + (slot - barW) / 2;
         let acc = 0;
         const segments: Segment[] = [];
-        for (const p of profiles) {
-          const val = d.byProfile[p] ?? 0;
+        for (const p of list) {
+          const val = visible(d.byProfile[p] ?? ZERO);
           const h = (val / max) * plotH;
           // Applied below as an inline `fill` style property, not an SVG
           // presentation attribute, so var() resolves.
           segments.push({ y: baseY - acc - h, h, color: colors[p] ?? "var(--fg-faint)" });
           acc += h;
         }
-        const title = `${d.day}\n` + profiles
-          .filter((p) => (d.byProfile[p] ?? 0) > 0)
-          .map((p) => `${p} ${fmt(d.byProfile[p] ?? 0)}`)
+        const title = `${d.day}\n` + list
+          .filter((p) => visible(d.byProfile[p] ?? ZERO) > 0)
+          .map((p) => `${p} ${fmt(visible(d.byProfile[p] ?? ZERO))}`)
           .join(" · ");
         return { x, title, segments };
       });
     } else {
-      const s = props.series ?? { input: true, output: true, cache: true };
-      const totals = data.map((d) => (s.input ? d.input : 0) + (s.output ? d.output : 0) + (s.cache ? d.cache : 0));
-      max = Math.max(1, ...totals);
+      max = Math.max(1, ...data.map((d) => visible(typed(d))));
       bars = data.map((d, i) => {
         const x = M.left + i * slot + (slot - barW) / 2;
-        const hIn = ((s.input ? d.input : 0) / max) * plotH;
-        const hOut = ((s.output ? d.output : 0) / max) * plotH;
-        const hCache = ((s.cache ? d.cache : 0) / max) * plotH;
+        const t = typed(d);
+        const hIn = ((s.input ? t.input : 0) / max) * plotH;
+        const hOut = ((s.output ? t.output : 0) / max) * plotH;
+        const hCache = ((s.cache ? t.cache : 0) / max) * plotH;
         return {
           x,
-          title: `${d.day}\ninput ${fmt(d.input)} · output ${fmt(d.output)} · cache ${fmt(d.cache)}`,
+          title: `${d.day}\ninput ${fmt(t.input)} · output ${fmt(t.output)} · cache ${fmt(t.cache)}`,
           segments: [
             { cls: "tok-in", y: baseY - hIn, h: hIn },
             { cls: "tok-out", y: baseY - hIn - hOut, h: hOut },

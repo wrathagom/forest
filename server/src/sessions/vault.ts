@@ -57,11 +57,14 @@ export type DigestMessageRow = {
 };
 
 export type TokenBucket = { input: number; output: number; cache: number };
-export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, number> };
+// The per-profile split carries the same three token types as the flat totals,
+// so the charts can apply the account and token-type filters together.
+export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, TokenBucket> };
 export type TokensByProjectRow = TokenBucket & {
   projectId: string | null;
   projectName: string;
   sessions: number;
+  byProfile: Record<string, TokenBucket>;
 };
 
 export type TokensByProfileRow = TokenBucket & {
@@ -415,21 +418,22 @@ export class Vault {
     const byDay = new Map(rows.map((r) => [r.day, r]));
 
     const profRows = this.db
-      .query<{ day: string; profile: string; total: number }, [number]>(
+      .query<{ day: string; profile: string; input: number; output: number; cache: number }, [number]>(
         `SELECT strftime('%Y-%m-%d', m.timestamp / 1000, 'unixepoch') AS day,
                 CASE WHEN s.profile IS NULL THEN 'unassigned' ELSE s.profile END AS profile,
-                COALESCE(SUM(m.input_tokens), 0) + COALESCE(SUM(m.output_tokens), 0)
-                  + COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS total
+                COALESCE(SUM(m.input_tokens), 0)  AS input,
+                COALESCE(SUM(m.output_tokens), 0) AS output,
+                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache
            FROM agent_messages m
            JOIN agent_sessions s ON s.session_id = m.session_id
           WHERE m.timestamp >= ?
           GROUP BY day, profile`,
       )
       .all(startUtc);
-    const profByDay = new Map<string, Record<string, number>>();
+    const profByDay = new Map<string, Record<string, TokenBucket>>();
     for (const r of profRows) {
       const bucket = profByDay.get(r.day) ?? {};
-      bucket[r.profile] = r.total;
+      bucket[r.profile] = { input: r.input, output: r.output, cache: r.cache };
       profByDay.set(r.day, bucket);
     }
 
@@ -467,6 +471,29 @@ export class Vault {
     const names = new Map(
       this.db.query<{ id: string; name: string }, []>("SELECT id, name FROM projects").all().map((p) => [p.id, p.name]),
     );
+
+    // Second pass grouped by project *and* profile, so the accounts legend can
+    // filter this chart the same way the token-type legend already does.
+    const norm = "CASE WHEN s.profile IS NULL THEN 'unassigned' ELSE s.profile END";
+    const profRows = this.db
+      .query<{ project_id: string | null; profile: string; input: number; output: number; cache: number }, []>(
+        `SELECT s.project_id AS project_id,
+                ${norm} AS profile,
+                COALESCE(SUM(m.input_tokens), 0)  AS input,
+                COALESCE(SUM(m.output_tokens), 0) AS output,
+                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache
+           FROM agent_sessions s
+           LEFT JOIN agent_messages m ON m.session_id = s.session_id
+          GROUP BY s.project_id, ${norm}`,
+      )
+      .all();
+    const profByProject = new Map<string | null, Record<string, TokenBucket>>();
+    for (const r of profRows) {
+      const bucket = profByProject.get(r.project_id) ?? {};
+      bucket[r.profile] = { input: r.input, output: r.output, cache: r.cache };
+      profByProject.set(r.project_id, bucket);
+    }
+
     return rows
       .map((r) => ({
         projectId: r.project_id,
@@ -475,6 +502,7 @@ export class Vault {
         output: r.output,
         cache: r.cache,
         sessions: r.sessions,
+        byProfile: profByProject.get(r.project_id) ?? {},
       }))
       .sort((a, b) => b.input + b.output + b.cache - (a.input + a.output + a.cache));
   }

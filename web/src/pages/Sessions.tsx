@@ -51,6 +51,9 @@ export default function Sessions() {
   const toggleSeries = (k: "input" | "output" | "cache") => setSeries((s) => ({ ...s, [k]: !s[k] }));
   const [profile, setProfile] = createSignal("");           // "" all, else normalized profile key
   const [chartMode, setChartMode] = createSignal<"type" | "profile">("type");
+  const [hiddenProfiles, setHiddenProfiles] = createSignal<string[]>([]); // accounts toggled off in the legend
+  const toggleProfileSeries = (p: string) =>
+    setHiddenProfiles((h) => (h.includes(p) ? h.filter((x) => x !== p) : [...h, p]));
 
   createEffect(() => {
     const q = query();
@@ -110,7 +113,16 @@ export default function Sessions() {
   );
 
   const profileOptions = createMemo(() => stats()?.profiles ?? []);
+  // Colors are keyed off the full list so a profile keeps its hue when others
+  // are toggled off.
   const profileColors = createMemo(() => profileColorMap(stats()?.profiles ?? []));
+
+  // Both legends stay on screen in either mode, so both filters can apply at
+  // once and neither one is ever a control the reader can't see.
+  const visibleProfiles = createMemo(() => profileOptions().filter((p) => !hiddenProfiles().includes(p)));
+  const visibleProfileRows = createMemo(() =>
+    (stats()?.tokensByProfile ?? []).filter((r) => !hiddenProfiles().includes(r.profile)),
+  );
 
   const empty = () => page.state === "ready" && total() === 0 && !debounced() && project() === "" && profile() === "";
 
@@ -129,21 +141,33 @@ export default function Sessions() {
 
       <Show when={!empty()}>
         <div class="chart-toolbar">
-          <div class="chart-mode-toggle">
-            <button type="button" classList={{ active: chartMode() === "type" }} onclick={() => setChartMode("type")}>by type</button>
-            <button type="button" classList={{ active: chartMode() === "profile" }} onclick={() => setChartMode("profile")}>by account</button>
-          </div>
-          <Show when={chartMode() === "type"}>
-            <div class="chart-legend">
-              <button type="button" class="chart-legend-item" classList={{ off: !series().input }} onclick={() => toggleSeries("input")}><i class="tok-in" /> input</button>
-              <button type="button" class="chart-legend-item" classList={{ off: !series().output }} onclick={() => toggleSeries("output")}><i class="tok-out" /> output</button>
-              <button type="button" class="chart-legend-item" classList={{ off: !series().cache }} onclick={() => toggleSeries("cache")}><i class="tok-cache" /> cache</button>
+          <div class="chart-legend">
+            <span class="chart-legend-label muted">stack</span>
+            <div class="chart-mode-toggle">
+              <button type="button" classList={{ active: chartMode() === "type" }} onclick={() => setChartMode("type")}>by type</button>
+              <button type="button" classList={{ active: chartMode() === "profile" }} onclick={() => setChartMode("profile")}>by account</button>
             </div>
-          </Show>
-          <Show when={chartMode() === "profile"}>
+          </div>
+          <div class="chart-legend">
+            <span class="chart-legend-label muted">type</span>
+            <button type="button" class="chart-legend-item" classList={{ off: !series().input }} onclick={() => toggleSeries("input")}><i class="tok-in" /> input</button>
+            <button type="button" class="chart-legend-item" classList={{ off: !series().output }} onclick={() => toggleSeries("output")}><i class="tok-out" /> output</button>
+            <button type="button" class="chart-legend-item" classList={{ off: !series().cache }} onclick={() => toggleSeries("cache")}><i class="tok-cache" /> cache</button>
+          </div>
+          <Show when={profileOptions().length > 0}>
             <div class="chart-legend">
+              <span class="chart-legend-label muted">accounts</span>
               <For each={profileOptions()}>
-                {(p) => <span class="chart-legend-item"><i style={{ background: profileColors()[p] }} /> {p}</span>}
+                {(p) => (
+                  <button
+                    type="button"
+                    class="chart-legend-item"
+                    classList={{ off: hiddenProfiles().includes(p) }}
+                    onclick={() => toggleProfileSeries(p)}
+                  >
+                    <i style={{ background: profileColors()[p] }} /> {p}
+                  </button>
+                )}
               </For>
             </div>
           </Show>
@@ -155,7 +179,7 @@ export default function Sessions() {
             data={stats()?.tokensOverTime ?? []}
             series={series()}
             mode={chartMode()}
-            profiles={profileOptions()}
+            profiles={visibleProfiles()}
             colors={profileColors()}
           />
         </section>
@@ -166,13 +190,14 @@ export default function Sessions() {
             <TokensByProjectChart
               data={stats()?.tokensByProject ?? []}
               series={series()}
+              profiles={visibleProfiles()}
               onSelectProject={(id) => setProject(id ?? "none")}
             />
           </section>
           <section class="sessions-chart-card">
             <h3 class="section-title">tokens by account</h3>
             <TokensByProfileChart
-              data={stats()?.tokensByProfile ?? []}
+              data={visibleProfileRows()}
               series={series()}
               onSelectProfile={(p) => setProfile(p)}
             />

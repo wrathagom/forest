@@ -512,8 +512,15 @@ export async function fetchSessionsOverview(opts: {
 }
 
 export type TokenBucket = { input: number; output: number; cache: number };
-export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, number> };
-export type TokensByProjectRow = TokenBucket & { projectId: string | null; projectName: string; sessions: number };
+// byProfile carries the same three token types as the flat totals, so the
+// accounts and token-type legends can filter the same chart together.
+export type TokensOverTimePoint = TokenBucket & { day: string; byProfile: Record<string, TokenBucket> };
+export type TokensByProjectRow = TokenBucket & {
+  projectId: string | null;
+  projectName: string;
+  sessions: number;
+  byProfile: Record<string, TokenBucket>;
+};
 export type TokensByProfileRow = TokenBucket & { profile: string; sessions: number };
 
 export type SessionsStatsResponse = {

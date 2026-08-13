@@ -937,7 +937,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .sessions-page { display: flex; flex-direction: column; gap: 0.6rem; }
 .sessions-totals { margin: 0; }
 
-.chart-legend { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--fg-dim); }
+.chart-legend { display: flex; align-items: center; gap: 1rem; font-size: 0.75rem; color: var(--fg-dim); flex-wrap: wrap; }
+/* Names which dimension a legend filters, now that both are on screen at once. */
+.chart-legend-label { font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .chart-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; background: none; border: none; padding: 0; margin: 0; color: inherit; font: inherit; cursor: pointer; }
 .chart-legend-item:hover { color: var(--fg); }
 .chart-legend-item.off { opacity: 0.35; }
