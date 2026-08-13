@@ -61,4 +61,19 @@ describe("LiveAgentSessions agent field", () => {
     expect(live.getEntry("s1")?.profile).toBe("personal");
     expect(live.list()).toHaveLength(2);
   });
+
+  test("applyCodexScan only notifies when something changed", () => {
+    let notifications = 0;
+    const live = new LiveAgentSessions({ onChange: () => { notifications++; } });
+    const entry = {
+      agentSessionId: "cx1", cwd: "/x", projectId: null, projectName: null,
+      worktreeLabel: null, ptySessionId: null, state: "waiting" as const,
+      endedAt: null, startedAt: 1000, lastEventAt: 2000, lastUserMsg: null,
+    };
+    live.applyCodexScan(entry);
+    live.applyCodexScan({ ...entry });            // identical → no new notify
+    expect(notifications).toBe(1);
+    live.applyCodexScan({ ...entry, lastEventAt: 3000 }); // changed → notify
+    expect(notifications).toBe(2);
+  });
 });

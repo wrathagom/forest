@@ -180,7 +180,7 @@ export class LiveAgentSessions {
    *  hook-driven entries. Codex is global: no profile, no parent. */
   applyCodexScan(e: CodexScanEntry): void {
     const prev = this.entries.get(e.agentSessionId);
-    this.entries.set(e.agentSessionId, {
+    const next: LiveEntry = {
       agent: "codex",
       agentSessionId: e.agentSessionId,
       parentSessionId: null,
@@ -197,8 +197,19 @@ export class LiveAgentSessions {
       lastEventAt: e.lastEventAt,
       lastUserMsg: e.lastUserMsg,
       launchedVia: null,
-    });
-    this.notify({ event: "codexscan", agentSessionId: e.agentSessionId });
+    };
+    this.entries.set(e.agentSessionId, next);
+    // The scanner reruns every tick for every in-window rollout, so only notify
+    // subscribers (which drives a BBS republish) when something meaningful changed.
+    const changed =
+      !prev ||
+      prev.state !== next.state ||
+      prev.endedAt !== next.endedAt ||
+      prev.lastEventAt !== next.lastEventAt ||
+      prev.ptySessionId !== next.ptySessionId ||
+      prev.projectId !== next.projectId ||
+      prev.lastUserMsg !== next.lastUserMsg;
+    if (changed) this.notify({ event: "codexscan", agentSessionId: e.agentSessionId });
   }
 
   markEndedByPty(ptySessionId: string, at: number = Date.now()): void {
