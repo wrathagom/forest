@@ -1003,6 +1003,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .session-chip-inert:hover { color: var(--fg-dim); border-color: var(--border); }
 .session-chip-project { color: var(--fg); font-weight: 500; }
 .session-chip-time { color: var(--fg-dim); opacity: 0.7; }
+.session-chip-agent { font-size: 0.85em; line-height: 1; }
 .session-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
 .session-chip-dot-working { background: var(--ok); animation: session-pulse 1.4s ease-in-out infinite; }
 .session-chip-dot-waiting { background: var(--warn); }

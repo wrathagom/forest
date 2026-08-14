@@ -40,6 +40,7 @@ import { Vault } from "./sessions/vault";
 import { AgentDetector } from "./sessions/agent-detect";
 import { installHooks } from "./sessions/hook-installer";
 import { scanClaudeProjects } from "./sessions/scanner";
+import { scanCodexSessions } from "./sessions/codex-scanner";
 import { discoverClaudeConfigDirs } from "./sessions/config-dirs";
 import { LiveAgentSessions } from "./sessions/live";
 import { makeDismissalStore } from "./store/dismissals";
@@ -139,6 +140,34 @@ bbsPublisher.startHeartbeat();
 
 const projectNameById = (id: string) => listVisibleProjects(db).find((p) => p.id === id)?.name ?? null;
 const projectsForRunner = () => listVisibleProjects(db).map((p) => ({ id: p.id, path: p.path }));
+
+// Codex has no hooks: poll its rollout logs and feed recent/live sessions into
+// the same live-session store the session bar reads. Mirrors the AgentDetector
+// cadence. Additive — never touches the Claude hook path or the vault.
+const codexSessionsRoot = join(homedir(), ".codex", "sessions");
+function liveCodexTerminals() {
+  const out: { ptySessionId: string; cwd: string; startedAt: number }[] = [];
+  for (const s of sessions.list()) {
+    const agent = s.launcher?.agent ?? detector.get(s.pty.pid) ?? null;
+    if (agent === "codex") out.push({ ptySessionId: s.id, cwd: s.cwd, startedAt: s.createdAt });
+  }
+  return out;
+}
+setInterval(() => {
+  try {
+    scanCodexSessions({
+      sessionsRoot: codexSessionsRoot,
+      now: Date.now(),
+      liveWindowMs: 30 * 60_000,
+      projects: listVisibleProjects(db).map((p) => ({ id: p.id, path: p.path })),
+      projectName: projectNameById,
+      liveCodexTerminals: liveCodexTerminals(),
+      apply: (e) => liveSessions.applyCodexScan(e),
+    });
+  } catch (err) {
+    log("warn", "codex-scan: failed", { error: (err as Error).message });
+  }
+}, 3_000);
 
 const runner = new AgentRunner({
   vault,

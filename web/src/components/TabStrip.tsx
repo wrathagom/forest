@@ -1,6 +1,7 @@
 import { For, Show } from "solid-js";
 import type { Tab } from "../lib/tabs";
 import LauncherButton, { type LauncherEntry } from "./LauncherButton";
+import { agentIcon } from "../lib/agents";
 
 export default function TabStrip(props: {
   tabs: Tab[];
@@ -43,7 +44,7 @@ export default function TabStrip(props: {
           >
             <span class="tab-label">
               {t.kind === "file" && t.dirty ? "● " : ""}
-              {t.kind === "terminal" && t.agent ? "🤖 " : ""}
+              {t.kind === "terminal" && t.agent ? agentIcon(t.agent) + " " : ""}
               {t.label}
             </span>
             {/* Only file tabs may be pinned right: TerminalView owns a live PTY

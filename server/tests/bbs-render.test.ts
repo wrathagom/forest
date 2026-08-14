@@ -4,7 +4,7 @@ import type { LiveEntry } from "../src/sessions/live";
 
 function entry(over: Partial<LiveEntry> = {}): LiveEntry {
   return {
-    agentSessionId: "s1", parentSessionId: null, projectId: "p1", projectName: "forest",
+    agent: "claude", agentSessionId: "s1", parentSessionId: null, projectId: "p1", projectName: "forest",
     cwd: "/home/u/forest", worktreeLabel: null, branch: "main", profile: null,
     ptySessionId: null, state: "working", endedAt: null, startedAt: 0, lastEventAt: 0,
     lastUserMsg: null, launchedVia: null, ...over,

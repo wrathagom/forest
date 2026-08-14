@@ -1,6 +1,8 @@
 export type LiveState = "working" | "waiting" | "stale";
+export type AgentKind = "claude" | "codex";
 
 export type LiveEntry = {
+  agent: AgentKind;
   agentSessionId: string;
   parentSessionId: string | null;
   projectId: string | null;
@@ -39,6 +41,22 @@ export type LiveUpdate = {
   at: number;
   /** how the session was launched: "mobile" for headless runs, null for PTY-backed and external sessions */
   launchedVia?: "mobile" | null;
+};
+
+/** A Codex rollout snapshot from the disk scanner. Codex has no hooks, so the
+ *  scanner computes state/endedAt itself and overwrites the entry each tick. */
+export type CodexScanEntry = {
+  agentSessionId: string;
+  cwd: string;
+  projectId: string | null;
+  projectName: string | null;
+  worktreeLabel: string | null;
+  ptySessionId: string | null;
+  state: LiveState;
+  endedAt: number | null;
+  startedAt: number;
+  lastEventAt: number;
+  lastUserMsg: string | null;
 };
 
 export type LiveDeps = {
@@ -136,6 +154,7 @@ export class LiveAgentSessions {
     let endedAt: number | null = u.event === "sessionend" ? u.at : null;
     if (u.event === "userpromptsubmit") this.undismiss(u.agentSessionId);
     const entry: LiveEntry = {
+      agent: "claude",
       agentSessionId: u.agentSessionId,
       parentSessionId: u.parentSessionId ?? prev?.parentSessionId ?? null,
       projectId: u.projectId ?? prev?.projectId ?? null,
@@ -154,6 +173,43 @@ export class LiveAgentSessions {
     };
     this.entries.set(u.agentSessionId, entry);
     this.notify({ event: u.event, agentSessionId: u.agentSessionId });
+  }
+
+  /** Upsert a Codex session discovered by the disk scanner. Keyed by the Codex
+   *  session_id (a UUID distinct from any Claude id), so it never collides with
+   *  hook-driven entries. Codex is global: no profile, no parent. */
+  applyCodexScan(e: CodexScanEntry): void {
+    const prev = this.entries.get(e.agentSessionId);
+    const next: LiveEntry = {
+      agent: "codex",
+      agentSessionId: e.agentSessionId,
+      parentSessionId: null,
+      projectId: e.projectId,
+      projectName: e.projectName,
+      cwd: e.cwd || prev?.cwd || "",
+      worktreeLabel: e.worktreeLabel,
+      branch: null,
+      profile: null,
+      ptySessionId: e.ptySessionId,
+      state: e.state,
+      endedAt: e.endedAt,
+      startedAt: prev?.startedAt ?? e.startedAt,
+      lastEventAt: e.lastEventAt,
+      lastUserMsg: e.lastUserMsg,
+      launchedVia: null,
+    };
+    this.entries.set(e.agentSessionId, next);
+    // The scanner reruns every tick for every in-window rollout, so only notify
+    // subscribers (which drives a BBS republish) when something meaningful changed.
+    const changed =
+      !prev ||
+      prev.state !== next.state ||
+      prev.endedAt !== next.endedAt ||
+      prev.lastEventAt !== next.lastEventAt ||
+      prev.ptySessionId !== next.ptySessionId ||
+      prev.projectId !== next.projectId ||
+      prev.lastUserMsg !== next.lastUserMsg;
+    if (changed) this.notify({ event: "codexscan", agentSessionId: e.agentSessionId });
   }
 
   markEndedByPty(ptySessionId: string, at: number = Date.now()): void {
@@ -199,6 +255,7 @@ export class LiveAgentSessions {
     const at = a.at ?? Date.now();
     const prev = this.entries.get(a.agentSessionId);
     this.entries.set(a.agentSessionId, {
+      agent: "claude",
       agentSessionId: a.agentSessionId,
       parentSessionId: prev?.parentSessionId ?? null,
       projectId: a.projectId,
@@ -206,6 +263,7 @@ export class LiveAgentSessions {
       cwd: a.cwd || prev?.cwd || "",
       worktreeLabel: a.worktreeLabel,
       branch: a.branch,
+      profile: null,
       ptySessionId: null,
       state: "working",
       endedAt: null,

@@ -110,11 +110,11 @@ describe("TabStrip", () => {
     expect(screen.queryByText(/🤖/)).toBeNull();
   });
 
-  test("terminal tab with an agent shows a leading bot icon", () => {
+  test("terminal tab with an agent shows a leading per-agent icon", () => {
     render(() => (
       <TabStrip tabs={[agentTermTab]} activeId={null} onSelect={() => {}} onClose={() => {}} {...defaultLauncherProps} />
     ));
-    expect(screen.getByText("🤖 term 2")).toBeTruthy();
+    expect(screen.getByText("✳️ term 2")).toBeTruthy();
   });
 
   test("terminal tab with an agent exposes the agent name via title", () => {

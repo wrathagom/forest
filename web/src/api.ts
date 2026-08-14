@@ -538,6 +538,7 @@ export async function fetchSessionsStats(): Promise<SessionsStatsResponse> {
 export type LiveSessionState = "working" | "waiting" | "stale";
 
 export type LiveSessionRow = {
+  agent: string;
   agentSessionId: string;
   parentSessionId: string | null;
   projectId: string | null;
