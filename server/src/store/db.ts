@@ -68,6 +68,12 @@ const SCHEMA = `
     ON agent_messages(session_id, timestamp);
   CREATE INDEX IF NOT EXISTS idx_agent_messages_timestamp
     ON agent_messages(timestamp);
+  -- Covering index for the tokens-over-time chart: the day-bucketed SUMs read
+  -- only these columns, so this lets the 30-day scan skip the (large) message
+  -- rows entirely instead of touching the content column.
+  CREATE INDEX IF NOT EXISTS idx_agent_messages_ts_tokens
+    ON agent_messages(timestamp, session_id, input_tokens, output_tokens,
+                      cache_create_tokens, cache_read_tokens);
 
   CREATE VIRTUAL TABLE IF NOT EXISTS agent_messages_fts USING fts5(
     session_id UNINDEXED,
@@ -148,10 +154,13 @@ const SCHEMA = `
 `;
 
 // IMPORTANT: table, column, and decl must be literal (hard-coded) strings — they are interpolated directly into SQL, not parameterised.
-function addColumnIfMissing(db: Database, table: string, column: string, decl: string): void {
+// Returns true when the column was actually added (so callers can run a
+// one-time backfill), false when it already existed.
+function addColumnIfMissing(db: Database, table: string, column: string, decl: string): boolean {
   const cols = db.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all();
-  if (cols.some((c) => c.name === column)) return;
+  if (cols.some((c) => c.name === column)) return false;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  return true;
 }
 
 export function openDb(path: string): Database {
@@ -165,5 +174,20 @@ export function openDb(path: string): Database {
   addColumnIfMissing(db, "agent_sessions", "launched_via", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "profile", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "title", "TEXT");
+
+  // Denormalized per-session token totals, maintained at ingest so the sessions
+  // list and token charts never re-sum the whole agent_messages table. When the
+  // columns are first added, backfill them once from the existing messages.
+  const addedInput = addColumnIfMissing(db, "agent_sessions", "input_tokens", "INTEGER NOT NULL DEFAULT 0");
+  const addedOutput = addColumnIfMissing(db, "agent_sessions", "output_tokens", "INTEGER NOT NULL DEFAULT 0");
+  const addedCache = addColumnIfMissing(db, "agent_sessions", "cache_tokens", "INTEGER NOT NULL DEFAULT 0");
+  if (addedInput || addedOutput || addedCache) {
+    db.exec(`
+      UPDATE agent_sessions SET
+        input_tokens  = (SELECT COALESCE(SUM(input_tokens),  0) FROM agent_messages WHERE session_id = agent_sessions.session_id),
+        output_tokens = (SELECT COALESCE(SUM(output_tokens), 0) FROM agent_messages WHERE session_id = agent_sessions.session_id),
+        cache_tokens  = (SELECT COALESCE(SUM(cache_create_tokens), 0) + COALESCE(SUM(cache_read_tokens), 0) FROM agent_messages WHERE session_id = agent_sessions.session_id)
+    `);
+  }
   return db;
 }

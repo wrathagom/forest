@@ -240,16 +240,22 @@ export class Vault {
         const text = ftsByUuid.get(m.uuid) ?? "";
         if (text.length > 0) insertFts.run(m.session_id, inserted.id, text);
       }
-      // bump message_count and last_activity on session
+      // Recompute message_count, denormalized token totals, and last_activity
+      // from the session's messages. Recompute-from-source (rather than adding
+      // deltas) stays correct across the ON CONFLICT DO NOTHING dedup above.
+      const sid = rows[0]!.session_id;
       this.db
         .query(
           `UPDATE agent_sessions
-            SET message_count = (
-                  SELECT count(*) FROM agent_messages WHERE session_id = ?),
+            SET message_count = (SELECT count(*) FROM agent_messages WHERE session_id = ?),
+                input_tokens  = (SELECT COALESCE(SUM(input_tokens),  0) FROM agent_messages WHERE session_id = ?),
+                output_tokens = (SELECT COALESCE(SUM(output_tokens), 0) FROM agent_messages WHERE session_id = ?),
+                cache_tokens  = (SELECT COALESCE(SUM(cache_create_tokens), 0) + COALESCE(SUM(cache_read_tokens), 0)
+                                   FROM agent_messages WHERE session_id = ?),
                 last_activity = MAX(last_activity, ?)
           WHERE session_id = ?`,
         )
-        .run(rows[0]!.session_id, Math.max(...rows.map((r) => r.timestamp)), rows[0]!.session_id);
+        .run(sid, sid, sid, sid, Math.max(...rows.map((r) => r.timestamp)), sid);
     });
     tx();
   }
@@ -328,7 +334,7 @@ export class Vault {
       ({
         last_activity: "s.last_activity",
         started_at: "s.started_at",
-        tokens: "(COALESCE(t.input,0)+COALESCE(t.output,0)+COALESCE(t.cache,0))",
+        tokens: "(s.input_tokens + s.output_tokens + s.cache_tokens)",
         message_count: "s.message_count",
         project: "p.name",
         profile: "s.profile",
@@ -368,19 +374,12 @@ export class Vault {
               s.cwd_exists, s.parent_session_id, s.started_at, s.last_activity,
               s.message_count, s.first_user_msg, s.profile, s.permission_mode, s.launched_via, s.title,
               p.name AS project_name,
-              COALESCE(t.input, 0)  AS input_tokens,
-              COALESCE(t.output, 0) AS output_tokens,
-              COALESCE(t.cache, 0)  AS cache_tokens
+              s.input_tokens  AS input_tokens,
+              s.output_tokens AS output_tokens,
+              s.cache_tokens  AS cache_tokens
               ${snippetSel}
          FROM agent_sessions s
          LEFT JOIN projects p ON p.id = s.project_id
-         LEFT JOIN (
-              SELECT session_id,
-                     COALESCE(SUM(input_tokens), 0)  AS input,
-                     COALESCE(SUM(output_tokens), 0) AS output,
-                     COALESCE(SUM(cache_create_tokens), 0) + COALESCE(SUM(cache_read_tokens), 0) AS cache
-                FROM agent_messages GROUP BY session_id
-         ) t ON t.session_id = s.session_id
          ${whereSql}
          ORDER BY ${sortCol} ${dir}${nullsLast}, s.last_activity DESC, s.session_id ASC
          LIMIT ? OFFSET ?`;
@@ -459,12 +458,11 @@ export class Vault {
         []
       >(
         `SELECT s.project_id AS project_id,
-                COALESCE(SUM(m.input_tokens), 0)  AS input,
-                COALESCE(SUM(m.output_tokens), 0) AS output,
-                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache,
-                COUNT(DISTINCT s.session_id) AS sessions
+                COALESCE(SUM(s.input_tokens), 0)  AS input,
+                COALESCE(SUM(s.output_tokens), 0) AS output,
+                COALESCE(SUM(s.cache_tokens), 0)  AS cache,
+                COUNT(*) AS sessions
            FROM agent_sessions s
-           LEFT JOIN agent_messages m ON m.session_id = s.session_id
           GROUP BY s.project_id`,
       )
       .all();
@@ -479,11 +477,10 @@ export class Vault {
       .query<{ project_id: string | null; profile: string; input: number; output: number; cache: number }, []>(
         `SELECT s.project_id AS project_id,
                 ${norm} AS profile,
-                COALESCE(SUM(m.input_tokens), 0)  AS input,
-                COALESCE(SUM(m.output_tokens), 0) AS output,
-                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache
+                COALESCE(SUM(s.input_tokens), 0)  AS input,
+                COALESCE(SUM(s.output_tokens), 0) AS output,
+                COALESCE(SUM(s.cache_tokens), 0)  AS cache
            FROM agent_sessions s
-           LEFT JOIN agent_messages m ON m.session_id = s.session_id
           GROUP BY s.project_id, ${norm}`,
       )
       .all();
@@ -512,12 +509,11 @@ export class Vault {
     const rows = this.db
       .query<{ profile: string; input: number; output: number; cache: number; sessions: number }, []>(
         `SELECT ${norm} AS profile,
-                COALESCE(SUM(m.input_tokens), 0)  AS input,
-                COALESCE(SUM(m.output_tokens), 0) AS output,
-                COALESCE(SUM(m.cache_create_tokens), 0) + COALESCE(SUM(m.cache_read_tokens), 0) AS cache,
-                COUNT(DISTINCT s.session_id) AS sessions
+                COALESCE(SUM(s.input_tokens), 0)  AS input,
+                COALESCE(SUM(s.output_tokens), 0) AS output,
+                COALESCE(SUM(s.cache_tokens), 0)  AS cache,
+                COUNT(*) AS sessions
            FROM agent_sessions s
-           LEFT JOIN agent_messages m ON m.session_id = s.session_id
           GROUP BY ${norm}`,
       )
       .all();
