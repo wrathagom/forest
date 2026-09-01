@@ -1,4 +1,14 @@
-import { createSignal, createResource, onCleanup, onMount, Show, getOwner, runWithOwner } from "solid-js";
+import {
+  createSignal,
+  createResource,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  Match,
+  getOwner,
+  runWithOwner,
+} from "solid-js";
 import { EditorState, type Extension, Compartment } from "@codemirror/state";
 import { EditorView, lineNumbers, keymap } from "@codemirror/view";
 import { defaultKeymap, indentWithTab, history, historyKeymap } from "@codemirror/commands";
@@ -10,11 +20,13 @@ import { loadLanguageExtension } from "../lib/language";
 import Markdown from "./Markdown";
 import EditorStatusBar, { type EditorStats } from "./EditorStatusBar";
 import ImageViewer from "./ImageViewer";
+import PdfViewer from "./PdfViewer";
 import { markdownStats, cursorStats } from "../lib/editorStats";
 
 type Loaded =
   | { kind: "text"; mtimeMs: number; sha: string; language: string }
   | { kind: "image"; size: number; mime: string; mtimeMs: number }
+  | { kind: "pdf"; size: number; mtimeMs: number }
   | { kind: "binary"; size: number }
   | { kind: "too-large"; size: number };
 
@@ -298,8 +310,7 @@ export default function FileEditor(props: {
         fallback={
           <Show when={loaded()}>
             {(l) => (
-              <Show
-                when={l().kind === "image"}
+              <Switch
                 fallback={
                   <div class="file-editor-placeholder">
                     <Show when={l().kind === "binary"}>
@@ -311,15 +322,26 @@ export default function FileEditor(props: {
                   </div>
                 }
               >
-                <ImageViewer
-                  src={fileRawUrl(
-                    props.projectId,
-                    props.path,
-                    (l() as { kind: "image"; mtimeMs: number }).mtimeMs,
-                  )}
-                  alt={props.path}
-                />
-              </Show>
+                <Match when={l().kind === "image"}>
+                  <ImageViewer
+                    src={fileRawUrl(
+                      props.projectId,
+                      props.path,
+                      (l() as { kind: "image"; mtimeMs: number }).mtimeMs,
+                    )}
+                    alt={props.path}
+                  />
+                </Match>
+                <Match when={l().kind === "pdf"}>
+                  <PdfViewer
+                    src={fileRawUrl(
+                      props.projectId,
+                      props.path,
+                      (l() as { kind: "pdf"; mtimeMs: number }).mtimeMs,
+                    )}
+                  />
+                </Match>
+              </Switch>
             )}
           </Show>
         }
