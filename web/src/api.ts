@@ -687,7 +687,7 @@ export async function listTasks(projectId: string): Promise<{ tasks: Task[] }> {
   );
 }
 
-export async function getTaskDetail(taskId: string): Promise<{ task: Task; diff: string | null }> {
+export async function getTaskDetail(taskId: string): Promise<{ task: Task; diff: string | null; mergedIntoBase?: boolean }> {
   return unwrap(
     await fetch(`/api/tasks/${encodeURIComponent(taskId)}`),
     "task detail",

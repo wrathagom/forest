@@ -240,18 +240,27 @@ export function projectTaskRoutes(deps: TaskRoutesDeps): Route[] {
       handler: async (ctx) => {
         const task = getTaskById(ctx.db, ctx.params.taskId!);
         if (!task) return notFound();
+        const project = task.branch ? getProjectById(ctx.db, task.projectId) : null;
+
         let diff: string | null = null;
-        if (task.status === "review" && task.branch) {
-          const project = getProjectById(ctx.db, task.projectId);
-          if (project) {
-            try {
-              diff = await gitRangeDiff(project.path, task.baseBranch, task.branch, runGit);
-            } catch {
-              diff = null;
-            }
+        if (task.status === "review" && task.branch && project) {
+          try {
+            diff = await gitRangeDiff(project.path, task.baseBranch, task.branch, runGit);
+          } catch {
+            diff = null;
           }
         }
-        return json({ task, diff });
+
+        let mergedIntoBase = false;
+        if (project && task.branch && task.status !== "done" && task.status !== "abandoned") {
+          try {
+            mergedIntoBase = await gitIsMerged(project.path, task.branch, task.baseBranch, runGit);
+          } catch {
+            mergedIntoBase = false;
+          }
+        }
+
+        return json({ task, diff, mergedIntoBase });
       },
     },
     {

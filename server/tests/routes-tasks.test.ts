@@ -120,6 +120,37 @@ describe("GET /api/tasks/:taskId", () => {
     );
     expect(res.status).toBe(404);
   });
+  test("reports mergedIntoBase when the branch is an ancestor of the base", async () => {
+    const db = openDb(":memory:");
+    const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const t = createTask(db, { projectId: pid, intent: "x", baseBranch: "main" });
+    db.query("UPDATE tasks SET status='review', branch='task/x' WHERE id=?").run(t.id);
+    const runGit: RunGit = async (args) =>
+      args[0] === "merge-base" && args[1] === "--is-ancestor"
+        ? { stdout: "", stderr: "", code: 0 }
+        : { stdout: "", stderr: "", code: 0 };
+    const res = await route("GET", ONE, deps({ runGit })).handler(
+      ctx(db, new Request(`http://x/api/tasks/${t.id}`), { taskId: t.id }),
+    );
+    const body = await res.json() as { mergedIntoBase: boolean };
+    expect(body.mergedIntoBase).toBe(true);
+  });
+
+  test("mergedIntoBase is false for a branch not yet merged", async () => {
+    const db = openDb(":memory:");
+    const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const t = createTask(db, { projectId: pid, intent: "x", baseBranch: "main" });
+    db.query("UPDATE tasks SET status='review', branch='task/x' WHERE id=?").run(t.id);
+    const runGit: RunGit = async (args) =>
+      args[0] === "merge-base" && args[1] === "--is-ancestor"
+        ? { stdout: "", stderr: "", code: 1 }
+        : { stdout: "", stderr: "", code: 0 };
+    const res = await route("GET", ONE, deps({ runGit })).handler(
+      ctx(db, new Request(`http://x/api/tasks/${t.id}`), { taskId: t.id }),
+    );
+    const body = await res.json() as { mergedIntoBase: boolean };
+    expect(body.mergedIntoBase).toBe(false);
+  });
 });
 
 describe("DELETE /api/tasks/:taskId", () => {
