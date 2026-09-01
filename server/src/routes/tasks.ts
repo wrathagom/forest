@@ -11,7 +11,7 @@ import {
 } from "../store/tasks";
 import {
   defaultRunGit, gitRangeDiff, gitWorktreeAdd, gitWorktreeRemove, gitDeleteBranch,
-  gitMerge, gitPush, gitCurrentBranch, gitBranchExists, type RunGit,
+  gitMerge, gitIsMerged, gitPush, gitCurrentBranch, gitBranchExists, type RunGit,
 } from "../git";
 import { defaultRunGh, ghCreatePr, type RunGh } from "../gh";
 
@@ -124,6 +124,19 @@ async function completeTask(
   const worktreePath = task.worktreePath!;
 
   if (action === "merged") {
+    // The branch may already be in base (e.g. the agent ran `git merge` itself).
+    // In that case skip the merge — gitMerge would report `empty` — and just
+    // record it as merged and clean up.
+    if (await gitIsMerged(project.path, branch, task.baseBranch, runGit)) {
+      const head = await runGit(["rev-parse", branch], project.path);
+      const sha = head.stdout.trim() || null;
+      await gitWorktreeRemove(project.path, worktreePath, runGit).catch(() => {});
+      await gitDeleteBranch(project.path, branch, runGit).catch(() => {});
+      updateTask(ctx.db, task.id, {
+        status: "done", result: "merged", resultRef: sha, worktreePath: null,
+      });
+      return getTaskById(ctx.db, task.id)!;
+    }
     const merge = await gitMerge(project.path, branch, runGit);
     if (!merge.ok) {
       return { httpStatus: 409, message: merge.message };

@@ -305,6 +305,7 @@ describe("PATCH completion — merge", () => {
     const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
     const t = launchedTask(db, pid);
     const runGit: RunGit = async (args) => {
+      if (args[0] === "merge-base" && args[1] === "--is-ancestor") return { stdout: "", stderr: "", code: 1 };
       if (args[0] === "status") return { stdout: "", stderr: "", code: 0 };
       if (args[0] === "merge") return { stdout: "", stderr: "", code: 0 };
       if (args[0] === "rev-parse") return { stdout: "merged-sha\n", stderr: "", code: 0 };
@@ -326,6 +327,7 @@ describe("PATCH completion — merge", () => {
     const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
     const t = launchedTask(db, pid);
     const runGit: RunGit = async (args) => {
+      if (args[0] === "merge-base" && args[1] === "--is-ancestor") return { stdout: "", stderr: "", code: 1 };
       if (args[0] === "status") return { stdout: "", stderr: "", code: 0 };
       if (args[0] === "merge") return { stdout: "", stderr: "CONFLICT\n", code: 1 };
       if (args[0] === "rev-parse") return { stdout: "merge-head\n", stderr: "", code: 0 };
@@ -342,15 +344,45 @@ describe("PATCH completion — merge", () => {
     const db = openDb(":memory:");
     const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
     const t = launchedTask(db, pid);
-    const runGit: RunGit = async (args) =>
-      args[0] === "status"
+    const runGit: RunGit = async (args) => {
+      if (args[0] === "merge-base" && args[1] === "--is-ancestor") return { stdout: "", stderr: "", code: 1 };
+      return args[0] === "status"
         ? { stdout: " M other.ts\n", stderr: "", code: 0 }
         : { stdout: "", stderr: "", code: 0 };
+    };
     const req = new Request(`http://x/api/tasks/${t.id}`, {
       method: "PATCH", body: JSON.stringify({ status: "done", result: "merged" }),
     });
     const res = await route("PATCH", PATCH, deps({ runGit })).handler(ctx(db, req, { taskId: t.id }));
     expect(res.status).toBe(409);
+  });
+
+  test("already-merged branch → done/merged without re-running git merge, still cleans up", async () => {
+    const db = openDb(":memory:");
+    const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const t = launchedTask(db, pid);
+    const gitCalls: string[][] = [];
+    const runGit: RunGit = async (args) => {
+      gitCalls.push(args);
+      if (args[0] === "merge-base" && args[1] === "--is-ancestor") {
+        return { stdout: "", stderr: "", code: 0 }; // already merged
+      }
+      if (args[0] === "rev-parse") return { stdout: "branch-tip-sha\n", stderr: "", code: 0 };
+      return { stdout: "", stderr: "", code: 0 };
+    };
+    const req = new Request(`http://x/api/tasks/${t.id}`, {
+      method: "PATCH", body: JSON.stringify({ status: "done", result: "merged" }),
+    });
+    const res = await route("PATCH", PATCH, deps({ runGit })).handler(ctx(db, req, { taskId: t.id }));
+    expect(res.status).toBe(200);
+    expect(gitCalls.some((c) => c[0] === "merge")).toBe(false);
+    expect(gitCalls.some((c) => c[0] === "worktree" && c[1] === "remove")).toBe(true);
+    expect(gitCalls.some((c) => c[0] === "branch" && c[1] === "-D")).toBe(true);
+    const done = getTaskById(db, t.id)!;
+    expect(done.status).toBe("done");
+    expect(done.result).toBe("merged");
+    expect(done.resultRef).toBe("branch-tip-sha");
+    expect(done.worktreePath).toBeNull();
   });
 });
 
