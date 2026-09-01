@@ -24,6 +24,10 @@ const SKIP_DIRS = new Set([".git", "node_modules"]);
 
 const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 
+// Images and PDFs stream raw from /file/raw and are never inlined into a JSON
+// response, so they get a far more generous ceiling than the text path's 2 MB.
+const MAX_MEDIA_BYTES = 50 * 1024 * 1024; // 50 MB
+
 const LANGUAGE_BY_EXT: Record<string, string> = {
   ts: "typescript", tsx: "typescript", mts: "typescript", cts: "typescript",
   js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
@@ -330,12 +334,20 @@ export function projectFilesRoutes(deps: ProjectFilesDeps = {}): Route[] {
         }
         if (!st.isFile()) return badRequest("not a file");
         const mtimeMs = st.mtimeMs;
+        const mime = imageMimeFor(rel);
+        const pdf = isPdf(rel);
+        if (mime || pdf) {
+          // Media renders from /file/raw, so it uses the generous media cap
+          // rather than the text path's 2 MB limit.
+          if (st.size > MAX_MEDIA_BYTES) {
+            return json({ kind: "too-large", path: rel, size: st.size, mtimeMs });
+          }
+          return mime
+            ? json({ kind: "image", path: rel, size: st.size, mtimeMs, mime })
+            : json({ kind: "pdf", path: rel, size: st.size, mtimeMs });
+        }
         if (st.size > MAX_TEXT_BYTES) {
           return json({ kind: "too-large", path: rel, size: st.size, mtimeMs });
-        }
-        const mime = imageMimeFor(rel);
-        if (mime) {
-          return json({ kind: "image", path: rel, size: st.size, mtimeMs, mime });
         }
         const buf = await readFile(abs);
         if (isBinary(buf)) {
@@ -364,7 +376,8 @@ export function projectFilesRoutes(deps: ProjectFilesDeps = {}): Route[] {
           return notFound();
         }
         if (!st.isFile()) return badRequest("not a file");
-        const mime = imageMimeFor(rel) ?? "application/octet-stream";
+        const mime =
+          imageMimeFor(rel) ?? (isPdf(rel) ? "application/pdf" : "application/octet-stream");
         // Images load via <img>, which never runs scripts. These headers also
         // neuter the edge case of navigating directly to a raw SVG URL (SVG can
         // embed <script>): nosniff stops MIME guessing, and the CSP blocks any
