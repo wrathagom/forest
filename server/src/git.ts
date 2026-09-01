@@ -281,6 +281,22 @@ export async function gitMerge(
   throw new Error(firstLine(merge.stderr) || `git merge exited ${merge.code}`);
 }
 
+/**
+ * True when `branch` is fully contained in `base` (a real merge makes the
+ * branch an ancestor of base). Runs `git merge-base --is-ancestor`, which exits
+ * 0 for ancestor, 1 for not-ancestor. Any other/error exit is treated as
+ * not-merged so detection never blocks a completion.
+ */
+export async function gitIsMerged(
+  cwd: string,
+  branch: string,
+  base: string,
+  run: RunGit = defaultRunGit,
+): Promise<boolean> {
+  const r = await run(["merge-base", "--is-ancestor", branch, base], cwd);
+  return r.code === 0;
+}
+
 /** Unified diff of everything on `branch` since it diverged from `base`. */
 export async function gitRangeDiff(
   cwd: string,
