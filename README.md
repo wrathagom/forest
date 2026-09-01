@@ -138,6 +138,39 @@ sort first in search results), so position is what tells you.
 
 Both the preset and the color-by choice are per-device, in `localStorage`.
 
+### Project lifecycle (`forest.yaml`)
+
+Drop a `forest.yaml` at a project's repo root to teach Forest how to launch,
+stop, and health-check it:
+
+```yaml
+# forest.yaml
+start:  docker compose up -d          # required for a Start button
+stop:   docker compose down           # required for a Stop button
+health: curl -fsS localhost:3000/up   # optional; exit 0 = healthy, nonzero = errors
+```
+
+Each value is a single shell command run from the project directory. Ask Claude
+or Codex to write this file for you — "add a forest.yaml that starts and stops
+this project."
+
+The file is **inert until you enable lifecycle** for that project (a one-click
+**Enable lifecycle** button on the project page). This is the security boundary:
+Forest scans every repo under your scan root, so no discovered `forest.yaml`
+runs anything until you opt it in.
+
+Once enabled, the project page gets **Start** / **Stop** buttons, and Forest
+reports a **lifecycle** status you can color cards by (the dashboard **color by**
+dropdown):
+
+- **stopped** — nothing running.
+- **running** — something is up (no health command to judge it).
+- **healthy** — up and the `health` command exits 0.
+- **errors** — up but the `health` command exits nonzero.
+
+"Up" is decided by Forest's existing container/process detection, and the health
+command only runs on a project that's already up.
+
 ### Theming
 
 Forest ships 16 themes — Catppuccin (Latte, Frappé, Macchiato, Mocha), Rosé Pine
