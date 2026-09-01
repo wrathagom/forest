@@ -69,7 +69,6 @@ export default function FileTreePanel(props: {
   entries: TreeEntry[];
   highlightedPaths: string[];
   onOpenFile: (path: string) => void;
-  onOpenDiff: (path: string) => void;
   onOpenFileRight: (path: string) => void;
 }) {
   const [expanded, setExpanded] = createSignal<Set<string>>(
@@ -133,15 +132,10 @@ export default function FileTreePanel(props: {
   };
 
   const onFileClick = (node: Node, e: MouseEvent) => {
-    // Alt-click pins the file to the right pane. This must be checked BEFORE the
-    // git-status branch below: only `file:` tabs may be pinned, so alt-clicking a
-    // modified file has to open the file, not its diff.
-    if (e.altKey) {
-      props.onOpenFileRight(node.path);
-      return;
-    }
-    // "!" marks a gitignored file — open it normally; ignored files have no diff.
-    if (node.gitStatus && node.gitStatus !== "!") props.onOpenDiff(node.path);
+    // Clicking any file — changed or not — opens it in the editor. A changed
+    // file surfaces its own "view diff" button in the editor header; the diff
+    // is no longer the default. Alt-click still pins the file to the right pane.
+    if (e.altKey) props.onOpenFileRight(node.path);
     else props.onOpenFile(node.path);
   };
 

@@ -436,6 +436,14 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 
 /* file editor */
 .file-editor { height: 100%; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.file-editor-bar {
+  padding: 0.3rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.file-editor-bar .panel-retry { margin-left: 0; }
 .file-editor-host { flex: 1; min-height: 0; min-width: 0; }
 .file-editor-placeholder { padding: 2rem; color: var(--fg-dim); text-align: center; }
 .file-editor-image {
