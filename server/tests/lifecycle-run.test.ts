@@ -31,4 +31,15 @@ describe("runCommand", () => {
     expect(r.timedOut).toBe(true);
     expect(r.exitCode).not.toBe(0);
   });
+
+  test("resolves promptly even when the command backgrounds a child that inherits the pipe", async () => {
+    const started = Date.now();
+    // `(sleep 5 &)` leaves a grandchild holding the stdout pipe open; the command
+    // itself (echo + exit) returns immediately. runCommand must not wait for the
+    // grandchild.
+    const r = await runCommand("(sleep 5 &) ; echo ready", process.cwd(), { timeoutMs: 10_000 });
+    expect(r.exitCode).toBe(0);
+    expect(r.output).toContain("ready");
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
 });
