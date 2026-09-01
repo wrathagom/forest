@@ -15,6 +15,7 @@ function project(over: Partial<ProjectRow> = {}): ProjectRow {
     snapshot: {
       git: { branch: "main", dirty: false, changed: 0, ahead: 0, behind: 0, lastCommit: null },
       lastEdit: NOW, services: { docker: [], processes: [] }, errors: [],
+      lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
     },
     ...over,
   };
