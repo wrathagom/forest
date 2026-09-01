@@ -73,6 +73,7 @@ export default function Sessions() {
 
   const [stats] = createResource(fetchSessionsStats);
   let inflight: AbortController | null = null;
+  onCleanup(() => inflight?.abort()); // don't leave a search running when the page unmounts
   const [page] = createResource(
     () => ({ q: debounced(), project: project(), profile: profile(), sort: sort(), dir: dir(), offset: offset() }),
     async (key): Promise<SessionsOverviewResponse | undefined> => {
