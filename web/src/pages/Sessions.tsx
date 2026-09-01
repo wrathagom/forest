@@ -5,12 +5,14 @@ import {
   fetchSessionsStats,
   type SessionListRow,
   type SessionsSort,
+  type SessionsOverviewResponse,
 } from "../api";
 import RelativeTime from "../components/RelativeTime";
 import TokensOverTimeChart from "../components/charts/TokensOverTimeChart";
 import TokensByProjectChart from "../components/charts/TokensByProjectChart";
 import TokensByProfileChart from "../components/charts/TokensByProfileChart";
 import { profileColorMap } from "../components/charts/profileColors";
+import PhrasesTab from "../components/PhrasesTab";
 
 const PAGE = 50;
 
@@ -39,6 +41,7 @@ const COLUMNS: Array<{ key: SessionsSort | null; label: string }> = [
 
 export default function Sessions() {
   const nav = useNavigate();
+  const [tab, setTab] = createSignal<"sessions" | "phrases">("sessions");
   const [query, setQuery] = createSignal("");
   const [debounced, setDebounced] = createSignal("");
   const [project, setProject] = createSignal("");          // "" all, "none" unassigned, else project id
@@ -71,18 +74,30 @@ export default function Sessions() {
   });
 
   const [stats] = createResource(fetchSessionsStats);
+  let inflight: AbortController | null = null;
+  onCleanup(() => inflight?.abort()); // don't leave a search running when the page unmounts
   const [page] = createResource(
     () => ({ q: debounced(), project: project(), profile: profile(), sort: sort(), dir: dir(), offset: offset() }),
-    (key) =>
-      fetchSessionsOverview({
-        q: key.q || undefined,
-        project: key.project || undefined,
-        profile: key.profile || undefined,
-        sort: key.sort,
-        dir: key.dir,
-        limit: PAGE,
-        offset: key.offset,
-      }),
+    async (key): Promise<SessionsOverviewResponse | undefined> => {
+      inflight?.abort();
+      const ctrl = new AbortController();
+      inflight = ctrl;
+      try {
+        return await fetchSessionsOverview({
+          q: key.q || undefined,
+          project: key.project || undefined,
+          profile: key.profile || undefined,
+          sort: key.sort,
+          dir: key.dir,
+          limit: PAGE,
+          offset: key.offset,
+          signal: ctrl.signal,
+        });
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") return undefined; // superseded by a newer query
+        throw err;
+      }
+    },
   );
 
   // Accumulate results as pages load
@@ -128,8 +143,19 @@ export default function Sessions() {
 
   return (
     <div class="sessions-page page">
-      <h2 class="section-title">sessions</h2>
+      <div class="sessions-tabbar">
+        <h2 class="section-title">sessions</h2>
+        <div class="sessions-tabs">
+          <button type="button" classList={{ active: tab() === "sessions" }} onclick={() => setTab("sessions")}>sessions</button>
+          <button type="button" classList={{ active: tab() === "phrases" }} onclick={() => setTab("phrases")}>phrases</button>
+        </div>
+      </div>
 
+      <Show when={tab() === "phrases"}>
+        <PhrasesTab />
+      </Show>
+
+      <Show when={tab() === "sessions"}>
       <Show when={stats()}>
         {(s) => (
           <p class="muted sessions-totals">
@@ -294,6 +320,7 @@ export default function Sessions() {
             </Show>
           </div>
         </Show>
+      </Show>
       </Show>
     </div>
   );

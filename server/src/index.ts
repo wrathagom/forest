@@ -56,6 +56,9 @@ import { defaultRunGh } from "./gh";
 import { mobileRoutes } from "./routes/mobile";
 import { createCaffeinate } from "./caffeinate";
 import { caffeinateRoutes } from "./routes/caffeinate";
+import { PhraseStore } from "./phrases/store";
+import { PhraseIndexBuilder } from "./phrases/builder";
+import { phrasesRoutes } from "./routes/phrases";
 import { LifecycleRegistry } from "./lifecycle/registry";
 import { readConfig } from "./lifecycle/config";
 import { runCommand } from "./lifecycle/run";
@@ -150,6 +153,8 @@ const port = parseInt(process.env.FOREST_PORT ?? "52810", 10);
 const staticDir = process.env.FOREST_STATIC_DIR ?? join(dirname(new URL(import.meta.url).pathname), "../../web/dist");
 
 const vault = new Vault(db);
+const phraseStore = new PhraseStore(db);
+const phraseBuilder = new PhraseIndexBuilder(db);
 
 const bbsClient = new BbsClient({ baseUrl: getBbsConfig(db).baseUrl });
 bbsPublisher = new BbsPublisher({
@@ -294,6 +299,7 @@ startServer({
       summarizer,
     }),
     ...sessionsOverviewRoutes({ vault }),
+    ...phrasesRoutes({ store: phraseStore, builder: phraseBuilder }),
     ...worktreeRoutes(),
     ...projectTaskRoutes({ sessions, runGit: defaultRunGit, runGh: defaultRunGh }),
     ...mobileRoutes({ runner, vault, liveSessions, listProjects: projectsForRunner, projectName: projectNameById }),
@@ -303,3 +309,17 @@ startServer({
 
 loop.start();
 log("info", "forest started", { port, staticDir });
+
+// Build the phrase index on startup when it is stale (never built, too old, or
+// enough new messages have arrived). Cooperative + fire-and-forget: it yields to
+// the event loop between batches, so the server serves requests while it runs.
+try {
+  if (phraseBuilder.isStale()) {
+    void phraseBuilder
+      .rebuild()
+      .then(() => log("info", "phrases: index built", phraseBuilder.status()))
+      .catch((err) => log("warn", "phrases: initial build failed", { error: (err as Error).message }));
+  }
+} catch (err) {
+  log("warn", "phrases: stale check failed", { error: (err as Error).message });
+}

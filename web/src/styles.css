@@ -1262,6 +1262,19 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
   }
 }
 
+.sessions-tabbar { display: flex; align-items: baseline; gap: 1rem; }
+.sessions-tabs { display: flex; gap: 2px; }
+.sessions-tabs button,
+.phrases-sort button { background: none; border: none; padding: 4px 10px; cursor: pointer; color: inherit; opacity: 0.6; border-radius: 4px; }
+.sessions-tabs button.active,
+.phrases-sort button.active { opacity: 1; font-weight: 600; background: rgba(128, 128, 128, 0.15); }
+.phrases-controls { display: flex; align-items: center; gap: 1rem; margin: 0.75rem 0; flex-wrap: wrap; }
+.phrases-status { display: inline-flex; align-items: center; gap: 0.5rem; }
+.phrases-spark { color: #888; vertical-align: middle; }
+.phrase-occurrences td { background: rgba(128, 128, 128, 0.06); }
+.phrase-occurrence { padding: 4px 8px; display: flex; gap: 0.75rem; align-items: baseline; }
+.phrase-snippet mark { background: rgba(255, 213, 0, 0.35); }
+
 /* PDF viewer — mirrors the file-editor image/zoom control styling. */
 .file-editor-pdf {
   position: relative;

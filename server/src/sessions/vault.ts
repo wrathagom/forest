@@ -9,6 +9,28 @@ import type {
   FtsEntry,
 } from "./parser";
 
+// Whether a cwd exists is stat'd on read (see refreshCwdExists). A single search
+// can return dozens of rows sharing few cwds, and searches repeat as the user
+// types — so cache the stat with a short TTL to keep it off the hot path.
+// NOTE (tests): this cache and existsFn are module-level, so under `bun test`
+// (one process for all files) they persist across test files. Any suite that
+// mutates a real dir at a reused cwd path must reset via __resetExistsForTest.
+let existsFn: (p: string) => boolean = existsSync;
+const cwdExistsCache = new Map<string, { exists: number; at: number }>();
+const CWD_TTL_MS = 5_000;
+
+/** Test seam: override the existence check. */
+export function __setExistsForTest(fn: (p: string) => boolean): void {
+  existsFn = fn;
+  cwdExistsCache.clear();
+}
+
+/** Test seam: restore the real existence check and clear the cache. */
+export function __resetExistsForTest(): void {
+  existsFn = existsSync;
+  cwdExistsCache.clear();
+}
+
 export type IngestSource =
   | "scan"
   | "hook:precompact"
@@ -544,14 +566,19 @@ export class Vault {
   // lives under the Claude config dir rather than inside the worktree it ran
   // in, so deleting a worktree leaves its mtime untouched and the scanner skips
   // it — the row would report cwd_exists = 1 forever. Derive it on read instead.
-  // Sessions sharing a cwd are stat'd once.
+  // Sessions sharing a cwd are stat'd at most once per TTL window (see
+  // cwdExistsCache above), not just once per call — searches repeat as the
+  // user types and would otherwise re-stat the same paths on every keystroke.
   private refreshCwdExists(rows: Array<{ cwd: string; cwd_exists: number }>): void {
-    const seen = new Map<string, number>();
+    const now = Date.now();
     for (const row of rows) {
-      let exists = seen.get(row.cwd);
-      if (exists === undefined) {
-        exists = existsSync(row.cwd) ? 1 : 0;
-        seen.set(row.cwd, exists);
+      const cached = cwdExistsCache.get(row.cwd);
+      let exists: number;
+      if (cached && now - cached.at < CWD_TTL_MS) {
+        exists = cached.exists;
+      } else {
+        exists = existsFn(row.cwd) ? 1 : 0;
+        cwdExistsCache.set(row.cwd, { exists, at: now });
       }
       row.cwd_exists = exists;
     }
