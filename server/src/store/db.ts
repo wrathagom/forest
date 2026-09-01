@@ -151,6 +151,16 @@ const SCHEMA = `
     source_last_activity  INTEGER NOT NULL,
     source_message_count  INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS agent_ngrams (
+    agent   TEXT NOT NULL,
+    n       INTEGER NOT NULL,
+    phrase  TEXT NOT NULL,
+    month   TEXT NOT NULL,        -- 'YYYY-MM' bucket of the message timestamp
+    count   INTEGER NOT NULL,
+    PRIMARY KEY (agent, n, phrase, month)
+  );
+  CREATE INDEX IF NOT EXISTS idx_ngrams_lookup ON agent_ngrams(agent, n);
 `;
 
 // IMPORTANT: table, column, and decl must be literal (hard-coded) strings — they are interpolated directly into SQL, not parameterised.
