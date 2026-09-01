@@ -2,6 +2,7 @@ import { json, badRequest } from "../server";
 import type { Route } from "../server";
 import type { PhraseStore } from "../phrases/store";
 import type { PhraseIndexBuilder } from "../phrases/builder";
+import { AGENT } from "../phrases/builder";
 
 export type PhrasesDeps = { store: PhraseStore; builder: PhraseIndexBuilder };
 
@@ -23,7 +24,7 @@ export function phrasesRoutes(deps: PhrasesDeps): Route[] {
         const offset = Math.max(intParam(sp.get("offset"), 0), 0);
         return json(
           deps.store.leaderboard({
-            agent: "claude",
+            agent: AGENT,
             n,
             from: sp.get("from") ?? undefined,
             to: sp.get("to") ?? undefined,
@@ -43,7 +44,7 @@ export function phrasesRoutes(deps: PhrasesDeps): Route[] {
         if (!phrase) return badRequest("phrase required");
         const limit = Math.min(Math.max(intParam(sp.get("limit"), 50), 1), 200);
         const offset = Math.max(intParam(sp.get("offset"), 0), 0);
-        return json({ occurrences: deps.store.occurrences({ phrase, agent: "claude", limit, offset }) });
+        return json({ occurrences: deps.store.occurrences({ phrase, agent: AGENT, limit, offset }) });
       },
     },
     {

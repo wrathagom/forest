@@ -71,12 +71,12 @@ export default function PhrasesTab() {
           <button type="button" classList={{ active: sort() === "trending" }} onclick={() => setSort("trending")}>trending</button>
         </div>
         <span class="phrases-status muted">
-          <Show when={status()} fallback="index not built">
+          <Show when={status()}>
             {(s) => (
-              <>
+              <Show when={s().lastBuiltAt !== null} fallback={<>index not built</>}>
                 built <RelativeTime ms={s().lastBuiltAt} /> · {s().rowCount} phrases
                 <Show when={s().staleNewMsgs > 0}> · {s().staleNewMsgs} new</Show>
-              </>
+              </Show>
             )}
           </Show>
           <button type="button" class="phrases-rebuild" onclick={doRebuild} disabled={status()?.building}>

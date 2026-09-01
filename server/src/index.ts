@@ -289,9 +289,13 @@ log("info", "forest started", { port, staticDir });
 // Build the phrase index on startup when it is stale (never built, too old, or
 // enough new messages have arrived). Cooperative + fire-and-forget: it yields to
 // the event loop between batches, so the server serves requests while it runs.
-if (phraseBuilder.isStale()) {
-  void phraseBuilder
-    .rebuild()
-    .then(() => log("info", "phrases: index built", phraseBuilder.status()))
-    .catch((err) => log("warn", "phrases: initial build failed", { error: (err as Error).message }));
+try {
+  if (phraseBuilder.isStale()) {
+    void phraseBuilder
+      .rebuild()
+      .then(() => log("info", "phrases: index built", phraseBuilder.status()))
+      .catch((err) => log("warn", "phrases: initial build failed", { error: (err as Error).message }));
+  }
+} catch (err) {
+  log("warn", "phrases: stale check failed", { error: (err as Error).message });
 }

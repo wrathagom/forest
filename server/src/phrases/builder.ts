@@ -18,7 +18,7 @@ export type PhraseStatus = {
   staleNewMsgs: number;
 };
 
-const AGENT = "claude"; // MVP: Claude only. Codex reuses this builder later.
+export const AGENT = "claude"; // MVP: Claude only. Codex reuses this builder later.
 
 // Intended to be constructed once and held for the life of the process (e.g.
 // a singleton on app startup). The `building` guard is per-instance state, so

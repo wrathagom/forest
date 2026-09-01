@@ -89,19 +89,30 @@ export class PhraseStore {
     const limit = Math.min(Math.max(opts.limit, 1), 200);
     const offset = Math.max(opts.offset, 0);
     const match = `"${opts.phrase.replace(/"/g, '""')}"`;
+    const needle = opts.phrase.toLowerCase();
+    // The FTS index is porter-stemmed, so MATCH over-matches inflections
+    // ("matters" also hits "mattered"). Use it as a fast prefilter, then keep
+    // only candidates whose stored text literally contains the phrase. Cap the
+    // candidate scan since the phrase is rare.
+    const CANDIDATE_CAP = 500;
     try {
-      return this.db
-        .query<PhraseOccurrence, [string, string, number, number]>(
+      const rows = this.db
+        .query<PhraseOccurrence & { text: string }, [string, string, number]>(
           `SELECT s.session_id AS session_id, s.project_id AS project_id, m.timestamp AS timestamp,
+                  agent_messages_fts.text AS text,
                   snippet(agent_messages_fts, 2, '<mark>', '</mark>', '…', 12) AS snippet
              FROM agent_messages_fts
              JOIN agent_messages m ON m.id = agent_messages_fts.message_id
              JOIN agent_sessions s ON s.session_id = m.session_id
             WHERE agent_messages_fts MATCH ? AND m.role = 'assistant' AND s.agent = ?
             ORDER BY m.timestamp DESC
-            LIMIT ? OFFSET ?`,
+            LIMIT ?`,
         )
-        .all(match, opts.agent, limit, offset);
+        .all(match, opts.agent, CANDIDATE_CAP);
+      return rows
+        .filter((r) => r.text.toLowerCase().includes(needle))
+        .slice(offset, offset + limit)
+        .map(({ text, ...o }) => o);
     } catch (err) {
       // A balanced quoted phrase can still trip FTS5 on pathological input; only
       // swallow that. Anything else is a real bug and should surface.

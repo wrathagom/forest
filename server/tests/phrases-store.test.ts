@@ -109,4 +109,21 @@ describe("PhraseStore.occurrences", () => {
     const store = new PhraseStore(db);
     expect(() => store.occurrences({ phrase: 'say "hi" now', agent: "claude", limit: 10, offset: 0 })).not.toThrow();
   });
+
+  test("excludes stemmed near-matches that lack the literal phrase", () => {
+    const db = openDb(":memory:");
+    const v = new Vault(db);
+    v.upsertSession({ session_id: "s1", agent: "claude", cwd: "/tmp", project_id: null, last_activity: 1, source: "scan" });
+    v.upsertMessages(
+      [{ session_id: "s1", uuid: "lit", role: "assistant", content: "{}", timestamp: 2000, model: null, input_tokens: null, cache_create_tokens: null, cache_read_tokens: null, output_tokens: null, stop_reason: null }],
+      [{ uuid: "lit", text: "we built it in a way that matters" }],
+    );
+    v.upsertMessages(
+      [{ session_id: "s1", uuid: "inf", role: "assistant", content: "{}", timestamp: 1000, model: null, input_tokens: null, cache_create_tokens: null, cache_read_tokens: null, output_tokens: null, stop_reason: null }],
+      [{ uuid: "inf", text: "we built it in a way that mattered" }],
+    );
+    const store = new PhraseStore(db);
+    const hits = store.occurrences({ phrase: "in a way that matters", agent: "claude", limit: 10, offset: 0 });
+    expect(hits.length).toBe(1); // the inflected "mattered" message is filtered out
+  });
 });
