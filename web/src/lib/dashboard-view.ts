@@ -8,7 +8,7 @@ export const VIEW_PRESETS: ViewPreset[] = ["compact", "status", "detail"];
 
 /** `bare` renders borderless and unlabelled — used only for the age chip. */
 export type ChipTone =
-  | "neutral" | "dirty" | "ahead" | "behind" | "running" | "agent" | "bare";
+  | "neutral" | "dirty" | "ahead" | "behind" | "running" | "agent" | "bare" | "error";
 
 export type Chip = { key: string; label: string; tone: ChipTone; title?: string };
 export type DetailRow = { label: string; value: string };
@@ -94,6 +94,24 @@ export function statusChips(p: ProjectRow, now: number): Chip[] {
     chips.push({
       key: "agents", label: `🤖 ${total}`, tone: "agent",
       title: p.liveAgents.map((a) => `${a.count} ${a.agent}`).join(", "),
+    });
+  }
+
+  const lc = p.snapshot?.lifecycle;
+  if (lc && lc.status !== "none") {
+    const toneByStatus: Record<string, ChipTone> = {
+      healthy: "running",
+      running: "running",
+      errors: "error",
+      stopped: "neutral",
+      starting: "neutral",
+      stopping: "neutral",
+    };
+    chips.push({
+      key: "lifecycle",
+      label: lc.status,
+      tone: toneByStatus[lc.status] ?? "neutral",
+      title: "forest.yaml lifecycle",
     });
   }
 
