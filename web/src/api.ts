@@ -214,6 +214,7 @@ export type TreeEntry = {
 export type FileResponse =
   | { kind: "text"; path: string; content: string; mtimeMs: number; sha: string; language: string }
   | { kind: "image"; path: string; size: number; mtimeMs: number; mime: string }
+  | { kind: "pdf"; path: string; size: number; mtimeMs: number }
   | { kind: "binary"; path: string; size: number; mtimeMs: number }
   | { kind: "too-large"; path: string; size: number; mtimeMs: number };
 
