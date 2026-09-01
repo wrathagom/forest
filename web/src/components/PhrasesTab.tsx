@@ -1,4 +1,4 @@
-import { For, Show, createResource, createSignal } from "solid-js";
+import { For, Show, createEffect, createResource, createSignal, onCleanup } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import {
   fetchPhrases,
@@ -41,6 +41,14 @@ export default function PhrasesTab() {
   const [occurrences] = createResource(expanded, (phrase) =>
     phrase ? fetchPhraseOccurrences(phrase) : Promise.resolve({ occurrences: [] as PhraseOccurrence[] }),
   );
+
+  // While a rebuild is running, poll status so the UI flips back to "done"
+  // without a manual reload (the rebuild POST is fire-and-forget).
+  createEffect(() => {
+    if (!status()?.building) return;
+    const id = setInterval(() => void refetchStatus(), 2000);
+    onCleanup(() => clearInterval(id));
+  });
 
   const doRebuild = async () => {
     await rebuildPhrases();
@@ -95,7 +103,7 @@ export default function PhrasesTab() {
                     <Show when={expanded() === row.phrase}>
                       <tr class="phrase-occurrences">
                         <td colspan="3">
-                          <Show when={occurrences()} fallback={<span class="muted">loading occurrences…</span>}>
+                          <Show when={!occurrences.loading && occurrences()} fallback={<span class="muted">loading occurrences…</span>}>
                             <For each={occurrences()!.occurrences} fallback={<span class="muted">no occurrences found</span>}>
                               {(o: PhraseOccurrence) => (
                                 <div
