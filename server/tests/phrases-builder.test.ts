@@ -25,6 +25,10 @@ function seed(db: ReturnType<typeof openDb>): Vault {
     [{ session_id: "s1", uuid: "m2", role: "assistant", content: assistantLine("in a way that matters."), timestamp: juneTs, model: null, input_tokens: null, cache_create_tokens: null, cache_read_tokens: null, output_tokens: null, stop_reason: null }],
     [{ uuid: "m2", text: "in a way that matters." }],
   );
+  v.upsertMessages(
+    [{ session_id: "s1", uuid: "m3", role: "assistant", content: assistantLine("frankly this rarely happens twice."), timestamp: juneTs, model: null, input_tokens: null, cache_create_tokens: null, cache_read_tokens: null, output_tokens: null, stop_reason: null }],
+    [{ uuid: "m3", text: "frankly this rarely happens twice." }],
+  );
   return v;
 }
 
@@ -40,9 +44,12 @@ describe("PhraseIndexBuilder.rebuild", () => {
     ).get("in a way that matters", 5);
     expect(row?.count).toBe(3);
 
-    // A rare phrase below the threshold is pruned.
-    const rare = db.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM agent_ngrams WHERE phrase = 'way that matters here'").get();
-    expect(rare?.count).toBe(0);
+    // A real sub-threshold phrase (appears once, < minTotal) is pruned.
+    const pruned = db.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM agent_ngrams WHERE phrase = 'rarely happens twice'").get();
+    expect(pruned?.count).toBe(0);
+    // The above-threshold phrase survives.
+    const kept = db.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM agent_ngrams WHERE phrase = 'in a way that matters'").get();
+    expect(kept?.count).toBe(1);
 
     // All rows are bucketed to June 2026.
     const months = db.query<{ month: string }, []>("SELECT DISTINCT month FROM agent_ngrams").all().map((r) => r.month);

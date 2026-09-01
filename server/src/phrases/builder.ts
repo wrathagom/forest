@@ -20,6 +20,9 @@ export type PhraseStatus = {
 
 const AGENT = "claude"; // MVP: Claude only. Codex reuses this builder later.
 
+// Intended to be constructed once and held for the life of the process (e.g.
+// a singleton on app startup). The `building` guard is per-instance state, so
+// multiple instances would not see each other's in-flight rebuild.
 export class PhraseIndexBuilder {
   private building = false;
   private readonly minTotal: number;
@@ -97,10 +100,10 @@ export class PhraseIndexBuilder {
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(agent, n, phrase, month) DO UPDATE SET count = count + excluded.count`,
       );
-      const select = db.query<{ id: number; content: string; timestamp: number }, [number, number]>(
+      const select = db.query<{ id: number; content: string; timestamp: number }, [string, number, number]>(
         `SELECT m.id, m.content, m.timestamp
            FROM agent_messages m JOIN agent_sessions s ON s.session_id = m.session_id
-          WHERE m.role = 'assistant' AND s.agent = 'claude' AND m.id > ?
+          WHERE m.role = 'assistant' AND s.agent = ? AND m.id > ?
           ORDER BY m.id ASC
           LIMIT ?`,
       );
@@ -108,7 +111,7 @@ export class PhraseIndexBuilder {
       let lastId = 0;
       let maxId = 0;
       for (;;) {
-        const batch = select.all(lastId, this.batchSize);
+        const batch = select.all(AGENT, lastId, this.batchSize);
         if (batch.length === 0) break;
         // Accumulate this batch in a local map to bound memory, then flush.
         const local = new Map<string, { n: number; phrase: string; month: string; count: number }>();
@@ -124,7 +127,7 @@ export class PhraseIndexBuilder {
           }
         }
         const flush = db.transaction(() => {
-          for (const e of local.values()) upsert.run("claude", e.n, e.phrase, e.month, e.count);
+          for (const e of local.values()) upsert.run(AGENT, e.n, e.phrase, e.month, e.count);
         });
         flush();
         await new Promise((r) => setTimeout(r, 0)); // yield between batches
@@ -143,13 +146,15 @@ export class PhraseIndexBuilder {
                  ON k.agent = b.agent AND k.n = b.n AND k.phrase = b.phrase`,
         ).run(this.minTotal);
         db.exec("DROP TABLE IF EXISTS agent_ngrams_build");
+
+        // Bookkeeping commits with the swap so agent_ngrams and its
+        // phrases.* watermark can never observe each other mid-update.
+        const rowCount = db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM agent_ngrams").get()!.n;
+        setConfig(db, "phrases.lastBuiltAt", String(Date.now()));
+        setConfig(db, "phrases.builtThroughMsgId", String(maxId));
+        setConfig(db, "phrases.rowCount", String(rowCount));
       });
       swap();
-
-      const rowCount = db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM agent_ngrams").get()!.n;
-      setConfig(db, "phrases.lastBuiltAt", String(Date.now()));
-      setConfig(db, "phrases.builtThroughMsgId", String(maxId));
-      setConfig(db, "phrases.rowCount", String(rowCount));
     } finally {
       this.building = false;
     }
