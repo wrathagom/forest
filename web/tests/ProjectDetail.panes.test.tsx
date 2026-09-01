@@ -36,6 +36,7 @@ vi.mock("../src/api", () => ({
 }));
 
 vi.mock("../src/components/ProjectHeader", () => ({ default: () => <div data-stub="ProjectHeader" /> }));
+vi.mock("../src/components/LifecyclePanel", () => ({ default: () => <div data-stub="LifecyclePanel" /> }));
 vi.mock("../src/components/TerminalView", () => ({ default: () => <div data-stub="TerminalView" /> }));
 // FileEditor stub records its path so we can count how many editors exist per path.
 // It also exposes a "view diff" button wired to onViewDiff, matching the real

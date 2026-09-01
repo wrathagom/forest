@@ -1,3 +1,5 @@
+import type { LifecycleStatus } from "../lifecycle/status";
+
 export type Snapshot = {
   git: {
     branch: string | null;
@@ -13,6 +15,12 @@ export type Snapshot = {
     processes: { pid: number; command: string; cwd: string; ports: number[] }[];
   };
   errors: string[];
+  lifecycle: {
+    status: LifecycleStatus;
+    hasConfig: boolean;
+    enabled: boolean;
+    health: { exitCode: number } | null;
+  };
 };
 
 export type GitProbe = (path: string, signal: AbortSignal) => Promise<Partial<Snapshot["git"]> & { lastEdit?: number | null; errors?: string[] }>;
@@ -33,5 +41,6 @@ export function emptySnapshot(): Snapshot {
     lastEdit: null,
     services: { docker: [], processes: [] },
     errors: [],
+    lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
   };
 }

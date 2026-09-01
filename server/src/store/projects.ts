@@ -8,6 +8,7 @@ export type Project = {
   pinned: boolean;
   hidden: boolean;
   group: string | null;
+  lifecycleEnabled: boolean;
   createdAt: number;
   updatedAt: number;
 };
@@ -19,6 +20,7 @@ type Row = {
   pinned: number;
   hidden: number;
   group_name: string | null;
+  lifecycle_enabled: number;
   created_at: number;
   updated_at: number;
 };
@@ -34,6 +36,7 @@ const fromRow = (r: Row): Project => ({
   pinned: r.pinned === 1,
   hidden: r.hidden === 1,
   group: r.group_name,
+  lifecycleEnabled: r.lifecycle_enabled === 1,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -93,6 +96,7 @@ export type ProjectPatch = {
   hidden?: boolean;
   name?: string;
   group?: string | null;
+  lifecycleEnabled?: boolean;
 };
 
 export function updateProject(db: Database, id: string, patch: ProjectPatch): void {
@@ -113,6 +117,10 @@ export function updateProject(db: Database, id: string, patch: ProjectPatch): vo
   if (patch.group !== undefined) {
     sets.push("group_name = ?");
     args.push(patch.group);
+  }
+  if (patch.lifecycleEnabled !== undefined) {
+    sets.push("lifecycle_enabled = ?");
+    args.push(patch.lifecycleEnabled ? 1 : 0);
   }
   if (sets.length === 0) return;
   sets.push("updated_at = ?");

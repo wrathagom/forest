@@ -50,11 +50,11 @@ describe("DashboardToolbar", () => {
     expect(active[0]!.textContent).toBe("compact");
   });
 
-  test("offers all six color-by dimensions in order", () => {
+  test("offers all seven color-by dimensions in order", () => {
     const { container } = setup();
     const opts = [...container.querySelectorAll(".colorby-select option")]
       .map((o) => o.getAttribute("value"));
-    expect(opts).toEqual(["git", "heat", "services", "agents", "group", "none"]);
+    expect(opts).toEqual(["git", "heat", "services", "agents", "lifecycle", "group", "none"]);
   });
 
   test("renders the git legend by default", () => {

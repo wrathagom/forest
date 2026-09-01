@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "@solidjs/router";
 import { useProjects } from "../projects-context";
 import { listSessions, createSession, killSession, createWorktree, prepareResume, fetchConfig, type SessionRow } from "../api";
 import ProjectHeader from "../components/ProjectHeader";
+import LifecyclePanel from "../components/LifecyclePanel";
 import TabStrip from "../components/TabStrip";
 import type { LauncherEntry } from "../components/LauncherButton";
 import TerminalView from "../components/TerminalView";
@@ -351,7 +352,12 @@ export default function ProjectDetail() {
   return (
     <div class={`project-detail ${infoExpanded() ? "with-info" : ""}`}>
       <Show when={project()} fallback={<div class="muted" style={{ padding: "1.2rem" }}>loading project…</div>}>
-        {(p) => <ProjectHeader project={p()} />}
+        {(p) => (
+          <div class="detail-topbar">
+            <ProjectHeader project={p()} />
+            <LifecyclePanel projectId={p().id} />
+          </div>
+        )}
       </Show>
       <TabStrip
         tabs={tabs()}

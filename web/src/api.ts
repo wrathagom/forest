@@ -32,7 +32,49 @@ export type Snapshot = {
     processes: { pid: number; command: string; cwd: string; ports: number[] }[];
   };
   errors: string[];
+  lifecycle: {
+    status: LifecycleStatus;
+    hasConfig: boolean;
+    enabled: boolean;
+    health: { exitCode: number } | null;
+  };
 };
+
+export type LifecycleStatus =
+  | "none" | "stopped" | "running" | "healthy" | "errors" | "starting" | "stopping";
+
+export type LifecycleView = {
+  hasConfig: boolean;
+  enabled: boolean;
+  config: { start?: string; stop?: string; health?: string } | null;
+  status: LifecycleStatus;
+  lastRun: { kind: "start" | "stop"; exitCode: number; output: string; at: number; failed: boolean } | null;
+};
+
+export type LifecycleRunResult = { exitCode: number; output: string; timedOut: boolean; failed: boolean };
+
+export async function fetchLifecycle(id: string): Promise<LifecycleView> {
+  return unwrap(await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle`), "fetch lifecycle");
+}
+
+export async function setLifecycleEnabled(id: string, enabled: boolean): Promise<LifecycleView> {
+  return unwrap(
+    await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle/enable`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }),
+    "enable lifecycle",
+  );
+}
+
+export async function startLifecycle(id: string): Promise<LifecycleRunResult> {
+  return unwrap(await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle/start`, { method: "POST" }), "start lifecycle");
+}
+
+export async function stopLifecycle(id: string): Promise<LifecycleRunResult> {
+  return unwrap(await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle/stop`, { method: "POST" }), "stop lifecycle");
+}
 
 async function unwrap<T>(r: Response, label: string): Promise<T> {
   if (r.ok) {
