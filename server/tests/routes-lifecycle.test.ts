@@ -86,4 +86,43 @@ describe("lifecycle routes", () => {
     const res = await get.handler(ctx(db, new Request(`http://x/api/projects/nope/lifecycle`), { id: "nope" }) as never);
     expect(res.status).toBe(404);
   });
+
+  test("GET status reflects the last stored snapshot", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    // simulate a scan having stored a healthy lifecycle status
+    const { upsertSnapshot } = await import("../src/store/snapshots");
+    const { emptySnapshot } = await import("../src/scanner/types");
+    const snap = emptySnapshot();
+    snap.lifecycle = { status: "healthy", hasConfig: true, enabled: true, health: { exitCode: 0 } };
+    upsertSnapshot(db, id, snap);
+    const routes = lifecycleRoutes(deps());
+    const get = route(routes, "GET", /lifecycle$/);
+    const res = await get.handler(ctx(db, new Request(`http://x/api/projects/${id}/lifecycle`), { id }) as never);
+    expect((await res.json()).status).toBe("healthy");
+  });
+
+  test("a transient status overrides the stored snapshot", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const d = deps();
+    d.registry.setTransient(id, "starting");
+    const routes = lifecycleRoutes(d);
+    const get = route(routes, "GET", /lifecycle$/);
+    const res = await get.handler(ctx(db, new Request(`http://x/api/projects/${id}/lifecycle`), { id }) as never);
+    expect((await res.json()).status).toBe("starting");
+  });
+
+  test("start returns 409 when a command is already in flight", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const d = deps();
+    const routes = lifecycleRoutes(d);
+    const enable = route(routes, "POST", /lifecycle\/enable$/);
+    await enable.handler(ctx(db, new Request(`http://x/e`, { method: "POST", body: JSON.stringify({ enabled: true }) }), { id }) as never);
+    d.registry.setTransient(id, "starting"); // simulate an in-flight command
+    const start = route(routes, "POST", /lifecycle\/start$/);
+    const res = await start.handler(ctx(db, new Request(`http://x/s`, { method: "POST" }), { id }) as never);
+    expect(res.status).toBe(409);
+  });
 });

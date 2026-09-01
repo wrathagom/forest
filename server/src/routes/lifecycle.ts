@@ -2,6 +2,7 @@
 import { json, notFound, badRequest } from "../server";
 import type { Route } from "../server";
 import { getProjectById, updateProject } from "../store/projects";
+import { getSnapshotByProjectId } from "../store/snapshots";
 import { computeLifecycle } from "../lifecycle/status";
 import type { ForestConfig } from "../lifecycle/config";
 import type { LifecycleRegistry } from "../lifecycle/registry";
@@ -15,15 +16,21 @@ export type LifecycleRoutesDeps = {
 
 const START_STOP_TIMEOUT_MS = 120_000;
 
-function view(deps: LifecycleRoutesDeps, project: { id: string; path: string; lifecycleEnabled: boolean }) {
+function view(
+  deps: LifecycleRoutesDeps,
+  db: import("bun:sqlite").Database,
+  project: { id: string; path: string; lifecycleEnabled: boolean },
+) {
   const config = deps.readConfig(project.path);
   const transient = deps.registry.transient(project.id);
+  const stored = getSnapshotByProjectId(db, project.id);
   const status =
     transient ??
+    stored?.snapshot.lifecycle?.status ??
     computeLifecycle({
       enabled: project.lifecycleEnabled,
       hasConfig: config !== null,
-      servicesUp: false, // steady up/down comes from the scan snapshot, not this endpoint
+      servicesUp: false, // no snapshot yet — best-effort until the first scan
       health: null,
     });
   return {
@@ -44,7 +51,7 @@ export function lifecycleRoutes(deps: LifecycleRoutesDeps): Route[] {
       handler: (ctx) => {
         const project = getProjectById(ctx.db, ctx.params.id!);
         if (!project) return notFound();
-        return json(view(deps, project));
+        return json(view(deps, ctx.db, project));
       },
     },
     {
@@ -57,7 +64,8 @@ export function lifecycleRoutes(deps: LifecycleRoutesDeps): Route[] {
         const body = (await ctx.request.json().catch(() => ({}))) as { enabled?: boolean };
         if (typeof body.enabled !== "boolean") return badRequest("enabled (boolean) is required");
         updateProject(ctx.db, project.id, { lifecycleEnabled: body.enabled });
-        return json(view(deps, { ...project, lifecycleEnabled: body.enabled }));
+        await ctx.loop.refresh(project.id).catch(() => null);
+        return json(view(deps, ctx.db, { ...project, lifecycleEnabled: body.enabled }));
       },
     },
     ...(["start", "stop"] as const).map((kind): Route => ({
