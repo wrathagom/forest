@@ -67,4 +67,26 @@ describe("augmentWithLifecycle", () => {
     });
     expect(s.lifecycle.status).toBe("none");
   });
+
+  test("enabled + docker container running counts as up -> healthy", async () => {
+    const s = emptySnapshot();
+    s.services.docker = [{ name: "web", state: "running", from: "compose" }];
+    const out = await augmentWithLifecycle(s, {
+      enabled: true,
+      config: { health: "true" },
+      runHealth: async () => ({ exitCode: 0 }),
+    });
+    expect(out.lifecycle.status).toBe("healthy");
+  });
+
+  test("a throwing health runner degrades to errors, not a rejection", async () => {
+    const s = emptySnapshot();
+    s.services.processes = [{ pid: 1, command: "node", cwd: "/x", ports: [3000] }];
+    const out = await augmentWithLifecycle(s, {
+      enabled: true,
+      config: { health: "boom" },
+      runHealth: async () => { throw new Error("spawn failed"); },
+    });
+    expect(out.lifecycle.status).toBe("errors");
+  });
 });

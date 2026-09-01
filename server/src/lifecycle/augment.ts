@@ -25,7 +25,12 @@ export async function augmentWithLifecycle(snap: Snapshot, input: AugmentInput):
   let health: { exitCode: number } | null = null;
 
   if (input.enabled && hasConfig && input.config!.health && up) {
-    health = await input.runHealth();
+    try {
+      health = await input.runHealth();
+    } catch {
+      // A failed-to-run health command is "up but unhealthy", not a scan failure.
+      health = { exitCode: 1 };
+    }
   }
 
   snap.lifecycle = {
