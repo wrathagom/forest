@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { gitInit, gitCommit, gitClone, type RunGit } from "../src/git";
+import { gitInit, gitCommit, gitClone, gitIsMerged, type RunGit } from "../src/git";
 
 function makeFakeRunGit() {
   const calls: { args: string[]; cwd: string }[] = [];
@@ -67,5 +67,26 @@ describe("gitClone", () => {
     const g = makeFakeRunGit();
     g.fail("fatal: repository 'x' not found");
     await expect(gitClone("git@host:x.git", "/dest", g.fake)).rejects.toThrow(/repository 'x' not found/);
+  });
+});
+
+describe("gitIsMerged", () => {
+  test("runs `merge-base --is-ancestor <branch> <base>` in cwd", async () => {
+    const g = makeFakeRunGit();
+    await gitIsMerged("/proj", "task/x", "main", g.fake);
+    expect(g.calls[0]!.args).toEqual(["merge-base", "--is-ancestor", "task/x", "main"]);
+    expect(g.calls[0]!.cwd).toBe("/proj");
+  });
+
+  test("true when git exits 0 (branch is an ancestor of base)", async () => {
+    const g = makeFakeRunGit();
+    g.succeed();
+    expect(await gitIsMerged("/proj", "task/x", "main", g.fake)).toBe(true);
+  });
+
+  test("false when git exits non-zero (not merged, or error)", async () => {
+    const g = makeFakeRunGit();
+    g.fail("not an ancestor");
+    expect(await gitIsMerged("/proj", "task/x", "main", g.fake)).toBe(false);
   });
 });
