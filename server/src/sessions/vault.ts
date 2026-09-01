@@ -12,6 +12,9 @@ import type {
 // Whether a cwd exists is stat'd on read (see refreshCwdExists). A single search
 // can return dozens of rows sharing few cwds, and searches repeat as the user
 // types — so cache the stat with a short TTL to keep it off the hot path.
+// NOTE (tests): this cache and existsFn are module-level, so under `bun test`
+// (one process for all files) they persist across test files. Any suite that
+// mutates a real dir at a reused cwd path must reset via __resetExistsForTest.
 let existsFn: (p: string) => boolean = existsSync;
 const cwdExistsCache = new Map<string, { exists: number; at: number }>();
 const CWD_TTL_MS = 5_000;
