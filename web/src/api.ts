@@ -536,6 +536,60 @@ export async function fetchSessionsStats(): Promise<SessionsStatsResponse> {
   return unwrap(await fetch("/api/sessions/stats"), "sessions stats");
 }
 
+export type PhraseMonth = { month: string; count: number };
+export type PhraseRow = {
+  phrase: string;
+  n: number;
+  count: number;
+  monthly: PhraseMonth[];
+  trendScore: number;
+};
+export type PhraseLeaderboard = { phrases: PhraseRow[]; total: number };
+export type PhraseOccurrence = {
+  session_id: string;
+  project_id: string | null;
+  timestamp: number;
+  snippet: string;
+};
+export type PhraseStatus = {
+  lastBuiltAt: number | null;
+  rowCount: number;
+  building: boolean;
+  staleNewMsgs: number;
+};
+
+export async function fetchPhrases(opts: {
+  n: number;
+  from?: string;
+  to?: string;
+  sort: "count" | "trending";
+  limit?: number;
+  offset?: number;
+  signal?: AbortSignal;
+}): Promise<PhraseLeaderboard> {
+  const sp = new URLSearchParams();
+  sp.set("n", String(opts.n));
+  sp.set("sort", opts.sort);
+  if (opts.from) sp.set("from", opts.from);
+  if (opts.to) sp.set("to", opts.to);
+  if (opts.limit !== undefined) sp.set("limit", String(opts.limit));
+  if (opts.offset !== undefined) sp.set("offset", String(opts.offset));
+  return unwrap(await fetch(`/api/phrases?${sp}`, { signal: opts.signal }), "phrases");
+}
+
+export async function fetchPhraseOccurrences(phrase: string, limit = 50): Promise<{ occurrences: PhraseOccurrence[] }> {
+  const sp = new URLSearchParams({ phrase, limit: String(limit) });
+  return unwrap(await fetch(`/api/phrases/occurrences?${sp}`), "phrase occurrences");
+}
+
+export async function fetchPhraseStatus(): Promise<PhraseStatus> {
+  return unwrap(await fetch("/api/phrases/status"), "phrase status");
+}
+
+export async function rebuildPhrases(): Promise<PhraseStatus> {
+  return unwrap(await fetch("/api/phrases/rebuild", { method: "POST" }), "rebuild phrases");
+}
+
 export type LiveSessionState = "working" | "waiting" | "stale";
 
 export type LiveSessionRow = {
