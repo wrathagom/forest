@@ -45,6 +45,8 @@ export class PhraseStore {
     limit: number;
     offset: number;
   }): PhraseLeaderboard {
+    const limit = Math.min(Math.max(opts.limit, 1), 200);
+    const offset = Math.max(opts.offset, 0);
     const where = ["agent = ?", "n = ?"];
     const params: unknown[] = [opts.agent, opts.n];
     if (opts.from) {
@@ -72,7 +74,7 @@ export class PhraseStore {
 
     const list: PhraseRow[] = [];
     for (const [phrase, monthly] of byPhrase) {
-      monthly.sort((a, b) => (a.month < b.month ? -1 : 1));
+      monthly.sort((a, b) => a.month.localeCompare(b.month));
       const count = monthly.reduce((s, m) => s + m.count, 0);
       list.push({ phrase, n: opts.n, count, monthly, trendScore: computeTrend(monthly, recentMonth) });
     }
@@ -80,10 +82,12 @@ export class PhraseStore {
     const keyOf = opts.sort === "trending" ? (r: PhraseRow) => r.trendScore : (r: PhraseRow) => r.count;
     list.sort((a, b) => keyOf(b) - keyOf(a) || b.count - a.count || (a.phrase < b.phrase ? -1 : 1));
 
-    return { phrases: list.slice(opts.offset, opts.offset + opts.limit), total: list.length };
+    return { phrases: list.slice(offset, offset + limit), total: list.length };
   }
 
   occurrences(opts: { phrase: string; agent: string; limit: number; offset: number }): PhraseOccurrence[] {
+    const limit = Math.min(Math.max(opts.limit, 1), 200);
+    const offset = Math.max(opts.offset, 0);
     const match = `"${opts.phrase.replace(/"/g, '""')}"`;
     try {
       return this.db
@@ -97,9 +101,12 @@ export class PhraseStore {
             ORDER BY m.timestamp DESC
             LIMIT ? OFFSET ?`,
         )
-        .all(match, opts.agent, opts.limit, opts.offset);
-    } catch {
-      return []; // FTS5 syntax error → treat as no matches (mirrors Vault.listAll)
+        .all(match, opts.agent, limit, offset);
+    } catch (err) {
+      // A balanced quoted phrase can still trip FTS5 on pathological input; only
+      // swallow that. Anything else is a real bug and should surface.
+      if (String(err).includes("fts5")) return [];
+      throw err;
     }
   }
 }
