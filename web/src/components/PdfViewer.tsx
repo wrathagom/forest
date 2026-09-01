@@ -46,8 +46,7 @@ export default function PdfViewer(props: { src: string }) {
 
     onCleanup(() => {
       cancelled = true;
-      void task.destroy();
-      void doc()?.destroy();
+      task.destroy().catch(() => {});
     });
   });
 
@@ -57,32 +56,43 @@ export default function PdfViewer(props: { src: string }) {
     const n = pageNum();
     const s = scale();
     if (!d) return;
+
     let cancelled = false;
+    let renderTask: { promise: Promise<unknown>; cancel: () => void } | undefined;
+    let textLayer: { render: () => Promise<void>; cancel: () => void } | undefined;
 
     d.getPage(n)
       .then(async (page) => {
         if (cancelled) return;
+        const dpr = window.devicePixelRatio || 1;
         const viewport = page.getViewport({ scale: s });
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {
+          setError("could not get a 2D canvas context");
+          return;
+        }
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        // Backing store scaled by DPR for crisp text; CSS size stays logical.
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
 
         // pdf.js's text layer positions glyphs using the --scale-factor var.
         textLayerDiv.style.setProperty("--scale-factor", String(s));
-        textLayerDiv.style.width = `${viewport.width}px`;
-        textLayerDiv.style.height = `${viewport.height}px`;
         textLayerDiv.replaceChildren();
 
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        renderTask = page.render({
+          canvasContext: ctx,
+          viewport,
+          transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+        });
+        await renderTask.promise;
         if (cancelled) return;
 
         const textContent = await page.getTextContent();
         if (cancelled) return;
-        const textLayer = new pdfjs.TextLayer({
+        textLayer = new pdfjs.TextLayer({
           textContentSource: textContent,
           container: textLayerDiv,
           viewport,
@@ -90,16 +100,19 @@ export default function PdfViewer(props: { src: string }) {
         await textLayer.render();
       })
       .catch((e) => {
+        // .cancel() rejects with RenderingCancelledException — expected, ignore it.
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       });
 
     onCleanup(() => {
       cancelled = true;
+      renderTask?.cancel();
+      textLayer?.cancel();
     });
   });
 
   const prev = () => setPageNum((p) => Math.max(1, p - 1));
-  const next = () => setPageNum((p) => Math.min(pageCount(), p + 1));
+  const next = () => setPageNum((p) => (pageCount() ? Math.min(pageCount(), p + 1) : p));
   const zoomIn = () => setScale((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)));
   const zoomOut = () => setScale((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)));
   const fit = () => setScale(1);
