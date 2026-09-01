@@ -353,10 +353,10 @@ export default function ProjectDetail() {
     <div class={`project-detail ${infoExpanded() ? "with-info" : ""}`}>
       <Show when={project()} fallback={<div class="muted" style={{ padding: "1.2rem" }}>loading project…</div>}>
         {(p) => (
-          <>
+          <div class="detail-topbar">
             <ProjectHeader project={p()} />
             <LifecyclePanel projectId={p().id} />
-          </>
+          </div>
         )}
       </Show>
       <TabStrip
