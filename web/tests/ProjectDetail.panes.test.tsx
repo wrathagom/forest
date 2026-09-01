@@ -36,10 +36,19 @@ vi.mock("../src/api", () => ({
 }));
 
 vi.mock("../src/components/ProjectHeader", () => ({ default: () => <div data-stub="ProjectHeader" /> }));
+vi.mock("../src/components/LifecyclePanel", () => ({ default: () => <div data-stub="LifecyclePanel" /> }));
 vi.mock("../src/components/TerminalView", () => ({ default: () => <div data-stub="TerminalView" /> }));
 // FileEditor stub records its path so we can count how many editors exist per path.
+// It also exposes a "view diff" button wired to onViewDiff, matching the real
+// editor's header button — this is now the only way to reach a diff.
 vi.mock("../src/components/FileEditor", () => ({
-  default: (p: { path: string }) => <div data-stub="FileEditor" data-path={p.path} />,
+  default: (p: { path: string; onViewDiff?: (path: string) => void }) => (
+    <div data-stub="FileEditor" data-path={p.path}>
+      <button data-stub="view-diff" onClick={() => p.onViewDiff?.(p.path)}>
+        view diff
+      </button>
+    </div>
+  ),
 }));
 vi.mock("../src/components/DiffView", () => ({ default: () => <div data-stub="DiffView" /> }));
 vi.mock("../src/components/CommitView", () => ({ default: () => <div data-stub="CommitView" /> }));
@@ -135,7 +144,8 @@ test("normal-clicking the pinned file never mounts two editors for it", async ()
 });
 
 test("the right pane stays pinned while the left navigates to a diff", async () => {
-  // A modified file so a plain click routes through onOpenDiff -> openDiff.
+  // A modified file: clicking it opens the editor, whose "view diff" button
+  // routes through onViewDiff -> openDiff.
   fetchTree.mockResolvedValue({
     entries: [
       { path: "a.ts", type: "file", gitStatus: null },
@@ -157,13 +167,21 @@ test("the right pane stays pinned while the left navigates to a diff", async () 
     container.querySelectorAll(`[data-stub="FileEditor"][data-path="${p}"]`).length;
   expect(editorsFor("b.ts")).toBe(1);
 
-  // Open a diff on the LEFT by plain-clicking the modified file in the tree.
+  // Click the modified file in the tree — it opens in the editor on the LEFT.
   const treeRow = (name: string) =>
     Array.from(container.querySelectorAll(".file-tree .tree-file")).find(
       (r) => r.querySelector(".tree-file-name")?.textContent === name,
     );
   await waitFor(() => expect(treeRow("modified.ts")).toBeTruthy());
   fireEvent.click(treeRow("modified.ts")!);
+
+  // Then use the editor's "view diff" button to navigate the left pane to a diff.
+  const editorFor = (p: string) =>
+    container.querySelector(`[data-stub="FileEditor"][data-path="${p}"]`);
+  await waitFor(() => expect(editorFor("modified.ts")).toBeTruthy());
+  fireEvent.click(
+    editorFor("modified.ts")!.querySelector('[data-stub="view-diff"]') as HTMLElement,
+  );
 
   // The navigation actually happened: the diff is now showing on the left.
   await waitFor(() => expect(container.querySelector('[data-stub="DiffView"]')).toBeTruthy());

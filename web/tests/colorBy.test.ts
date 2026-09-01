@@ -15,14 +15,15 @@ function project(over: Partial<ProjectRow> = {}): ProjectRow {
     snapshot: {
       git: { branch: "main", dirty: false, changed: 0, ahead: 0, behind: 0, lastCommit: null },
       lastEdit: NOW, services: { docker: [], processes: [] }, errors: [],
+      lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
     },
     ...over,
   };
 }
 
 describe("COLOR_BY_DIMENSIONS", () => {
-  test("exposes all six in order, git first", () => {
-    expect(COLOR_BY_DIMENSIONS).toEqual(["git", "heat", "services", "agents", "group", "none"]);
+  test("exposes all seven in order, git first", () => {
+    expect(COLOR_BY_DIMENSIONS).toEqual(["git", "heat", "services", "agents", "lifecycle", "group", "none"]);
   });
 });
 

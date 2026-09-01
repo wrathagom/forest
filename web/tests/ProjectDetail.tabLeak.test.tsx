@@ -16,6 +16,7 @@ const { listSessions, createSession, killSession, createWorktree, fetchConfig } 
 vi.mock("../src/api", () => ({ listSessions, createSession, killSession, createWorktree, fetchConfig }));
 
 vi.mock("../src/components/ProjectHeader", () => ({ default: () => <div data-stub="ProjectHeader" /> }));
+vi.mock("../src/components/LifecyclePanel", () => ({ default: () => <div data-stub="LifecyclePanel" /> }));
 vi.mock("../src/components/TerminalView", () => ({ default: () => <div data-stub="TerminalView" /> }));
 vi.mock("../src/components/FileEditor", () => ({ default: () => <div data-stub="FileEditor" /> }));
 vi.mock("../src/components/DiffView", () => ({ default: () => <div data-stub="DiffView" /> }));

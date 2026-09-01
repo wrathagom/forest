@@ -24,6 +24,7 @@ function statesFor(): ProjectRow[] {
     snapshot: {
       git: { branch: "main", dirty: false, changed: 0, ahead: 0, behind: 0, lastCommit: null },
       lastEdit: NOW, services: { docker: [], processes: [] }, errors: [],
+      lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
     },
   };
   const snap = base.snapshot!;
@@ -49,6 +50,11 @@ function statesFor(): ProjectRow[] {
     ...[0, 2, 10, 60, 200].map((d) => ({ ...base, snapshot: { ...snap, lastEdit: NOW - d * DAY } })),
     // every group hue, including the cycled one
     ...GROUPS.map((g) => ({ ...base, group: g })),
+    // every lifecycle status branch inside hueFor's "lifecycle" switch
+    ...(["healthy", "running", "errors", "starting", "stopping", "stopped"] as const).map((status) => ({
+      ...base,
+      snapshot: { ...snap, lifecycle: { status, hasConfig: true, enabled: true, health: null } },
+    })),
   ];
   return rows;
 }

@@ -184,6 +184,7 @@ export function openDb(path: string): Database {
   addColumnIfMissing(db, "agent_sessions", "launched_via", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "profile", "TEXT");
   addColumnIfMissing(db, "agent_sessions", "title", "TEXT");
+  addColumnIfMissing(db, "projects", "lifecycle_enabled", "INTEGER NOT NULL DEFAULT 0");
 
   // Denormalized per-session token totals, maintained at ingest so the sessions
   // list and token charts never re-sum the whole agent_messages table. When the

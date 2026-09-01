@@ -18,6 +18,7 @@ function proj(over: Partial<ProjectRow> & { name: string }): ProjectRow {
       lastEdit: null,
       services: { docker: [], processes: [] },
       errors: [],
+      lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
     },
     ...over,
   };
@@ -34,6 +35,7 @@ function withActivity(name: string, lastEdit: number, lastCommit: number | null)
       lastEdit,
       services: { docker: [], processes: [] },
       errors: [],
+      lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
     },
   });
 }

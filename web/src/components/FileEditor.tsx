@@ -1,20 +1,32 @@
-import { createSignal, onCleanup, onMount, Show, getOwner, runWithOwner } from "solid-js";
+import {
+  createSignal,
+  createResource,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  Match,
+  getOwner,
+  runWithOwner,
+} from "solid-js";
 import { EditorState, type Extension, Compartment } from "@codemirror/state";
 import { EditorView, lineNumbers, keymap } from "@codemirror/view";
 import { defaultKeymap, indentWithTab, history, historyKeymap } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { searchKeymap } from "@codemirror/search";
-import { fetchFile, writeFile, fileRawUrl } from "../api";
+import { fetchFile, writeFile, fileRawUrl, fetchGitDiff } from "../api";
 import { loadLanguageExtension } from "../lib/language";
 import Markdown from "./Markdown";
 import EditorStatusBar, { type EditorStats } from "./EditorStatusBar";
 import ImageViewer from "./ImageViewer";
+import PdfViewer from "./PdfViewer";
 import { markdownStats, cursorStats } from "../lib/editorStats";
 
 type Loaded =
   | { kind: "text"; mtimeMs: number; sha: string; language: string }
   | { kind: "image"; size: number; mime: string; mtimeMs: number }
+  | { kind: "pdf"; size: number; mtimeMs: number }
   | { kind: "binary"; size: number }
   | { kind: "too-large"; size: number };
 
@@ -72,6 +84,7 @@ export default function FileEditor(props: {
   projectId: string;
   path: string;
   onDirtyChange: (dirty: boolean) => void;
+  onViewDiff: (path: string) => void;
 }) {
   let host!: HTMLDivElement;
   let view: EditorView | null = null;
@@ -81,6 +94,21 @@ export default function FileEditor(props: {
   const [error, setError] = createSignal<string | null>(null);
   const [conflict, setConflict] = createSignal(false);
   const [savedDoc, setSavedDoc] = createSignal<string>("");
+
+  // Whether the file on disk differs from HEAD, so we can offer a "view diff"
+  // button. Keyed on a bump counter that we tick whenever the working tree
+  // changes under us (save, reload, external edit picked up by the poll).
+  const [gitKey, setGitKey] = createSignal(0);
+  const [gitStatus] = createResource(
+    () => ({ projectId: props.projectId, path: props.path, key: gitKey() }),
+    async ({ projectId, path }) => (await fetchGitDiff(projectId, path)).status,
+  );
+  // "!" is a gitignored file (no diff to HEAD); null means clean. Anything else
+  // is a real change worth surfacing a diff for.
+  const hasDiff = () => {
+    const s = gitStatus();
+    return s != null && s !== "!";
+  };
 
   const wrapCompartment = new Compartment();
   const [wrap, setWrap] = createSignal(false);
@@ -121,6 +149,7 @@ export default function FileEditor(props: {
       setLoaded({ kind: "text", mtimeMs: ok.mtimeMs, sha: ok.sha, language: meta.language });
       setSavedDoc(content);
       setConflict(false);
+      setGitKey((n) => n + 1);
       props.onDirtyChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -137,6 +166,7 @@ export default function FileEditor(props: {
         changes: { from: 0, to: view.state.doc.length, insert: r.content },
       });
       setConflict(false);
+      setGitKey((n) => n + 1);
       props.onDirtyChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -226,6 +256,8 @@ export default function FileEditor(props: {
         const meta = loaded();
         if (!meta || meta.kind !== "text") return;
         if (fresh.sha === meta.sha && fresh.mtimeMs === meta.mtimeMs) return;
+        // The file changed on disk underneath us — its diff-to-HEAD may have too.
+        setGitKey((n) => n + 1);
         if (isDirty()) {
           setConflict(true);
         } else if (view) {
@@ -256,6 +288,13 @@ export default function FileEditor(props: {
 
   return (
     <div class="file-editor">
+      <Show when={hasDiff()}>
+        <div class="file-editor-bar">
+          <button class="panel-retry" onclick={() => props.onViewDiff(props.path)}>
+            view diff
+          </button>
+        </div>
+      </Show>
       <Show when={error()}>
         <div class="banner banner-error">{error()}</div>
       </Show>
@@ -271,8 +310,7 @@ export default function FileEditor(props: {
         fallback={
           <Show when={loaded()}>
             {(l) => (
-              <Show
-                when={l().kind === "image"}
+              <Switch
                 fallback={
                   <div class="file-editor-placeholder">
                     <Show when={l().kind === "binary"}>
@@ -284,15 +322,26 @@ export default function FileEditor(props: {
                   </div>
                 }
               >
-                <ImageViewer
-                  src={fileRawUrl(
-                    props.projectId,
-                    props.path,
-                    (l() as { kind: "image"; mtimeMs: number }).mtimeMs,
-                  )}
-                  alt={props.path}
-                />
-              </Show>
+                <Match when={l().kind === "image"}>
+                  <ImageViewer
+                    src={fileRawUrl(
+                      props.projectId,
+                      props.path,
+                      (l() as { kind: "image"; mtimeMs: number }).mtimeMs,
+                    )}
+                    alt={props.path}
+                  />
+                </Match>
+                <Match when={l().kind === "pdf"}>
+                  <PdfViewer
+                    src={fileRawUrl(
+                      props.projectId,
+                      props.path,
+                      (l() as { kind: "pdf"; mtimeMs: number }).mtimeMs,
+                    )}
+                  />
+                </Match>
+              </Switch>
             )}
           </Show>
         }

@@ -59,6 +59,13 @@ import { caffeinateRoutes } from "./routes/caffeinate";
 import { PhraseStore } from "./phrases/store";
 import { PhraseIndexBuilder } from "./phrases/builder";
 import { phrasesRoutes } from "./routes/phrases";
+import { LifecycleRegistry } from "./lifecycle/registry";
+import { readConfig } from "./lifecycle/config";
+import { runCommand } from "./lifecycle/run";
+import { augmentWithLifecycle } from "./lifecycle/augment";
+import { PER_PROJECT_TIMEOUT_MS } from "./scanner/types";
+import { getProjectByPath } from "./store/projects";
+import { lifecycleRoutes } from "./routes/lifecycle";
 
 mkdirSync(dataDir(), { recursive: true });
 mkdirSync(join(dataDir(), "logs"), { recursive: true });
@@ -87,10 +94,26 @@ const sessions = new SessionRegistry({
   ),
 });
 
+const lifecycleRegistry = new LifecycleRegistry();
+
+async function scanProjectWithLifecycle(path: string) {
+  const snap = await scanProject(path, probes);
+  const project = getProjectByPath(db, path);
+  const config = readConfig(path);
+  return augmentWithLifecycle(snap, {
+    enabled: project?.lifecycleEnabled ?? false,
+    config,
+    runHealth: async () => {
+      const r = await runCommand(config!.health!, path, { timeoutMs: PER_PROJECT_TIMEOUT_MS });
+      return { exitCode: r.exitCode };
+    },
+  });
+}
+
 const loop = createLoop({
   intervalMs: getPollIntervalMs(db),
   listVisible: () => listVisibleProjects(db).map((p) => ({ id: p.id, path: p.path })),
-  scanProject: (path) => scanProject(path, probes),
+  scanProject: (path) => scanProjectWithLifecycle(path),
   onSnapshot: (id, snap) => upsertSnapshot(db, id, snap),
   log,
 });
@@ -263,6 +286,7 @@ startServer({
       processes: (path) => defaultProcessDetailProbe(path),
       containers: (path) => defaultContainerDetailProbe(path),
     }),
+    ...lifecycleRoutes({ registry: lifecycleRegistry, readConfig, runCommand }),
     ...projectCreateRoutes(),
     ...projectFilesRoutes(),
     ...projectGitRoutes(),

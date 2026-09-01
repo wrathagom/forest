@@ -20,6 +20,7 @@ const base: ProjectRow = {
   snapshot: {
     git: { branch: "main", dirty: false, changed: 0, ahead: 0, behind: 0, lastCommit: null },
     lastEdit: null, services: { docker: [], processes: [] }, errors: [],
+    lifecycle: { status: "none", hasConfig: false, enabled: false, health: null },
   },
 };
 

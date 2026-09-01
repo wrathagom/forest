@@ -136,6 +136,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .chip-ahead,
 .chip-running { color: var(--ok);   border-color: color-mix(in srgb, var(--ok) 35%, transparent);    background: color-mix(in srgb, var(--ok) 8%, transparent); }
 .chip-behind { color: var(--error); border-color: color-mix(in srgb, var(--error) 40%, transparent); background: color-mix(in srgb, var(--error) 8%, transparent); }
+.chip-error  { color: var(--error); border-color: color-mix(in srgb, var(--error) 40%, transparent); background: color-mix(in srgb, var(--error) 8%, transparent); }
 .chip-agent  { color: var(--info);  border-color: color-mix(in srgb, var(--info) 35%, transparent);  background: color-mix(in srgb, var(--info) 8%, transparent); }
 .chip-bare   { border-color: transparent; background: none; padding-left: 0; }
 
@@ -284,6 +285,27 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .project-breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
 .project-name { color: var(--fg); font-weight: 600; }
 .project-meta { display: flex; gap: 0.5rem; align-items: center; font-size: 0.85rem; color: var(--fg-dim); }
+/* Plain block wrapper (NOT display:contents) so <Show>'s loaded branch —
+   header + lifecycle panel — still counts as exactly one grid child in
+   .project-detail, matching the one-child loading fallback. That keeps the
+   grid's row auto-placement stable across the loading/loaded transition. */
+.detail-topbar { display: block; }
+.lifecycle-panel {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 1.2rem; border-bottom: 1px solid var(--border);
+}
+.lifecycle-btn {
+  font: inherit; font-size: 0.8rem; cursor: pointer; border-radius: 3px;
+  padding: 0.25rem 0.7rem; background: var(--bg-2); border: 1px solid var(--border); color: var(--fg);
+}
+.lifecycle-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.lifecycle-btn:disabled { opacity: 0.5; cursor: default; }
+.lifecycle-output { width: 100%; }
+.lifecycle-output pre {
+  margin: 0.3rem 0 0; padding: 0.5rem; max-height: 12rem; overflow: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+  font-size: 0.75rem; white-space: pre-wrap; word-break: break-word;
+}
 .tab-strip { display: flex; gap: 0.3rem; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg); }
 .tab { display: flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-2); color: var(--fg-dim); font-size: 0.8rem; cursor: pointer; }
 .tab:hover { color: var(--fg); }
@@ -323,7 +345,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 :root { --info-pane-width: 360px; }
 
 .project-detail.with-info { grid-template-columns: 1fr var(--info-pane-width); }
-.project-detail.with-info .project-header,
+.project-detail.with-info .detail-topbar,
 .project-detail.with-info .tab-strip,
 .project-detail.with-info .banner { grid-column: 1 / -1; }
 .project-detail.with-info .terminal-area { grid-column: 1; }
@@ -436,6 +458,14 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 
 /* file editor */
 .file-editor { height: 100%; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.file-editor-bar {
+  padding: 0.3rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.file-editor-bar .panel-retry { margin-left: 0; }
 .file-editor-host { flex: 1; min-height: 0; min-width: 0; }
 .file-editor-placeholder { padding: 2rem; color: var(--fg-dim); text-align: center; }
 .file-editor-image {
@@ -1244,3 +1274,49 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .phrase-occurrences td { background: rgba(128, 128, 128, 0.06); }
 .phrase-occurrence { padding: 4px 8px; display: flex; gap: 0.75rem; align-items: baseline; }
 .phrase-snippet mark { background: rgba(255, 213, 0, 0.35); }
+
+/* PDF viewer — mirrors the file-editor image/zoom control styling. */
+.file-editor-pdf {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+.file-editor-pdf .pdf-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+.file-editor-pdf .pdf-page {
+  position: relative;
+  align-self: flex-start;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.file-editor-pdf .pdf-page .textLayer {
+  position: absolute;
+  inset: 0;
+}
+.file-editor-pdf .pdf-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+.file-editor-pdf .pdf-page-readout {
+  font-size: 12px;
+  color: var(--fg-faint);
+  min-width: 4.5em;
+  text-align: center;
+}
+.file-editor-pdf .pdf-control-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}

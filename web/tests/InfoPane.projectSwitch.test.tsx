@@ -55,7 +55,6 @@ function renderPane() {
       expanded={() => true}
       highlightedPaths={() => []}
       onOpenFile={noop}
-      onOpenDiff={noop}
       onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}

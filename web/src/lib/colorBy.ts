@@ -33,10 +33,10 @@ export function readableOn(hue: string, neutrals: { bg: string; fg: string }): s
   return contrast("#000000", hue) >= contrast("#ffffff", hue) ? "#000000" : "#ffffff";
 }
 
-export type ColorByDimension = "git" | "heat" | "services" | "agents" | "group" | "none";
+export type ColorByDimension = "git" | "heat" | "services" | "agents" | "lifecycle" | "group" | "none";
 
 export const COLOR_BY_DIMENSIONS: ColorByDimension[] = [
-  "git", "heat", "services", "agents", "group", "none",
+  "git", "heat", "services", "agents", "lifecycle", "group", "none",
 ];
 
 /** `neutral` means "no signal in this dimension". The card needs it as a flag
@@ -136,6 +136,17 @@ function hueFor(
     return ramp[4]!;
   }
 
+  if (dim === "lifecycle") {
+    switch (snap.lifecycle.status) {
+      case "healthy": return t.ok;
+      case "running": return t.info;
+      case "errors": return t.error;
+      case "starting":
+      case "stopping": return t.warn;
+      default: return null; // none / stopped
+    }
+  }
+
   // Exhaustive guard, unreachable: every branch above returns for its
   // dimension, so by here `dim` has narrowed to `never`. If a seventh
   // dimension is ever added to the union without a matching branch above,
@@ -203,5 +214,12 @@ export function legend(
         { label: "ungrouped", swatch: t.bg3 },
       ];
     }
+    case "lifecycle":
+      return [
+        { label: "healthy", swatch: t.ok },
+        { label: "running", swatch: t.info },
+        { label: "errors", swatch: t.error },
+        { label: "stopped", swatch: t.bg3 },
+      ];
   }
 }

@@ -26,7 +26,6 @@ test("renders nothing when not expanded", () => {
       expanded={() => false}
       highlightedPaths={() => []}
       onOpenFile={noop}
-      onOpenDiff={noop}
       onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}
@@ -43,7 +42,6 @@ test("renders monitor, files, git, sessions tab labels", () => {
       expanded={() => true}
       highlightedPaths={() => []}
       onOpenFile={noop}
-      onOpenDiff={noop}
       onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}
@@ -62,7 +60,6 @@ test("legacy persisted tab 'processes' migrates to 'monitor'", () => {
       expanded={() => true}
       highlightedPaths={() => []}
       onOpenFile={noop}
-      onOpenDiff={noop}
       onOpenFileRight={noop}
       onOpenCommit={noop}
       onOpenSession={noop}
@@ -80,7 +77,6 @@ test("shows the tasks tab and renders TasksPanel when selected", async () => {
       expanded={() => true}
       highlightedPaths={() => []}
       onOpenFile={() => {}}
-      onOpenDiff={() => {}}
       onOpenFileRight={() => {}}
       onOpenCommit={() => {}}
       onOpenSession={() => {}}

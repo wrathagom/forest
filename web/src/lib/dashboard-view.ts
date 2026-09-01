@@ -1,4 +1,4 @@
-import type { ProjectRow } from "../api";
+import type { LifecycleStatus, ProjectRow } from "../api";
 import { lastActivity } from "./project-list";
 
 export type ViewPreset = "compact" | "status" | "detail";
@@ -8,10 +8,28 @@ export const VIEW_PRESETS: ViewPreset[] = ["compact", "status", "detail"];
 
 /** `bare` renders borderless and unlabelled — used only for the age chip. */
 export type ChipTone =
-  | "neutral" | "dirty" | "ahead" | "behind" | "running" | "agent" | "bare";
+  | "neutral" | "dirty" | "ahead" | "behind" | "running" | "agent" | "bare" | "error";
 
 export type Chip = { key: string; label: string; tone: ChipTone; title?: string };
 export type DetailRow = { label: string; value: string };
+
+/**
+ * The one tone mapping for a lifecycle status, shared by the card chip
+ * (`statusChips`) and `LifecyclePanel`'s own status chip so the two never
+ * drift out of color-sync with each other or with `colorBy.ts`'s hues
+ * (healthy=ok/green, running=info/blue, errors=error/red, starting/stopping=
+ * warn/amber via the existing `dirty` tone).
+ */
+export function lifecycleTone(status: LifecycleStatus): ChipTone {
+  switch (status) {
+    case "healthy": return "running";
+    case "running": return "agent";
+    case "errors": return "error";
+    case "starting":
+    case "stopping": return "dirty";
+    default: return "neutral"; // none / stopped
+  }
+}
 
 const MIN = 60_000, HOUR = 3_600_000, DAY = 86_400_000;
 
@@ -95,6 +113,11 @@ export function statusChips(p: ProjectRow, now: number): Chip[] {
       key: "agents", label: `🤖 ${total}`, tone: "agent",
       title: p.liveAgents.map((a) => `${a.count} ${a.agent}`).join(", "),
     });
+  }
+
+  const lc = p.snapshot?.lifecycle;
+  if (lc && lc.status !== "none") {
+    chips.push({ key: "lifecycle", label: lc.status, tone: lifecycleTone(lc.status), title: "forest.yaml lifecycle" });
   }
 
   // Always last, and always bare.
