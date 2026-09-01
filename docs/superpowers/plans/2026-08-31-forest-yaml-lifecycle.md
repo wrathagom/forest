@@ -8,7 +8,9 @@
 
 **Tech Stack:** Bun + TypeScript (server, `bun test`), SolidJS + Vite (web, `vitest`). Bun's built-in `YAML` parses the file; `Bun.spawn` runs commands.
 
-**Status note (deviation from spec):** The spec listed `start-failed` / `stop-failed` as distinct card statuses. To avoid sticky error colors (after a failed start nothing is up, so the true steady state is `stopped`), the card `LifecycleStatus` is `none | stopped | running | healthy | errors | starting | stopping`. A failed run is surfaced in the **panel** via `lastRun.failed` + its output, not as a persistent card color.
+**Status notes (deviations from spec, as built):**
+1. The spec listed `start-failed` / `stop-failed` as distinct card statuses. To avoid sticky error colors (after a failed start nothing is up, so the true steady state is `stopped`), the card `LifecycleStatus` is `none | stopped | running | healthy | errors | starting | stopping`. A failed run is surfaced in the **panel** via `lastRun.failed` + its output, not as a persistent card color.
+2. The transient `starting` / `stopping` states are applied **panel-only** (in the route's `view()`, which consults the registry), not by the scan wrapper — so during an in-flight start/stop the dashboard card keeps showing the last stored status until `loop.refresh` reconciles it after the command returns. This is a deliberate simplification: under the one-shot, returns-promptly execution model the transient window is brief, the panel the user clicked in is always correct, and it avoids coupling the ephemeral registry into the scan path.
 
 ---
 
