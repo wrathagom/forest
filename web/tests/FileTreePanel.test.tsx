@@ -33,7 +33,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -48,7 +47,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -57,43 +55,37 @@ describe("FileTreePanel", () => {
     expect(screen.getByText("main.ts")).toBeTruthy();
   });
 
-  test("clicking a clean file calls onOpenFile, not onOpenDiff", () => {
+  test("clicking a clean file opens it in the editor", () => {
     const onOpenFile = vi.fn();
-    const onOpenDiff = vi.fn();
     render(() => (
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={onOpenFile}
-        onOpenDiff={onOpenDiff}
         onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
     fireEvent.click(screen.getByText("main.ts"));
     expect(onOpenFile).toHaveBeenCalledWith("src/main.ts");
-    expect(onOpenDiff).not.toHaveBeenCalled();
   });
 
-  test("clicking a modified file calls onOpenDiff, not onOpenFile", () => {
+  test("clicking a modified file opens the editor too (not the diff)", () => {
     const onOpenFile = vi.fn();
-    const onOpenDiff = vi.fn();
     render(() => (
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={onOpenFile}
-        onOpenDiff={onOpenDiff}
         onOpenFileRight={() => {}}
       />
     ));
     fireEvent.click(screen.getByText(/^[▸▾]\s+src$/));
     fireEvent.click(screen.getByText(/^[▸▾]\s+ui$/));
     fireEvent.click(screen.getByText("App.tsx"));
-    expect(onOpenDiff).toHaveBeenCalledWith("src/ui/App.tsx");
-    expect(onOpenFile).not.toHaveBeenCalled();
+    expect(onOpenFile).toHaveBeenCalledWith("src/ui/App.tsx");
   });
 
   test("alt-click on a clean file opens it in the right pane", () => {
@@ -105,7 +97,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={onOpenFile}
-        onOpenDiff={() => {}}
         onOpenFileRight={onOpenFileRight}
       />
     ));
@@ -114,16 +105,15 @@ describe("FileTreePanel", () => {
     expect(onOpenFile).not.toHaveBeenCalled();
   });
 
-  test("alt-click on a git-modified file opens the FILE right, never the diff", () => {
-    const onOpenDiff = vi.fn();
+  test("alt-click on a git-modified file opens the FILE right, not the left pane", () => {
+    const onOpenFile = vi.fn();
     const onOpenFileRight = vi.fn();
     render(() => (
       <FileTreePanel
         projectId="p1"
         entries={sampleTree}
         highlightedPaths={[]}
-        onOpenFile={() => {}}
-        onOpenDiff={onOpenDiff}
+        onOpenFile={onOpenFile}
         onOpenFileRight={onOpenFileRight}
       />
     ));
@@ -131,7 +121,7 @@ describe("FileTreePanel", () => {
     fireEvent.click(screen.getByText(/^[▸▾]\s+ui$/));
     fireEvent.click(screen.getByText("App.tsx"), { altKey: true });
     expect(onOpenFileRight).toHaveBeenCalledWith("src/ui/App.tsx");
-    expect(onOpenDiff).not.toHaveBeenCalled();
+    expect(onOpenFile).not.toHaveBeenCalled();
   });
 
   test("alt-click on a gitignored file opens it right", () => {
@@ -145,7 +135,6 @@ describe("FileTreePanel", () => {
         entries={ignoredFileTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={onOpenFileRight}
       />
     ));
@@ -161,7 +150,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={onOpenFileRight}
       />
     ));
@@ -181,7 +169,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -201,7 +188,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -219,7 +205,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={["package.json", "untracked.md"]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -238,7 +223,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={["package.json"]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -252,7 +236,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={["src/main.ts"]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -268,7 +251,6 @@ describe("FileTreePanel", () => {
         entries={sampleTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -295,7 +277,6 @@ describe("FileTreePanel", () => {
         entries={ignoredTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -325,7 +306,6 @@ describe("FileTreePanel", () => {
         ]}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));
@@ -345,7 +325,6 @@ describe("FileTreePanel", () => {
         entries={ignoredTree}
         highlightedPaths={[]}
         onOpenFile={() => {}}
-        onOpenDiff={() => {}}
         onOpenFileRight={() => {}}
       />
     ));

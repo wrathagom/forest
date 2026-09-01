@@ -401,6 +401,7 @@ export default function ProjectDetail() {
                   projectId={params.id}
                   path={f.path}
                   onDirtyChange={(dirty) => setFileDirty(f.path, dirty)}
+                  onViewDiff={openDiff}
                 />
               </Show>
             )}
@@ -508,6 +509,7 @@ export default function ProjectDetail() {
                     projectId={params.id}
                     path={f.path}
                     onDirtyChange={(dirty) => setFileDirty(f.path, dirty)}
+                    onViewDiff={openDiff}
                   />
                 </Show>
               )}
@@ -520,7 +522,6 @@ export default function ProjectDetail() {
         expanded={infoExpanded}
         highlightedPaths={highlightedPaths}
         onOpenFile={openFile}
-        onOpenDiff={openDiff}
         onOpenFileRight={openFileRight}
         onOpenCommit={openCommit}
         onOpenSession={openSessionTab}

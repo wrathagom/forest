@@ -20,7 +20,6 @@ export default function InfoPane(props: {
   expanded: () => boolean;
   highlightedPaths: () => string[];
   onOpenFile: (path: string) => void;
-  onOpenDiff: (path: string) => void;
   onOpenFileRight: (path: string) => void;
   onOpenCommit: (sha: string) => void;
   onOpenSession: (sessionId: string, label: string) => void;
@@ -73,7 +72,6 @@ export default function InfoPane(props: {
                   entries={t().entries}
                   highlightedPaths={props.highlightedPaths()}
                   onOpenFile={props.onOpenFile}
-                  onOpenDiff={props.onOpenDiff}
                   onOpenFileRight={props.onOpenFileRight}
                 />
               )}
