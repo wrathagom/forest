@@ -70,6 +70,10 @@ export function imageMimeFor(filename: string): string | null {
   return IMAGE_MIME_BY_EXT[ext] ?? null;
 }
 
+export function isPdf(filename: string): boolean {
+  return filename.toLowerCase().endsWith(".pdf");
+}
+
 function isBinary(buf: Buffer): boolean {
   const sample = Math.min(buf.length, 8192);
   for (let i = 0; i < sample; i++) {
