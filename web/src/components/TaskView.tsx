@@ -77,6 +77,7 @@ export default function TaskView(props: {
     });
   const expandAll = () => setOpenPaths(new Set<string>(files().map((f) => f.path)));
   const collapseAll = () => setOpenPaths(new Set<string>());
+  const merged = createMemo(() => data()?.mergedIntoBase === true);
 
   const del = async () => {
     if (busy()) return;
@@ -172,17 +173,43 @@ export default function TaskView(props: {
                   <button class="task-act-discard" disabled={busy()} onclick={() => void del()}>Delete</button>
                 </Show>
                 <Show when={task().status === "running" || task().status === "review"}>
-                  <For each={ACTIONS}>
-                    {(a) => (
-                      <button
-                        class={a.cls}
-                        disabled={busy()}
-                        onclick={() => void act(a.status, a.result)}
-                      >
-                        {a.label}
-                      </button>
-                    )}
-                  </For>
+                  <Show when={merged()}>
+                    <div class="banner banner-ok">✓ Already merged into main</div>
+                    <button
+                      class="task-act-merge"
+                      disabled={busy()}
+                      onclick={() => void act("done", "merged")}
+                    >
+                      Complete &amp; clean up
+                    </button>
+                    <button
+                      class="task-act-keep"
+                      disabled={busy()}
+                      onclick={() => void act("done", "detached")}
+                    >
+                      Keep / detach
+                    </button>
+                    <button
+                      class="task-act-discard"
+                      disabled={busy()}
+                      onclick={() => void act("abandoned", "discarded")}
+                    >
+                      Discard
+                    </button>
+                  </Show>
+                  <Show when={!merged()}>
+                    <For each={ACTIONS}>
+                      {(a) => (
+                        <button
+                          class={a.cls}
+                          disabled={busy()}
+                          onclick={() => void act(a.status, a.result)}
+                        >
+                          {a.label}
+                        </button>
+                      )}
+                    </For>
+                  </Show>
                 </Show>
                 <Show when={task().status === "done" || task().status === "abandoned"}>
                   <span class="muted">

@@ -149,6 +149,36 @@ test("a running task also shows the four completion actions", async () => {
   expect(getByText("Discard")).toBeTruthy();
 });
 
+test("merged task shows the banner and a single Complete & clean up action", async () => {
+  getTaskDetail.mockResolvedValue({
+    task: task({ status: "review" }), diff: null, mergedIntoBase: true,
+  });
+  const { getByText, queryByText, container } = render(() => (
+    <TaskView taskId="t1" visible={true} onOpenSession={vi.fn()} />
+  ));
+  await waitFor(() => expect(getByText("Complete & clean up")).toBeTruthy());
+  expect(container.textContent).toContain("Already merged into main");
+  expect(getByText("Keep / detach")).toBeTruthy();
+  expect(getByText("Discard")).toBeTruthy();
+  expect(queryByText("Merge to main")).toBeNull();
+  expect(queryByText("Open PR")).toBeNull();
+});
+
+test("Complete & clean up calls patchTask with done/merged", async () => {
+  getTaskDetail.mockResolvedValue({
+    task: task({ status: "review" }), diff: null, mergedIntoBase: true,
+  });
+  patchTask.mockResolvedValue({ task: task({ status: "done", result: "merged" }) });
+  const { getByText } = render(() => (
+    <TaskView taskId="t1" visible={true} onOpenSession={vi.fn()} />
+  ));
+  await waitFor(() => expect(getByText("Complete & clean up")).toBeTruthy());
+  fireEvent.click(getByText("Complete & clean up"));
+  await waitFor(() =>
+    expect(patchTask).toHaveBeenCalledWith("t1", { status: "done", result: "merged" }),
+  );
+});
+
 test("a draft task's Delete button calls deleteTask and onClose", async () => {
   getTaskDetail.mockResolvedValue({ task: task({ status: "draft", branch: null, sessionId: null }), diff: null });
   deleteTask.mockResolvedValue(undefined);
