@@ -1,8 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { openDb } from "../src/store/db";
-import { Vault, __setExistsForTest } from "../src/sessions/vault";
+import { Vault, __setExistsForTest, __resetExistsForTest } from "../src/sessions/vault";
 
 describe("refreshCwdExists caching", () => {
+  afterEach(() => __resetExistsForTest());
+
   test("stats a given cwd at most once within the TTL", () => {
     const db = openDb(":memory:");
     const v = new Vault(db);

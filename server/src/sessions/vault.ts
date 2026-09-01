@@ -22,6 +22,12 @@ export function __setExistsForTest(fn: (p: string) => boolean): void {
   cwdExistsCache.clear();
 }
 
+/** Test seam: restore the real existence check and clear the cache. */
+export function __resetExistsForTest(): void {
+  existsFn = existsSync;
+  cwdExistsCache.clear();
+}
+
 export type IngestSource =
   | "scan"
   | "hook:precompact"
