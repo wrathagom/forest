@@ -54,6 +54,7 @@ export default function Sessions() {
   const toggleSeries = (k: "input" | "output" | "cache") => setSeries((s) => ({ ...s, [k]: !s[k] }));
   const [profile, setProfile] = createSignal("");           // "" all, else normalized profile key
   const [chartMode, setChartMode] = createSignal<"type" | "profile">("type");
+  const [projectLimit, setProjectLimit] = createSignal(10); // top-N projects shown in the "tokens by project" chart; 0 = all
   const [hiddenProfiles, setHiddenProfiles] = createSignal<string[]>([]); // accounts toggled off in the legend
   const toggleProfileSeries = (p: string) =>
     setHiddenProfiles((h) => (h.includes(p) ? h.filter((x) => x !== p) : [...h, p]));
@@ -212,11 +213,30 @@ export default function Sessions() {
 
         <div class="sessions-charts">
           <section class="sessions-chart-card">
-            <h3 class="section-title">tokens by project</h3>
+            <div class="chart-card-header">
+              <h3 class="section-title">tokens by project</h3>
+              <Show when={(stats()?.tokensByProject ?? []).length > 5}>
+                <label class="chart-limit">
+                  <span class="muted">show</span>
+                  <select
+                    class="chart-limit-select"
+                    value={String(projectLimit())}
+                    onchange={(e) => setProjectLimit(Number(e.currentTarget.value))}
+                  >
+                    <option value="5">top 5</option>
+                    <option value="10">top 10</option>
+                    <option value="25">top 25</option>
+                    <option value="50">top 50</option>
+                    <option value="0">all</option>
+                  </select>
+                </label>
+              </Show>
+            </div>
             <TokensByProjectChart
               data={stats()?.tokensByProject ?? []}
               series={series()}
               profiles={visibleProfiles()}
+              limit={projectLimit()}
               onSelectProject={(id) => setProject(id ?? "none")}
             />
           </section>

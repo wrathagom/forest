@@ -12,7 +12,13 @@ export default function TokensByProjectChart(props: {
   onSelectProject?: (projectId: string | null) => void;
   series?: { input: boolean; output: boolean; cache: boolean };
   profiles?: string[];
+  limit?: number;
 }) {
+  // Data arrives sorted by descending total, so slicing keeps the top N.
+  const rows = createMemo(() =>
+    props.limit && props.limit > 0 ? props.data.slice(0, props.limit) : props.data,
+  );
+
   const view = createMemo(() => {
     const s = props.series ?? { input: true, output: true, cache: true };
     // `profiles` is the visible account list; without one, no account filter is
@@ -27,8 +33,8 @@ export default function TokensByProjectChart(props: {
           }, { ...ZERO })
         : r;
     const visTotal = (b: TokenBucket) => (s.input ? b.input : 0) + (s.output ? b.output : 0) + (s.cache ? b.cache : 0);
-    const max = Math.max(1, ...props.data.map((r) => visTotal(typed(r))));
-    return props.data.map((r) => {
+    const max = Math.max(1, ...rows().map((r) => visTotal(typed(r))));
+    return rows().map((r) => {
       const t = typed(r);
       const total = visTotal(t);
       const iv = s.input ? t.input : 0;

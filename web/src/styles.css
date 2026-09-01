@@ -1007,6 +1007,10 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 @media (max-width: 900px) { .sessions-charts { grid-template-columns: 1fr; } }
 .sessions-chart-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.9rem; }
 .sessions-chart-card .section-title { margin: 0 0 0.5rem; }
+.chart-card-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.chart-card-header .section-title { margin: 0 0 0.5rem; }
+.chart-limit { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; margin-bottom: 0.5rem; }
+.chart-limit-select { background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; color: var(--fg); padding: 0.2rem 0.35rem; font: inherit; font-size: 0.75rem; }
 .chart-svg { width: 100%; height: 180px; display: block; }
 .chart-empty { padding: 1.5rem 0; text-align: center; }
 .chart-axis { stroke: var(--border); stroke-width: 1; }
