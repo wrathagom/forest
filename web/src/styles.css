@@ -1239,3 +1239,49 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
     border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   }
 }
+
+/* PDF viewer — mirrors the file-editor image/zoom control styling. */
+.file-editor-pdf {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+.file-editor-pdf .pdf-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+.file-editor-pdf .pdf-page {
+  position: relative;
+  align-self: flex-start;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.file-editor-pdf .pdf-page .textLayer {
+  position: absolute;
+  inset: 0;
+}
+.file-editor-pdf .pdf-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+.file-editor-pdf .pdf-page-readout {
+  font-size: 12px;
+  color: var(--fg-faint);
+  min-width: 4.5em;
+  text-align: center;
+}
+.file-editor-pdf .pdf-control-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}

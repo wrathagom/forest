@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { imageMimeFor } from "../src/routes/files";
+import { imageMimeFor, isPdf } from "../src/routes/files";
 
 describe("imageMimeFor", () => {
   test("maps common raster extensions to MIME types", () => {
@@ -27,5 +27,19 @@ describe("imageMimeFor", () => {
     expect(imageMimeFor("README.md")).toBeNull();
     expect(imageMimeFor("blob.bin")).toBeNull();
     expect(imageMimeFor("noext")).toBeNull();
+  });
+});
+
+describe("isPdf", () => {
+  test("matches .pdf case-insensitively", () => {
+    expect(isPdf("report.pdf")).toBe(true);
+    expect(isPdf("a/b/Report.PDF")).toBe(true);
+  });
+
+  test("is false for non-pdf files", () => {
+    expect(isPdf("main.ts")).toBe(false);
+    expect(isPdf("image.png")).toBe(false);
+    expect(isPdf("notpdf")).toBe(false);
+    expect(isPdf("pdf")).toBe(false);
   });
 });
