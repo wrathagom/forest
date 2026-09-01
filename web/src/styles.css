@@ -703,6 +703,25 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .diff-hunk { color: var(--info); }
 .diff-meta { color: var(--fg-dim); }
 .diff-ctx { color: var(--fg); }
+.diff-changes-label { display: flex; justify-content: space-between; align-items: center; }
+.diff-toggle-all { display: flex; gap: 0.6rem; }
+.diff-toggle-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--info); font: inherit; font-size: 0.7rem;
+}
+.diff-file { border: 1px solid var(--border); border-radius: 5px; margin-bottom: 0.35rem; overflow: hidden; }
+.diff-file-head {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  padding: 0.4rem 0.6rem; background: var(--bg-2); border: none; cursor: pointer;
+  color: var(--fg); font: inherit; text-align: left;
+}
+.diff-file-head:hover { background: var(--border); }
+.diff-caret { color: var(--fg-faint); display: inline-block; transition: transform 0.12s; }
+.diff-file.open .diff-caret { transform: rotate(90deg); }
+.diff-file-path { flex: 1; overflow-wrap: anywhere; }
+.diff-file-add { color: var(--ok); }
+.diff-file-del { color: var(--error); }
+.diff-file .diff-pre { margin: 0; border-top: 1px solid var(--border); }
 .commit-view-sha {
   font-family: "FiraCode Nerd Font Mono", ui-monospace, Menlo, monospace;
   font-size: 0.78rem;

@@ -1,5 +1,6 @@
-import { createResource, createEffect, onCleanup, For, Show, createSignal } from "solid-js";
+import { createResource, createEffect, onCleanup, For, Show, createSignal, createMemo } from "solid-js";
 import { getTaskDetail, patchTask, deleteTask, type Task, type TaskResult, type TaskStatus } from "../api";
+import { parseDiffFiles, type FileDiff } from "../lib/diff-files";
 
 const POLL_MS = 5000;
 
@@ -21,6 +22,26 @@ const ACTIONS: Array<{ label: string; status: TaskStatus; result: TaskResult; cl
   { label: "Discard", status: "abandoned", result: "discarded", cls: "task-act-discard" },
 ];
 
+function DiffFile(props: { file: FileDiff; open: boolean; onToggle: () => void }) {
+  return (
+    <div class={`diff-file${props.open ? " open" : ""}`}>
+      <button type="button" class="diff-file-head" onclick={() => props.onToggle()}>
+        <span class="diff-caret">▶</span>
+        <span class="diff-file-path">{props.file.path}</span>
+        <span class="diff-file-add">+{props.file.adds}</span>
+        <span class="diff-file-del">−{props.file.dels}</span>
+      </button>
+      <Show when={props.open}>
+        <pre class="diff-pre">
+          <For each={props.file.lines}>
+            {(line) => <div class={`diff-line diff-${classifyDiff(line)}`}>{line || " "}</div>}
+          </For>
+        </pre>
+      </Show>
+    </div>
+  );
+}
+
 export default function TaskView(props: {
   taskId: string;
   visible: boolean;
@@ -40,6 +61,22 @@ export default function TaskView(props: {
 
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+
+  const diffText = createMemo(() => data()?.diff ?? "");
+  const files = createMemo(() => parseDiffFiles(diffText()));
+  const totals = createMemo(() =>
+    files().reduce((t, f) => ({ adds: t.adds + f.adds, dels: t.dels + f.dels }), { adds: 0, dels: 0 }),
+  );
+  const [openPaths, setOpenPaths] = createSignal<Set<string>>(new Set());
+  const toggleFile = (path: string) =>
+    setOpenPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  const expandAll = () => setOpenPaths(new Set<string>(files().map((f) => f.path)));
+  const collapseAll = () => setOpenPaths(new Set<string>());
 
   const del = async () => {
     if (busy()) return;
@@ -108,16 +145,20 @@ export default function TaskView(props: {
                 </section>
               </Show>
 
-              <Show when={d().diff}>
+              <Show when={files().length > 0}>
                 <section class="task-view-section">
-                  <div class="task-view-label">CHANGES</div>
-                  <pre class="diff-pre">
-                    <For each={d().diff!.split("\n")}>
-                      {(line) => (
-                        <div class={`diff-line diff-${classifyDiff(line)}`}>{line || " "}</div>
-                      )}
-                    </For>
-                  </pre>
+                  <div class="task-view-label diff-changes-label">
+                    <span>CHANGES · {files().length} files, +{totals().adds} −{totals().dels}</span>
+                    <span class="diff-toggle-all">
+                      <button type="button" class="diff-toggle-link" onclick={expandAll}>expand all</button>
+                      <button type="button" class="diff-toggle-link" onclick={collapseAll}>collapse all</button>
+                    </span>
+                  </div>
+                  <For each={files()}>
+                    {(f) => (
+                      <DiffFile file={f} open={openPaths().has(f.path)} onToggle={() => toggleFile(f.path)} />
+                    )}
+                  </For>
                 </section>
               </Show>
 
