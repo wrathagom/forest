@@ -355,7 +355,7 @@ export default function ProjectDetail() {
         {(p) => (
           <>
             <ProjectHeader project={p()} />
-            <LifecyclePanel projectId={p().id} projectPath={p().path} />
+            <LifecyclePanel projectId={p().id} />
           </>
         )}
       </Show>
