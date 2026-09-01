@@ -11,7 +11,7 @@ import {
 } from "../store/tasks";
 import {
   defaultRunGit, gitRangeDiff, gitWorktreeAdd, gitWorktreeRemove, gitDeleteBranch,
-  gitMerge, gitIsMerged, gitPush, gitCurrentBranch, gitBranchExists, type RunGit,
+  gitMerge, gitIsMerged, gitAheadBehind, gitPush, gitCurrentBranch, gitBranchExists, type RunGit,
 } from "../git";
 import { defaultRunGh, ghCreatePr, type RunGh } from "../gh";
 
@@ -251,16 +251,24 @@ export function projectTaskRoutes(deps: TaskRoutesDeps): Route[] {
           }
         }
 
+        // `hasCommits` distinguishes a brand-new branch with no work yet (ahead 0,
+        // behind 0 — identical to base) from one actually merged into base (ahead 0,
+        // behind > 0). A bare `merge-base --is-ancestor` treats both as merged, so a
+        // just-launched task with no commits would wrongly show "already merged".
         let mergedIntoBase = false;
+        let hasCommits = true;
         if (project && task.branch && task.status !== "done" && task.status !== "abandoned") {
           try {
-            mergedIntoBase = await gitIsMerged(project.path, task.branch, task.baseBranch, runGit);
+            const { ahead, behind } = await gitAheadBehind(project.path, task.baseBranch, task.branch, runGit);
+            hasCommits = ahead > 0;
+            mergedIntoBase = ahead === 0 && behind > 0;
           } catch {
             mergedIntoBase = false;
+            hasCommits = true;
           }
         }
 
-        return json({ task, diff, mergedIntoBase });
+        return json({ task, diff, mergedIntoBase, hasCommits });
       },
     },
     {

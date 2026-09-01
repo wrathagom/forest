@@ -1,18 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { gitInit, gitCommit, gitClone, gitIsMerged, type RunGit } from "../src/git";
+import { gitInit, gitCommit, gitClone, gitIsMerged, gitAheadBehind, type RunGit } from "../src/git";
 
 function makeFakeRunGit() {
   const calls: { args: string[]; cwd: string }[] = [];
-  let nextOutcome: { code: number; stderr: string } = { code: 0, stderr: "" };
+  let nextOutcome: { code: number; stderr: string; stdout: string } = { code: 0, stderr: "", stdout: "" };
   const fake: RunGit = async (args, cwd) => {
     calls.push({ args, cwd });
-    return { stdout: "", stderr: nextOutcome.stderr, code: nextOutcome.code };
+    return { stdout: nextOutcome.stdout, stderr: nextOutcome.stderr, code: nextOutcome.code };
   };
   return {
     fake,
     calls,
-    succeed: () => { nextOutcome = { code: 0, stderr: "" }; },
-    fail: (msg: string) => { nextOutcome = { code: 1, stderr: msg }; },
+    succeed: () => { nextOutcome = { code: 0, stderr: "", stdout: "" }; },
+    fail: (msg: string) => { nextOutcome = { code: 1, stderr: msg, stdout: "" }; },
+    stdout: (out: string) => { nextOutcome = { code: 0, stderr: "", stdout: out }; },
   };
 }
 
@@ -88,5 +89,39 @@ describe("gitIsMerged", () => {
     const g = makeFakeRunGit();
     g.fail("not an ancestor");
     expect(await gitIsMerged("/proj", "task/x", "main", g.fake)).toBe(false);
+  });
+});
+
+describe("gitAheadBehind", () => {
+  test("runs `rev-list --left-right --count base...branch` in cwd", async () => {
+    const g = makeFakeRunGit();
+    g.stdout("0\t0\n");
+    await gitAheadBehind("/proj", "main", "task/x", g.fake);
+    expect(g.calls[0]!.args).toEqual(["rev-list", "--left-right", "--count", "main...task/x"]);
+    expect(g.calls[0]!.cwd).toBe("/proj");
+  });
+
+  test("parses `<behind>\\t<ahead>` output (left is base, right is branch)", async () => {
+    const g = makeFakeRunGit();
+    g.stdout("2\t3\n");
+    expect(await gitAheadBehind("/proj", "main", "task/x", g.fake)).toEqual({ ahead: 3, behind: 2 });
+  });
+
+  test("brand-new branch identical to base reports zero ahead and behind", async () => {
+    const g = makeFakeRunGit();
+    g.stdout("0\t0\n");
+    expect(await gitAheadBehind("/proj", "main", "task/x", g.fake)).toEqual({ ahead: 0, behind: 0 });
+  });
+
+  test("merged branch reports zero ahead but nonzero behind", async () => {
+    const g = makeFakeRunGit();
+    g.stdout("1\t0\n");
+    expect(await gitAheadBehind("/proj", "main", "task/x", g.fake)).toEqual({ ahead: 0, behind: 1 });
+  });
+
+  test("returns zeros on git error", async () => {
+    const g = makeFakeRunGit();
+    g.fail("bad revision");
+    expect(await gitAheadBehind("/proj", "main", "task/x", g.fake)).toEqual({ ahead: 0, behind: 0 });
   });
 });

@@ -278,6 +278,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .banner { padding: 0.5rem 1.2rem; font-size: 0.85rem; }
 .banner-error { background: color-mix(in srgb, var(--error) 12%, transparent); color: var(--error); border-bottom: 1px solid var(--error); }
 .banner-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); border-bottom: 1px solid var(--ok); }
+.banner-muted { background: color-mix(in srgb, var(--fg-dim) 10%, transparent); color: var(--fg-dim); border-bottom: 1px solid color-mix(in srgb, var(--fg-dim) 40%, transparent); }
 .hint { color: var(--fg-dim); font-size: 0.75rem; margin-top: 0.1rem; }
 .settings-row { display: flex; gap: 0.5rem; }
 /* .settings-row button[type="button"] is styled with .subdir-add-row button. */

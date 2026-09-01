@@ -297,6 +297,25 @@ export async function gitIsMerged(
   return r.code === 0;
 }
 
+/**
+ * Commits unique to each side of `base...branch`, via
+ * `rev-list --left-right --count`. `ahead` = commits on `branch` not in `base`
+ * (its own work); `behind` = commits on `base` not in `branch`. Used to tell a
+ * merged branch (ahead 0, behind > 0) apart from a brand-new one that has no
+ * commits yet (ahead 0, behind 0). Any git error yields {ahead: 0, behind: 0}.
+ */
+export async function gitAheadBehind(
+  cwd: string,
+  base: string,
+  branch: string,
+  run: RunGit = defaultRunGit,
+): Promise<{ ahead: number; behind: number }> {
+  const r = await run(["rev-list", "--left-right", "--count", `${base}...${branch}`], cwd);
+  if (r.code !== 0) return { ahead: 0, behind: 0 };
+  const [b, a] = r.stdout.trim().split(/\s+/);
+  return { ahead: Number(a) || 0, behind: Number(b) || 0 };
+}
+
 /** Unified diff of everything on `branch` since it diverged from `base`. */
 export async function gitRangeDiff(
   cwd: string,

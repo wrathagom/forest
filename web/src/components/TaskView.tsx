@@ -78,6 +78,8 @@ export default function TaskView(props: {
   const expandAll = () => setOpenPaths(new Set<string>(files().map((f) => f.path)));
   const collapseAll = () => setOpenPaths(new Set<string>());
   const merged = createMemo(() => data()?.mergedIntoBase === true);
+  // Undefined (older server) is treated as "has commits" so behavior is unchanged.
+  const hasCommits = createMemo(() => data()?.hasCommits !== false);
 
   const del = async () => {
     if (busy()) return;
@@ -197,7 +199,17 @@ export default function TaskView(props: {
                       Discard
                     </button>
                   </Show>
-                  <Show when={!merged()}>
+                  <Show when={!merged() && !hasCommits()}>
+                    <div class="banner banner-muted">No commits yet — nothing to review</div>
+                    <button
+                      class="task-act-discard"
+                      disabled={busy()}
+                      onclick={() => void act("abandoned", "discarded")}
+                    >
+                      Discard
+                    </button>
+                  </Show>
+                  <Show when={!merged() && hasCommits()}>
                     <For each={ACTIONS}>
                       {(a) => (
                         <button

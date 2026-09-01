@@ -120,36 +120,49 @@ describe("GET /api/tasks/:taskId", () => {
     );
     expect(res.status).toBe(404);
   });
-  test("reports mergedIntoBase when the branch is an ancestor of the base", async () => {
+  /** Git stub whose `rev-list --left-right --count` reports `<behind> <ahead>`. */
+  const gitAheadBehindStub = (behind: number, ahead: number): RunGit => async (args) =>
+    args[0] === "rev-list" && args.includes("--left-right")
+      ? { stdout: `${behind}\t${ahead}\n`, stderr: "", code: 0 }
+      : { stdout: "", stderr: "", code: 0 };
+
+  test("reports mergedIntoBase when the branch's commits are all in base and base moved on", async () => {
     const db = openDb(":memory:");
     const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
     const t = createTask(db, { projectId: pid, intent: "x", baseBranch: "main" });
     db.query("UPDATE tasks SET status='review', branch='task/x' WHERE id=?").run(t.id);
-    const runGit: RunGit = async (args) =>
-      args[0] === "merge-base" && args[1] === "--is-ancestor"
-        ? { stdout: "", stderr: "", code: 0 }
-        : { stdout: "", stderr: "", code: 0 };
-    const res = await route("GET", ONE, deps({ runGit })).handler(
+    const res = await route("GET", ONE, deps({ runGit: gitAheadBehindStub(1, 0) })).handler(
       ctx(db, new Request(`http://x/api/tasks/${t.id}`), { taskId: t.id }),
     );
-    const body = await res.json() as { mergedIntoBase: boolean };
+    const body = await res.json() as { mergedIntoBase: boolean; hasCommits: boolean };
     expect(body.mergedIntoBase).toBe(true);
+    expect(body.hasCommits).toBe(false);
   });
 
-  test("mergedIntoBase is false for a branch not yet merged", async () => {
+  test("mergedIntoBase is false and hasCommits true for a branch with unmerged work", async () => {
     const db = openDb(":memory:");
     const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
     const t = createTask(db, { projectId: pid, intent: "x", baseBranch: "main" });
     db.query("UPDATE tasks SET status='review', branch='task/x' WHERE id=?").run(t.id);
-    const runGit: RunGit = async (args) =>
-      args[0] === "merge-base" && args[1] === "--is-ancestor"
-        ? { stdout: "", stderr: "", code: 1 }
-        : { stdout: "", stderr: "", code: 0 };
-    const res = await route("GET", ONE, deps({ runGit })).handler(
+    const res = await route("GET", ONE, deps({ runGit: gitAheadBehindStub(0, 2) })).handler(
       ctx(db, new Request(`http://x/api/tasks/${t.id}`), { taskId: t.id }),
     );
-    const body = await res.json() as { mergedIntoBase: boolean };
+    const body = await res.json() as { mergedIntoBase: boolean; hasCommits: boolean };
     expect(body.mergedIntoBase).toBe(false);
+    expect(body.hasCommits).toBe(true);
+  });
+
+  test("a brand-new branch with no commits is neither merged nor has commits", async () => {
+    const db = openDb(":memory:");
+    const pid = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const t = createTask(db, { projectId: pid, intent: "x", baseBranch: "main" });
+    db.query("UPDATE tasks SET status='running', branch='task/x' WHERE id=?").run(t.id);
+    const res = await route("GET", ONE, deps({ runGit: gitAheadBehindStub(0, 0) })).handler(
+      ctx(db, new Request(`http://x/api/tasks/${t.id}`), { taskId: t.id }),
+    );
+    const body = await res.json() as { mergedIntoBase: boolean; hasCommits: boolean };
+    expect(body.mergedIntoBase).toBe(false);
+    expect(body.hasCommits).toBe(false);
   });
 });
 

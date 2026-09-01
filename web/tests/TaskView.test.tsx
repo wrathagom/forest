@@ -179,6 +179,20 @@ test("Complete & clean up calls patchTask with done/merged", async () => {
   );
 });
 
+test("a running task with no commits shows a message and no review actions", async () => {
+  getTaskDetail.mockResolvedValue({
+    task: task({ status: "running" }), diff: null, mergedIntoBase: false, hasCommits: false,
+  });
+  const { getByText, queryByText, container } = render(() => (
+    <TaskView taskId="t1" visible={true} onOpenSession={vi.fn()} />
+  ));
+  await waitFor(() => expect(container.textContent).toContain("No commits yet"));
+  expect(getByText("Discard")).toBeTruthy();
+  expect(queryByText("Merge to main")).toBeNull();
+  expect(queryByText("Open PR")).toBeNull();
+  expect(queryByText("Already merged into main")).toBeNull();
+});
+
 test("a draft task's Delete button calls deleteTask and onClose", async () => {
   getTaskDetail.mockResolvedValue({ task: task({ status: "draft", branch: null, sessionId: null }), diff: null });
   deleteTask.mockResolvedValue(undefined);
