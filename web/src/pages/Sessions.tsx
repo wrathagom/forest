@@ -5,6 +5,7 @@ import {
   fetchSessionsStats,
   type SessionListRow,
   type SessionsSort,
+  type SessionsOverviewResponse,
 } from "../api";
 import RelativeTime from "../components/RelativeTime";
 import TokensOverTimeChart from "../components/charts/TokensOverTimeChart";
@@ -71,18 +72,29 @@ export default function Sessions() {
   });
 
   const [stats] = createResource(fetchSessionsStats);
+  let inflight: AbortController | null = null;
   const [page] = createResource(
     () => ({ q: debounced(), project: project(), profile: profile(), sort: sort(), dir: dir(), offset: offset() }),
-    (key) =>
-      fetchSessionsOverview({
-        q: key.q || undefined,
-        project: key.project || undefined,
-        profile: key.profile || undefined,
-        sort: key.sort,
-        dir: key.dir,
-        limit: PAGE,
-        offset: key.offset,
-      }),
+    async (key): Promise<SessionsOverviewResponse | undefined> => {
+      inflight?.abort();
+      const ctrl = new AbortController();
+      inflight = ctrl;
+      try {
+        return await fetchSessionsOverview({
+          q: key.q || undefined,
+          project: key.project || undefined,
+          profile: key.profile || undefined,
+          sort: key.sort,
+          dir: key.dir,
+          limit: PAGE,
+          offset: key.offset,
+          signal: ctrl.signal,
+        });
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") return undefined; // superseded by a newer query
+        throw err;
+      }
+    },
   );
 
   // Accumulate results as pages load

@@ -499,6 +499,7 @@ export async function fetchSessionsOverview(opts: {
   dir?: "asc" | "desc";
   limit?: number;
   offset?: number;
+  signal?: AbortSignal;
 }): Promise<SessionsOverviewResponse> {
   const sp = new URLSearchParams();
   if (opts.q) sp.set("q", opts.q);
@@ -508,7 +509,7 @@ export async function fetchSessionsOverview(opts: {
   if (opts.dir) sp.set("dir", opts.dir);
   if (opts.limit !== undefined) sp.set("limit", String(opts.limit));
   if (opts.offset !== undefined) sp.set("offset", String(opts.offset));
-  return unwrap(await fetch(`/api/sessions?${sp}`), "sessions overview");
+  return unwrap(await fetch(`/api/sessions?${sp}`, { signal: opts.signal }), "sessions overview");
 }
 
 export type TokenBucket = { input: number; output: number; cache: number };
