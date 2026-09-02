@@ -37,4 +37,29 @@ describe("readConfig", () => {
   test("returns null when no command keys are present", () => {
     expect(readConfig(tmpProject("name: just-a-name\n"))).toBeNull();
   });
+
+  test("parses url alongside commands", () => {
+    const dir = tmpProject("start: make up\nurl: http://localhost:3000\n");
+    expect(readConfig(dir)).toEqual({ start: "make up", url: "http://localhost:3000" });
+  });
+
+  test("a url-only forest.yaml is a valid config", () => {
+    const dir = tmpProject("url: http://localhost:8080\n");
+    expect(readConfig(dir)).toEqual({ url: "http://localhost:8080" });
+  });
+
+  test("drops an empty url", () => {
+    const dir = tmpProject("start: make up\nurl: '   '\n");
+    expect(readConfig(dir)).toEqual({ start: "make up" });
+  });
+
+  test("drops a non-http(s) url (e.g. javascript:)", () => {
+    const dir = tmpProject('start: make up\nurl: "javascript:alert(1)"\n');
+    expect(readConfig(dir)).toEqual({ start: "make up" });
+  });
+
+  test("a url-only file with a non-http(s) scheme is not a valid config", () => {
+    const dir = tmpProject('url: "javascript:alert(1)"\n');
+    expect(readConfig(dir)).toBeNull();
+  });
 });

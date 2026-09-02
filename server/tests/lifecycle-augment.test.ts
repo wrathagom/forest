@@ -89,4 +89,22 @@ describe("augmentWithLifecycle", () => {
     });
     expect(out.lifecycle.status).toBe("errors");
   });
+
+  test("carries a configured url into the snapshot", async () => {
+    const s = await augmentWithLifecycle(upSnap(), {
+      enabled: true,
+      config: { start: "make up", url: "http://localhost:3000" },
+      runHealth: async () => ({ exitCode: 0 }),
+    });
+    expect(s.lifecycle.url).toBe("http://localhost:3000");
+  });
+
+  test("omits url when the config has none", async () => {
+    const s = await augmentWithLifecycle(upSnap(), {
+      enabled: true,
+      config: { start: "make up" },
+      runHealth: async () => ({ exitCode: 0 }),
+    });
+    expect(s.lifecycle.url).toBeUndefined();
+  });
 });

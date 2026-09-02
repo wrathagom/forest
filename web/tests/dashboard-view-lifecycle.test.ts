@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { statusChips } from "../src/lib/dashboard-view";
 import type { ProjectRow } from "../src/api";
 
-function proj(status: string, hasConfig = true, enabled = true): ProjectRow {
+function proj(status: string, hasConfig = true, enabled = true, url?: string): ProjectRow {
   return {
     id: "p", name: "p", path: "/p", pinned: false, hidden: false, group: null,
     scannedAt: Date.now(), liveSessions: 0, liveAgents: [],
@@ -11,7 +11,7 @@ function proj(status: string, hasConfig = true, enabled = true): ProjectRow {
       lastEdit: null,
       services: { docker: [], processes: [] },
       errors: [],
-      lifecycle: { status: status as never, hasConfig, enabled, health: null },
+      lifecycle: { status: status as never, hasConfig, enabled, health: null, url },
     },
   } as ProjectRow;
 }
@@ -30,6 +30,33 @@ describe("lifecycle chip", () => {
 
   test("status 'none' shows no lifecycle chip", () => {
     const chip = statusChips(proj("none", false, false), Date.now()).find((c) => c.key === "lifecycle");
+    expect(chip).toBeUndefined();
+  });
+});
+
+describe("url quick-link chip", () => {
+  test("running with a url adds a link chip carrying the href", () => {
+    const chip = statusChips(proj("running", true, true, "http://localhost:3000"), Date.now())
+      .find((c) => c.key === "url");
+    expect(chip?.href).toBe("http://localhost:3000");
+  });
+
+  test("healthy and starting also show the link chip", () => {
+    for (const s of ["healthy", "starting"]) {
+      const chip = statusChips(proj(s, true, true, "http://localhost:3000"), Date.now())
+        .find((c) => c.key === "url");
+      expect(chip?.href).toBe("http://localhost:3000");
+    }
+  });
+
+  test("stopped hides the link chip even with a url configured", () => {
+    const chip = statusChips(proj("stopped", true, true, "http://localhost:3000"), Date.now())
+      .find((c) => c.key === "url");
+    expect(chip).toBeUndefined();
+  });
+
+  test("no chip when there is no url", () => {
+    const chip = statusChips(proj("running"), Date.now()).find((c) => c.key === "url");
     expect(chip).toBeUndefined();
   });
 });

@@ -37,6 +37,7 @@ export type Snapshot = {
     hasConfig: boolean;
     enabled: boolean;
     health: { exitCode: number } | null;
+    url?: string;
   };
 };
 
@@ -46,7 +47,7 @@ export type LifecycleStatus =
 export type LifecycleView = {
   hasConfig: boolean;
   enabled: boolean;
-  config: { start?: string; stop?: string; health?: string } | null;
+  config: { start?: string; stop?: string; health?: string; url?: string } | null;
   status: LifecycleStatus;
   lastRun: { kind: "start" | "stop"; exitCode: number; output: string; at: number; failed: boolean } | null;
 };

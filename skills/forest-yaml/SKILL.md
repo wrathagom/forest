@@ -10,14 +10,16 @@ can launch, stop, and health-check it from the project page.
 
 ## File Format
 
-`forest.yaml` has three keys. Each value is a **single shell command** run from
-the project directory:
+`forest.yaml` has four keys. `start`, `stop`, and `health` are each a **single
+shell command** run from the project directory; `url` is a plain link, not a
+command:
 
 ```yaml
 # forest.yaml
 start:  docker compose up -d          # required for a Start button
 stop:   docker compose down           # required for a Stop button
 health: curl -fsS localhost:3000/up   # optional; exit 0 = healthy, nonzero = errors
+url:    http://localhost:3000         # optional; quick-link shown while the app is up
 ```
 
 - `start` — required for a **Start** button. Should launch the project and
@@ -27,9 +29,13 @@ health: curl -fsS localhost:3000/up   # optional; exit 0 = healthy, nonzero = er
 - `health` — optional. Exit `0` = healthy, nonzero = errors. Forest only runs it
   on a project it already considers "up", so it judges health, it doesn't start
   anything.
+- `url` — optional. The primary link to open the running app, e.g.
+  `http://localhost:3000`. Forest shows a quick-link to it (in the project panel
+  and on the dashboard card) only while the app is up. It runs nothing — it's
+  just a convenience link.
 
-Emit only the keys whose command actually exists for this project. A file with
-just `start` + `stop` is fine; so is one with all three.
+Emit only the keys that actually apply to this project. A file with just
+`start` + `stop` is fine; so is one with all four.
 
 ## Security: the file is inert until enabled
 
@@ -74,6 +80,7 @@ lifecycle* to activate it — don't imply it works the moment the file exists.
 start:  docker compose up -d
 stop:   docker compose down
 health: curl -fsS localhost:8080/healthz
+url:    http://localhost:8080
 ```
 
 ### Node / Bun HTTP server
@@ -83,6 +90,7 @@ health: curl -fsS localhost:8080/healthz
 start:  bun run start &
 stop:   pkill -f "bun run start"
 health: curl -fsS localhost:3000/
+url:    http://localhost:3000
 ```
 
 ### Go binary

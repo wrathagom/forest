@@ -227,3 +227,27 @@ describe("ProjectCard — navigation", () => {
     expect(queryByTestId("detail-sentinel")).toBeNull();
   });
 });
+
+describe("ProjectCard — url quick-link", () => {
+  const withUrl: ProjectRow = {
+    ...base,
+    snapshot: {
+      ...base.snapshot!,
+      lifecycle: { status: "running", hasConfig: true, enabled: true, health: null, url: "http://localhost:3000" },
+    },
+  };
+
+  test("renders the url chip as a new-tab link", async () => {
+    renderCard(withUrl);
+    const link = await screen.findByRole("link", { name: /open/i });
+    expect((link as HTMLAnchorElement).target).toBe("_blank");
+    expect((link as HTMLAnchorElement).href).toContain("localhost:3000");
+  });
+
+  test("clicking the url chip does not navigate the card", async () => {
+    const { queryByTestId } = renderCard(withUrl);
+    fireEvent.click(await screen.findByRole("link", { name: /open/i }));
+    await flush();
+    expect(queryByTestId("detail-sentinel")).toBeNull();
+  });
+});

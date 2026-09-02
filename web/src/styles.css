@@ -140,6 +140,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .chip-agent  { color: var(--info);  border-color: color-mix(in srgb, var(--info) 35%, transparent);  background: color-mix(in srgb, var(--info) 8%, transparent); }
 .chip-bare   { border-color: transparent; background: none; padding-left: 0; }
 
+a.chip { text-decoration: none; cursor: pointer; }
+a.chip:hover { text-decoration: underline; }
+
 .card-rows {
   margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.5rem;
   font-size: 0.78rem;
@@ -301,7 +304,16 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 }
 .lifecycle-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .lifecycle-btn:disabled { opacity: 0.5; cursor: default; }
-.lifecycle-output { width: 100%; }
+.lifecycle-output { width: auto; }
+.lifecycle-output[open] { width: 100%; }
+.lifecycle-output summary { cursor: pointer; font-size: 0.8rem; color: var(--fg-dim); }
+.lifecycle-link {
+  font-size: 0.8rem; text-decoration: none; border-radius: 3px; padding: 0.25rem 0.7rem;
+  color: var(--ok);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+.lifecycle-link:hover { text-decoration: underline; }
 .lifecycle-output pre {
   margin: 0.3rem 0 0; padding: 0.5rem; max-height: 12rem; overflow: auto;
   background: var(--bg); border: 1px solid var(--border); border-radius: 3px;

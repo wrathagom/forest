@@ -96,7 +96,23 @@ export default function ProjectCard(props: {
                 </Show>
                 <div class="card-chips">
                   <For each={statusChips(props.project, Date.now())}>
-                    {(c) => <span class={`chip chip-${c.tone}`} title={c.title}>{c.label}</span>}
+                    {(c) => (
+                      <Show
+                        when={c.href}
+                        fallback={<span class={`chip chip-${c.tone}`} title={c.title}>{c.label}</span>}
+                      >
+                        <a
+                          class={`chip chip-${c.tone}`}
+                          href={c.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={c.title}
+                          onclick={(e) => e.stopPropagation()}
+                        >
+                          {c.label}
+                        </a>
+                      </Show>
+                    )}
                   </For>
                 </div>
               </>
