@@ -140,6 +140,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
 .chip-agent  { color: var(--info);  border-color: color-mix(in srgb, var(--info) 35%, transparent);  background: color-mix(in srgb, var(--info) 8%, transparent); }
 .chip-bare   { border-color: transparent; background: none; padding-left: 0; }
 
+a.chip { text-decoration: none; cursor: pointer; }
+a.chip:hover { text-decoration: underline; }
+
 .card-rows {
   margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.5rem;
   font-size: 0.78rem;
