@@ -6,12 +6,14 @@ export type ForestConfig = {
   start?: string;
   stop?: string;
   health?: string;
+  url?: string;
 };
 
 /**
  * Read and parse `<projectPath>/forest.yaml`. Tolerant: a missing or malformed
- * file, or one with no string command keys, returns null. Only `start`, `stop`,
- * and `health` (each a string) are read; everything else is ignored.
+ * file, or one with no recognised string keys, returns null. Only `start`,
+ * `stop`, `health`, and `url` (each a string) are read; everything else is
+ * ignored.
  */
 export function readConfig(projectPath: string): ForestConfig | null {
   let raw: string;
@@ -29,11 +31,16 @@ export function readConfig(projectPath: string): ForestConfig | null {
   if (!parsed || typeof parsed !== "object") return null;
   const obj = parsed as Record<string, unknown>;
   const cfg: ForestConfig = {};
-  for (const key of ["start", "stop", "health"] as const) {
+  for (const key of ["start", "stop", "health", "url"] as const) {
     const v = obj[key];
     if (typeof v === "string" && v.trim() !== "") cfg[key] = v.trim();
   }
-  if (cfg.start === undefined && cfg.stop === undefined && cfg.health === undefined) {
+  if (
+    cfg.start === undefined &&
+    cfg.stop === undefined &&
+    cfg.health === undefined &&
+    cfg.url === undefined
+  ) {
     return null;
   }
   return cfg;
