@@ -154,6 +154,20 @@ Each value is a single shell command run from the project directory. Ask Claude
 or Codex to write this file for you — "add a forest.yaml that starts and stops
 this project."
 
+This repo ships a **`forest-yaml` skill** (`skills/forest-yaml/`) that teaches an
+agent to author the file — it inspects the repo for the real start/stop/health
+commands rather than guessing. Running `./scripts/forest-service.sh install` (or
+`restart`) symlinks it into every detected Claude profile (`~/.claude` and each
+`~/.claude-<name>`), so a `git pull` + `restart` keeps the skill current
+everywhere at once. To manage skills on their own — copy instead of link, or
+preview — call the installer directly:
+
+```sh
+./scripts/install-skills.sh            # symlink every skill into every profile
+./scripts/install-skills.sh --copy     # copy instead of symlink
+./scripts/install-skills.sh --dry-run  # preview, touch nothing
+```
+
 The file is **inert until you enable lifecycle** for that project (a one-click
 **Enable lifecycle** button on the project page). This is the security boundary:
 Forest scans every repo under your scan root, so no discovered `forest.yaml`
