@@ -20,6 +20,7 @@ export type Snapshot = {
     hasConfig: boolean;
     enabled: boolean;
     health: { exitCode: number } | null;
+    url?: string;
   };
 };
 

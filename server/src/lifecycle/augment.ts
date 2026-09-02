@@ -39,5 +39,6 @@ export async function augmentWithLifecycle(snap: Snapshot, input: AugmentInput):
     enabled: input.enabled,
     health,
   };
+  if (input.config?.url) snap.lifecycle.url = input.config.url;
   return snap;
 }
