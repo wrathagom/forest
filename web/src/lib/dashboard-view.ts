@@ -10,7 +10,7 @@ export const VIEW_PRESETS: ViewPreset[] = ["compact", "status", "detail"];
 export type ChipTone =
   | "neutral" | "dirty" | "ahead" | "behind" | "running" | "agent" | "bare" | "error";
 
-export type Chip = { key: string; label: string; tone: ChipTone; title?: string };
+export type Chip = { key: string; label: string; tone: ChipTone; title?: string; href?: string };
 export type DetailRow = { label: string; value: string };
 
 /**
@@ -29,6 +29,11 @@ export function lifecycleTone(status: LifecycleStatus): ChipTone {
     case "stopping": return "dirty";
     default: return "neutral"; // none / stopped
   }
+}
+
+/** True when the app is up — the only states in which a quick-link makes sense. */
+export function isLifecycleUp(status: LifecycleStatus): boolean {
+  return status === "running" || status === "healthy" || status === "starting";
 }
 
 const MIN = 60_000, HOUR = 3_600_000, DAY = 86_400_000;
@@ -118,6 +123,9 @@ export function statusChips(p: ProjectRow, now: number): Chip[] {
   const lc = p.snapshot?.lifecycle;
   if (lc && lc.status !== "none") {
     chips.push({ key: "lifecycle", label: lc.status, tone: lifecycleTone(lc.status), title: "forest.yaml lifecycle" });
+    if (lc.url && isLifecycleUp(lc.status)) {
+      chips.push({ key: "url", label: "open ↗", tone: "running", title: lc.url, href: lc.url });
+    }
   }
 
   // Always last, and always bare.
