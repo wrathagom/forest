@@ -165,6 +165,14 @@ service_installed() {
   esac
 }
 
+# Install the repo's skills into every detected Claude profile. Delegates to
+# install-skills.sh (symlink by default), which is idempotent and safe to re-run.
+install_skills() {
+  local installer="$SCRIPT_DIR/install-skills.sh"
+  [ -x "$installer" ] || { note "skill installer not found at $installer — skipping skills"; return; }
+  if [ "$DRY_RUN" -eq 1 ]; then "$installer" --dry-run; else "$installer"; fi
+}
+
 # --- subcommands -------------------------------------------------------------
 cmd_install() {
   find_bun
@@ -174,6 +182,7 @@ cmd_install() {
     macos) render_plist | write_file "$(plist_path)"; macos_load ;;
     linux) render_unit  | write_file "$(unit_path)";  linux_load ;;
   esac
+  install_skills
   note "Forest is running at http://localhost:$PORT"
   note "manage it: $0 {status|restart|uninstall}"
 }
@@ -189,6 +198,7 @@ cmd_restart() {
   find_bun
   build_web
   case "$PLATFORM" in macos) macos_restart ;; linux) linux_restart ;; esac
+  install_skills
   note "Forest restarted at http://localhost:$PORT"
 }
 
@@ -205,9 +215,9 @@ forest-service.sh — run Forest as a per-user background service
 usage: $0 <command> [options]
 
 commands:
-  install      build the web UI, install the service file, and start it
+  install      build the web UI, install the service file + skills, and start it
   uninstall    stop and remove the service (data + logs are kept)
-  restart      rebuild the web UI and bounce the service (use after 'git pull')
+  restart      rebuild the web UI, refresh skills, and bounce (use after 'git pull')
   status       show whether the service is installed/running, plus recent logs
 
 options:
