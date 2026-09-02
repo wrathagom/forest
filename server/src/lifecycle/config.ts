@@ -35,6 +35,11 @@ export function readConfig(projectPath: string): ForestConfig | null {
     const v = obj[key];
     if (typeof v === "string" && v.trim() !== "") cfg[key] = v.trim();
   }
+  // `url` is rendered as an href in the UI, so only allow http(s) — drop
+  // anything else (e.g. a `javascript:` URL) rather than surface it.
+  if (cfg.url !== undefined && !/^https?:\/\//i.test(cfg.url)) {
+    delete cfg.url;
+  }
   if (
     cfg.start === undefined &&
     cfg.stop === undefined &&

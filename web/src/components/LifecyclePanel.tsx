@@ -34,10 +34,14 @@ export default function LifecyclePanel(props: { projectId: string }) {
 
   // Poll the (cheap) lifecycle endpoint so status updates live without a manual
   // refresh: fast while a command is in flight or the status is transient, slow
-  // otherwise. The memo means the interval is recreated only when the cadence
-  // flips, not on every poll.
+  // otherwise. Skip entirely for a project with no forest.yaml — its lifecycle
+  // status can't change through Forest. Both gates are memos so the interval is
+  // recreated only when the cadence (or the should-poll gate) flips, not on
+  // every poll.
+  const shouldPoll = createMemo(() => busy() || !!data()?.hasConfig);
   const fast = createMemo(() => busy() || isTransient(displayStatus()));
   createEffect(() => {
+    if (!shouldPoll()) return;
     const ms = fast() ? POLL_FAST_MS : POLL_SLOW_MS;
     const t = setInterval(() => void refetch(), ms);
     onCleanup(() => clearInterval(t));
@@ -85,7 +89,9 @@ export default function LifecyclePanel(props: { projectId: string }) {
       </Show>
       <Show when={data()}>
         {(d) => {
-          const status = () => displayStatus() ?? d().status;
+          // Inside `Show when={data()}`, d().status === data().status, so the
+          // optimistic pending value is the only thing that can override it.
+          const status = () => pending() ?? d().status;
           return (
             <>
               <span class={`chip chip-${lifecycleTone(status())}`} title="forest.yaml lifecycle">{status()}</span>

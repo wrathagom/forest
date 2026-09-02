@@ -1,5 +1,6 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import LifecyclePanel from "../src/components/LifecyclePanel";
 import * as api from "../src/api";
 
@@ -94,5 +95,18 @@ describe("LifecyclePanel", () => {
     render(() => <LifecyclePanel projectId="p" />);
     await screen.findByRole("button", { name: /^start$/i });
     expect(screen.queryByRole("link", { name: /open/i })).toBeNull();
+  });
+
+  test("clears the error banner when switching projects", async () => {
+    const [id, setId] = createSignal("p1");
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "stopped", lastRun: null,
+    });
+    vi.spyOn(api, "startLifecycle").mockRejectedValue(new Error("boom"));
+    render(() => <LifecyclePanel projectId={id()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /^start$/i }));
+    expect(await screen.findByText(/boom/i)).toBeTruthy();
+    setId("p2");
+    await waitFor(() => expect(screen.queryByText(/boom/i)).toBeNull());
   });
 });
