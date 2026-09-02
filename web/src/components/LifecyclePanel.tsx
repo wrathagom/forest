@@ -1,12 +1,47 @@
-import { Show, createResource, createSignal } from "solid-js";
+import { Show, createResource, createSignal, createMemo, createEffect, onCleanup } from "solid-js";
 import { fetchLifecycle, setLifecycleEnabled, startLifecycle, stopLifecycle } from "../api";
-import { lifecycleTone } from "../lib/dashboard-view";
+import type { LifecycleStatus, LifecycleRunResult } from "../api";
+import { lifecycleTone, isLifecycleUp } from "../lib/dashboard-view";
+
+const POLL_FAST_MS = 1_000;
+const POLL_SLOW_MS = 10_000;
 
 export default function LifecyclePanel(props: { projectId: string }) {
   const [data, { refetch }] = createResource(() => props.projectId, fetchLifecycle);
   const [busy, setBusy] = createSignal(false);
   const [output, setOutput] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  // Optimistic status shown the instant a command is clicked, before the first
+  // poll observes the server's transient state. Cleared when the command ends.
+  const [pending, setPending] = createSignal<LifecycleStatus | null>(null);
+
+  // Reset per-project local state when navigating between projects so a banner
+  // or last-run output from one project can't bleed into the next.
+  createEffect((prev: string | undefined) => {
+    const id = props.projectId;
+    if (prev !== undefined && prev !== id) {
+      setError(null);
+      setOutput(null);
+      setPending(null);
+    }
+    return id;
+  });
+
+  // The status actually displayed: optimistic pending wins until the command
+  // resolves, then the polled backend status drives the display.
+  const displayStatus = (): LifecycleStatus | undefined => pending() ?? data()?.status;
+  const isTransient = (s: LifecycleStatus | undefined) => s === "starting" || s === "stopping";
+
+  // Poll the (cheap) lifecycle endpoint so status updates live without a manual
+  // refresh: fast while a command is in flight or the status is transient, slow
+  // otherwise. The memo means the interval is recreated only when the cadence
+  // flips, not on every poll.
+  const fast = createMemo(() => busy() || isTransient(displayStatus()));
+  createEffect(() => {
+    const ms = fast() ? POLL_FAST_MS : POLL_SLOW_MS;
+    const t = setInterval(() => void refetch(), ms);
+    onCleanup(() => clearInterval(t));
+  });
 
   const enable = async () => {
     setBusy(true);
@@ -21,9 +56,10 @@ export default function LifecyclePanel(props: { projectId: string }) {
     }
   };
 
-  const run = async (fn: (id: string) => Promise<{ output: string; failed: boolean }>) => {
+  const run = async (kind: "start" | "stop", fn: (id: string) => Promise<LifecycleRunResult>) => {
     setBusy(true);
     setError(null);
+    setPending(kind === "start" ? "starting" : "stopping");
     try {
       const r = await fn(props.projectId);
       setOutput(r.output || "(no output)");
@@ -31,6 +67,7 @@ export default function LifecyclePanel(props: { projectId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      setPending(null);
       setBusy(false);
     }
   };
@@ -47,37 +84,44 @@ export default function LifecyclePanel(props: { projectId: string }) {
         <span class="muted">lifecycle…</span>
       </Show>
       <Show when={data()}>
-        {(d) => (
-          <>
-            <span class={`chip chip-${lifecycleTone(d().status)}`} title="forest.yaml lifecycle">{d().status}</span>
+        {(d) => {
+          const status = () => displayStatus() ?? d().status;
+          return (
+            <>
+              <span class={`chip chip-${lifecycleTone(status())}`} title="forest.yaml lifecycle">{status()}</span>
 
-            <Show when={!d().hasConfig}>
-              <span class="muted">No <code>forest.yaml</code> — add one with <code>start</code>/<code>stop</code>/<code>health</code> to enable lifecycle controls.</span>
-            </Show>
-
-            <Show when={d().hasConfig && !d().enabled}>
-              <button class="lifecycle-btn" disabled={busy()} onclick={enable}>Enable lifecycle</button>
-            </Show>
-
-            <Show when={d().enabled}>
-              <Show when={d().config?.start}>
-                <button class="lifecycle-btn" disabled={busy()} onclick={() => run(startLifecycle)}>Start</button>
+              <Show when={d().config?.url && isLifecycleUp(status())}>
+                <a class="lifecycle-link" href={d().config!.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
               </Show>
-              <Show when={d().config?.stop}>
-                <button class="lifecycle-btn" disabled={busy()} onclick={() => run(stopLifecycle)}>Stop</button>
-              </Show>
-            </Show>
 
-            <Show when={output() ?? d().lastRun?.output}>
-              {(out) => (
-                <details open={d().lastRun?.failed ?? false} class="lifecycle-output">
-                  <summary>last run</summary>
-                  <pre>{out()}</pre>
-                </details>
-              )}
-            </Show>
-          </>
-        )}
+              <Show when={!d().hasConfig}>
+                <span class="muted">No <code>forest.yaml</code> — add one with <code>start</code>/<code>stop</code>/<code>health</code> to enable lifecycle controls.</span>
+              </Show>
+
+              <Show when={d().hasConfig && !d().enabled}>
+                <button class="lifecycle-btn" disabled={busy()} onclick={enable}>Enable lifecycle</button>
+              </Show>
+
+              <Show when={d().enabled}>
+                <Show when={d().config?.start}>
+                  <button class="lifecycle-btn" disabled={busy()} onclick={() => run("start", startLifecycle)}>Start</button>
+                </Show>
+                <Show when={d().config?.stop}>
+                  <button class="lifecycle-btn" disabled={busy()} onclick={() => run("stop", stopLifecycle)}>Stop</button>
+                </Show>
+              </Show>
+
+              <Show when={output() ?? d().lastRun?.output}>
+                {(out) => (
+                  <details open={d().lastRun?.failed ?? false} class="lifecycle-output">
+                    <summary>last run</summary>
+                    <pre>{out()}</pre>
+                  </details>
+                )}
+              </Show>
+            </>
+          );
+        }}
       </Show>
     </div>
   );
