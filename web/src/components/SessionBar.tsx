@@ -1,6 +1,6 @@
-import { createResource, onCleanup, For, Show } from "solid-js";
+import { createResource, createSignal, onCleanup, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { fetchLiveSessions, type LiveSessionRow } from "../api";
+import { fetchLiveSessions, markSessionDone, type LiveSessionRow } from "../api";
 import RelativeTime from "./RelativeTime";
 import { agentIcon } from "../lib/agents";
 
@@ -41,7 +41,26 @@ export default function SessionBar() {
   }, 3000);
   onCleanup(() => clearInterval(interval));
 
-  const rows = () => (sessions.error ? [] : sessions() ?? []);
+  // Sessions the user just removed, hidden immediately so the chip vanishes before
+  // the next 3s poll. The server also filters dismissed sessions, so once the poll
+  // lands the row stays gone; this set is belt-and-suspenders against the poll lag.
+  const [removed, setRemoved] = createSignal<Set<string>>(new Set());
+  const rows = () =>
+    (sessions.error ? [] : sessions() ?? []).filter((s) => !removed().has(s.agentSessionId));
+
+  const onRemove = (s: LiveSessionRow) => {
+    setRemoved((prev) => new Set(prev).add(s.agentSessionId));
+    void markSessionDone(s.agentSessionId)
+      .then(() => refetch())
+      .catch(() => {
+        // dismissal failed — restore the chip so the user can try again
+        setRemoved((prev) => {
+          const next = new Set(prev);
+          next.delete(s.agentSessionId);
+          return next;
+        });
+      });
+  };
 
   const onChipClick = (s: LiveSessionRow) => {
     if (!canOpen(s)) return; // inert — nothing to open (esp. a closed Codex chip)
@@ -60,21 +79,34 @@ export default function SessionBar() {
       <div class="session-bar">
         <For each={rows()}>
           {(s) => (
-            <button
-              type="button"
-              class={`session-chip session-chip-${s.state}${canOpen(s) ? "" : " session-chip-inert"}`}
-              title={chipTitle(s)}
-              disabled={!canOpen(s)}
-              onClick={() => onChipClick(s)}
-            >
-              <span class={`session-chip-dot session-chip-dot-${isClosed(s) ? "closed" : s.state}`} />
-              <span class="session-chip-agent" aria-hidden="true">{agentIcon(s.agent)}</span>
-              <Show when={s.profile && s.profile !== "default"}>
-                <span class="session-profile-badge">{s.profile}</span>
+            <div class="session-chip-wrap">
+              <button
+                type="button"
+                class={`session-chip session-chip-${s.state}${canOpen(s) ? "" : " session-chip-inert"}`}
+                title={chipTitle(s)}
+                disabled={!canOpen(s)}
+                onClick={() => onChipClick(s)}
+              >
+                <span class={`session-chip-dot session-chip-dot-${isClosed(s) ? "closed" : s.state}`} />
+                <span class="session-chip-agent" aria-hidden="true">{agentIcon(s.agent)}</span>
+                <Show when={s.profile && s.profile !== "default"}>
+                  <span class="session-profile-badge">{s.profile}</span>
+                </Show>
+                <span class="session-chip-project">{s.projectName ?? "unassigned"}</span>
+                <span class="session-chip-time"><RelativeTime ms={s.lastEventAt} /></span>
+              </button>
+              <Show when={isClosed(s)}>
+                <button
+                  type="button"
+                  class="session-chip-remove"
+                  title="Remove from bar"
+                  aria-label="Remove session from bar"
+                  onClick={(e) => { e.stopPropagation(); onRemove(s); }}
+                >
+                  ×
+                </button>
               </Show>
-              <span class="session-chip-project">{s.projectName ?? "unassigned"}</span>
-              <span class="session-chip-time"><RelativeTime ms={s.lastEventAt} /></span>
-            </button>
+            </div>
           )}
         </For>
       </div>
