@@ -5,10 +5,11 @@ import type { LiveSessionRow } from "../src/api";
 const navigate = vi.fn();
 vi.mock("@solidjs/router", () => ({ useNavigate: () => navigate }));
 
-const { fetchLiveSessions } = vi.hoisted(() => ({
+const { fetchLiveSessions, markSessionDone } = vi.hoisted(() => ({
   fetchLiveSessions: vi.fn(),
+  markSessionDone: vi.fn(),
 }));
-vi.mock("../src/api", () => ({ fetchLiveSessions }));
+vi.mock("../src/api", () => ({ fetchLiveSessions, markSessionDone }));
 
 import SessionBar from "../src/components/SessionBar";
 
@@ -37,6 +38,8 @@ const closedRow = (over: Partial<LiveSessionRow> = {}) =>
 beforeEach(() => {
   navigate.mockReset();
   fetchLiveSessions.mockReset();
+  markSessionDone.mockReset();
+  markSessionDone.mockResolvedValue(undefined);
 });
 
 test("renders nothing when there are no live sessions", async () => {
@@ -127,7 +130,7 @@ test("clicking a live Codex chip navigates to ?term= (focuses its terminal)", as
   await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
   const chip = container.querySelector(".session-chip")!;
   expect(chip.classList.contains("session-chip-inert")).toBe(false);
-  expect(chip.hasAttribute("disabled")).toBe(false);
+  expect(chip.getAttribute("aria-disabled")).toBe("false");
   fireEvent.click(chip);
   expect(navigate).toHaveBeenCalledWith("/projects/p1?term=pty-cx");
 });
@@ -148,7 +151,10 @@ test("a closed Codex chip is inert (no dead transcript reader)", async () => {
   await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
   const chip = container.querySelector(".session-chip")!;
   expect(chip.classList.contains("session-chip-inert")).toBe(true);
-  expect(chip.hasAttribute("disabled")).toBe(true);
+  // Deliberately not `disabled` — a disabled button drops out of the tab order,
+  // which would also make the sibling remove-× unreachable via :focus-within.
+  // aria-disabled keeps it focusable while onChipClick still no-ops the click.
+  expect(chip.getAttribute("aria-disabled")).toBe("true");
   fireEvent.click(chip);
   expect(navigate).not.toHaveBeenCalled();
 });
@@ -164,4 +170,58 @@ test("shows profile badge for non-default profile, hides badge for default profi
   await waitFor(() => expect(container.querySelectorAll(".session-chip")).toHaveLength(2));
   expect(container.querySelector(".session-profile-badge")?.textContent).toBe("work");
   expect(container.textContent).not.toContain("default");
+});
+
+test("only closed chips render a remove button", async () => {
+  fetchLiveSessions.mockResolvedValue({
+    sessions: [
+      liveRow(), // working — not closed
+      closedRow({ agentSessionId: "c1", ptySessionId: "pty-c1", projectId: "p2", projectName: "Two" }),
+    ],
+  });
+  const { container } = render(() => <SessionBar />);
+  await waitFor(() => expect(container.querySelectorAll(".session-chip")).toHaveLength(2));
+  expect(container.querySelectorAll(".session-chip-remove")).toHaveLength(1);
+});
+
+test("clicking the remove x dismisses a closed session and removes its chip optimistically", async () => {
+  fetchLiveSessions.mockResolvedValue({ sessions: [closedRow()] });
+  const { container } = render(() => <SessionBar />);
+  await waitFor(() => expect(container.querySelector(".session-chip-remove")).toBeTruthy());
+  fireEvent.click(container.querySelector(".session-chip-remove")!);
+  // optimistic: the chip vanishes immediately, without waiting on the network call to resolve
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeNull());
+  expect(markSessionDone).toHaveBeenCalledWith("abcdef12-3456-7890-aaaa-bbbbbbbbbbbb");
+});
+
+test("a failed dismissal restores the chip", async () => {
+  markSessionDone.mockRejectedValue(new Error("network error"));
+  fetchLiveSessions.mockResolvedValue({ sessions: [closedRow()] });
+  const { container } = render(() => <SessionBar />);
+  await waitFor(() => expect(container.querySelector(".session-chip-remove")).toBeTruthy());
+  fireEvent.click(container.querySelector(".session-chip-remove")!);
+  // optimistic removal happens first, regardless of how the request resolves
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeNull());
+  // once the rejection is handled, the chip comes back so the user can retry
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
+});
+
+test("a session removed while closed reappears once revived (no longer closed)", async () => {
+  const sessionId = "revive-1";
+  fetchLiveSessions
+    .mockResolvedValueOnce({
+      sessions: [closedRow({ agentSessionId: sessionId, ptySessionId: "pty-r" })],
+    })
+    .mockResolvedValueOnce({
+      // server "un-dismissed" it on a new prompt: same id, live again, not closed
+      sessions: [liveRow({ agentSessionId: sessionId, ptySessionId: "pty-r-new", state: "working" })],
+    });
+  const { container } = render(() => <SessionBar />);
+  await waitFor(() => expect(container.querySelector(".session-chip-remove")).toBeTruthy());
+  fireEvent.click(container.querySelector(".session-chip-remove")!);
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeNull());
+  // markSessionDone resolves, refetch() runs, and the row comes back not-closed —
+  // the `removed` set still has the id, but the `&& isClosed(s)` guard no longer applies.
+  await waitFor(() => expect(container.querySelector(".session-chip")).toBeTruthy());
+  expect(container.querySelector(".session-chip-remove")).toBeNull();
 });

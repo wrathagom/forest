@@ -88,7 +88,7 @@ export default function SessionBar() {
                 type="button"
                 class={`session-chip session-chip-${s.state}${canOpen(s) ? "" : " session-chip-inert"}`}
                 title={chipTitle(s)}
-                disabled={!canOpen(s)}
+                aria-disabled={!canOpen(s)}
                 onClick={() => onChipClick(s)}
               >
                 <span class={`session-chip-dot session-chip-dot-${isClosed(s) ? "closed" : s.state}`} />
