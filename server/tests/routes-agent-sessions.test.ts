@@ -170,6 +170,74 @@ describe("agent-sessions routes", () => {
     const after = await (await liveRoute.handler(ctx(db, new Request("http://x/api/agent-sessions/live"), {}))).json() as { sessions: Array<{ agentSessionId: string }> };
     expect(after.sessions.map((s) => s.agentSessionId)).not.toContain(sid);
   });
+
+  test("GET /api/agent-sessions/live over-fetches so dismissed entries back-fill with legitimately-closed ones", async () => {
+    const db = openDb(":memory:");
+    const live = new LiveAgentSessions();
+
+    const mkUpdate = (sid: string, event: string, at: number) => ({
+      agentSessionId: sid,
+      event,
+      cwd: "/proj",
+      parentSessionId: null,
+      projectId: "pid",
+      projectName: "proj",
+      worktreeLabel: null,
+      branch: null,
+      profile: null,
+      lastUserMsg: null,
+      ptySessionId: null,
+      at,
+    });
+
+    // 8 open sessions -- endedAt stays null, so these always outrank any closed
+    // entry regardless of timestamp (list() groups open before closed).
+    for (let i = 1; i <= 8; i++) live.applyHookEvent(mkUpdate(`active-${i}`, "stop", 1000 + i));
+
+    // A couple the user marks "done". dismiss() closes them (sets endedAt) without
+    // touching lastEventAt, and these two are given the most recent lastEventAt of
+    // any closed entry -- so a naive, non-over-fetching read would rank them into
+    // the visible top 10 before being filtered out, permanently losing two slots.
+    live.applyHookEvent(mkUpdate("dismissed-1", "stop", 500));
+    live.applyHookEvent(mkUpdate("dismissed-2", "stop", 490));
+    live.dismiss("dismissed-1", 9000);
+    live.dismiss("dismissed-2", 9000);
+
+    // 3 legitimately-closed sessions (real SessionEnd, never dismissed), each older
+    // by lastEventAt than the dismissed pair. Once the dismissed entries are
+    // excluded, "closed-1" -- the most recent of these -- must back-fill the slot
+    // a dismissed entry would otherwise have occupied. (applyHookEvent drops a
+    // SessionEnd for a session it never saw start, so seed each one first.)
+    for (const sid of ["closed-1", "closed-2", "closed-3"]) live.applyHookEvent(mkUpdate(sid, "sessionstart", 1));
+    live.applyHookEvent(mkUpdate("closed-1", "sessionend", 480));
+    live.applyHookEvent(mkUpdate("closed-2", "sessionend", 470));
+    live.applyHookEvent(mkUpdate("closed-3", "sessionend", 460));
+
+    // Sanity check on the setup itself: the raw (unfiltered) top 10 is exactly the
+    // 8 active sessions plus the two about to be dismissed -- confirming that,
+    // without the over-fetch, "closed-1" would never even be considered.
+    expect(live.list(10).map((e) => e.agentSessionId)).toEqual([
+      "active-8", "active-7", "active-6", "active-5",
+      "active-4", "active-3", "active-2", "active-1",
+      "dismissed-1", "dismissed-2",
+    ]);
+
+    const routes = agentSessionsRoutes({
+      vault: new Vault(db),
+      listProjects: () => [],
+      claudeConfigDirs: () => [],
+      liveSessions: live,
+    });
+    const liveRoute = routes.find((r) => r.method === "GET" && r.pattern.test("/api/agent-sessions/live"))!;
+    const res = await (await liveRoute.handler(ctx(db, new Request("http://x/api/agent-sessions/live"), {}))).json() as {
+      sessions: Array<{ agentSessionId: string }>;
+    };
+    const ids = res.sessions.map((s) => s.agentSessionId);
+
+    expect(ids).not.toContain("dismissed-1");
+    expect(ids).not.toContain("dismissed-2");
+    expect(ids).toContain("closed-1");
+  });
 });
 
 describe("POST /api/agent-sessions/:sid/prepare-resume", () => {
