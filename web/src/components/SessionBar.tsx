@@ -46,7 +46,11 @@ export default function SessionBar() {
   // lands the row stays gone; this set is belt-and-suspenders against the poll lag.
   const [removed, setRemoved] = createSignal<Set<string>>(new Set());
   const rows = () =>
-    (sessions.error ? [] : sessions() ?? []).filter((s) => !removed().has(s.agentSessionId));
+    (sessions.error ? [] : sessions() ?? []).filter(
+      // suppress only while still closed — if the session is resumed (server
+      // un-dismisses it), it comes back not-closed and reappears on its own.
+      (s) => !(removed().has(s.agentSessionId) && isClosed(s)),
+    );
 
   const onRemove = (s: LiveSessionRow) => {
     setRemoved((prev) => new Set(prev).add(s.agentSessionId));
@@ -99,9 +103,9 @@ export default function SessionBar() {
                 <button
                   type="button"
                   class="session-chip-remove"
-                  title="Remove from bar"
+                  title="Remove session from bar"
                   aria-label="Remove session from bar"
-                  onClick={(e) => { e.stopPropagation(); onRemove(s); }}
+                  onClick={() => onRemove(s)}
                 >
                   ×
                 </button>
