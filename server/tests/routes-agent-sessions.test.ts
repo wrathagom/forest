@@ -126,6 +126,50 @@ describe("agent-sessions routes", () => {
     expect(body.sessions[0]!.projectName).toBe("proj");
     expect(body.sessions[0]!.lastUserMsg).toBe("do the thing");
   });
+
+  test("GET /api/agent-sessions/live excludes dismissed sessions", async () => {
+    const db = openDb(":memory:");
+    const projectPath = join(tmp, "proj");
+    mkdirSync(projectPath, { recursive: true });
+    const projectId = upsertProject(db, { path: projectPath, name: "proj" });
+
+    const sid = "dismiss-sid-1";
+    const claudeRoot = join(tmp, "claude-projects");
+    const slugDir = join(claudeRoot, "projects", "-tmp-proj");
+    const transcript = join(slugDir, `${sid}.jsonl`);
+    mkdirSync(slugDir, { recursive: true });
+    const line = JSON.stringify({
+      type: "user", uuid: "u1", timestamp: "2026-05-09T00:00:00Z",
+      message: { role: "user", content: "hello forest" }, sessionId: sid, cwd: projectPath,
+    });
+    writeFileSync(transcript, line + "\n");
+
+    const live = new LiveAgentSessions();
+    const routes = agentSessionsRoutes({
+      vault: new Vault(db),
+      listProjects: () => [{ id: projectId, path: projectPath }],
+      claudeConfigDirs: () => [{ path: claudeRoot, profile: "default" }],
+      liveSessions: live,
+      projectName: (id) => (id === projectId ? "proj" : null),
+    });
+
+    const ingest = routes.find((r) => r.method === "POST")!;
+    const req = new Request("http://x/api/agent-sessions/ingest", {
+      method: "POST",
+      headers: { "x-forest-event": "userpromptsubmit", "x-forest-pty": "pty-77" },
+      body: JSON.stringify({ session_id: sid, cwd: projectPath, transcript_path: transcript, prompt: "do the thing" }),
+    });
+    await ingest.handler(ctx(db, req, {}));
+
+    const liveRoute = routes.find((r) => r.method === "GET" && r.pattern.test("/api/agent-sessions/live"))!;
+
+    const before = await (await liveRoute.handler(ctx(db, new Request("http://x/api/agent-sessions/live"), {}))).json() as { sessions: Array<{ agentSessionId: string }> };
+    expect(before.sessions.map((s) => s.agentSessionId)).toContain(sid);
+
+    live.dismiss(sid);
+    const after = await (await liveRoute.handler(ctx(db, new Request("http://x/api/agent-sessions/live"), {}))).json() as { sessions: Array<{ agentSessionId: string }> };
+    expect(after.sessions.map((s) => s.agentSessionId)).not.toContain(sid);
+  });
 });
 
 describe("POST /api/agent-sessions/:sid/prepare-resume", () => {
