@@ -658,14 +658,6 @@ export async function fetchLiveSessions(): Promise<{ sessions: LiveSessionRow[] 
   return unwrap(await fetch("/api/agent-sessions/live"), "live sessions");
 }
 
-// Remove a session from the bar. Reuses the existing "done" endpoint, which marks
-// the session dismissed server-side (persisted, auto-expires after 12h, and clears
-// if the session gets a new prompt). Returns 204 with no body.
-export async function dismissLiveSession(sid: string): Promise<void> {
-  const res = await fetch(`/api/agent-sessions/${encodeURIComponent(sid)}/done`, { method: "POST" });
-  if (!res.ok) throw new Error(`dismiss session failed: ${res.status}`);
-}
-
 export type MobilePermissionMode = "plan" | "acceptEdits" | "bypassPermissions";
 
 export type MobileListItem = {
