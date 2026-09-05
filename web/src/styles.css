@@ -319,6 +319,13 @@ a.chip:hover { text-decoration: underline; }
   background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
   font-size: 0.75rem; white-space: pre-wrap; word-break: break-word;
 }
+.lifecycle-sections {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);
+  width: 100%;
+}
+.lifecycle-section { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.lifecycle-section-name { font-weight: 600; font-size: 0.85em; color: var(--fg); }
 .tab-strip { display: flex; gap: 0.3rem; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg); }
 .tab { display: flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-2); color: var(--fg-dim); font-size: 0.8rem; cursor: pointer; }
 .tab:hover { color: var(--fg); }
