@@ -121,4 +121,9 @@ describe("readConfig", () => {
     const dir = tmpProject("start: make up\nsections:\n  game:\n    - 1\n    - 2\n");
     expect(readConfig(dir)).toEqual({ start: "make up" });
   });
+
+  test("trims a section name", () => {
+    const dir = tmpProject("sections:\n  ' game ':\n    start: godot .\n");
+    expect(readConfig(dir)).toEqual({ sections: { game: { start: "godot ." } } });
+  });
 });

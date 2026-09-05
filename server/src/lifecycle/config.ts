@@ -65,8 +65,9 @@ export function readConfig(projectPath: string): ForestConfig | null {
   const rawSections = obj.sections;
   if (rawSections && typeof rawSections === "object" && !Array.isArray(rawSections)) {
     const sections: Record<string, LifecycleSection> = {};
-    for (const [name, value] of Object.entries(rawSections as Record<string, unknown>)) {
-      if (name.trim() === "") continue;
+    for (const [rawName, value] of Object.entries(rawSections as Record<string, unknown>)) {
+      const name = rawName.trim();
+      if (name === "") continue;
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
       const sec = readSection(value as Record<string, unknown>);
       if (hasAnyKey(sec)) sections[name] = sec;
