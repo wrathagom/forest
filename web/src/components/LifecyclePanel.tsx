@@ -1,4 +1,4 @@
-import { Show, For, createResource, createSignal, createMemo, createEffect, onCleanup } from "solid-js";
+import { Show, Index, createResource, createSignal, createMemo, createEffect, onCleanup } from "solid-js";
 import { fetchLifecycle, setLifecycleEnabled, startLifecycle, stopLifecycle, startSection, stopSection } from "../api";
 import type { LifecycleStatus, LifecycleRunResult } from "../api";
 import { lifecycleTone, isLifecycleUp } from "../lib/dashboard-view";
@@ -42,11 +42,11 @@ export default function LifecyclePanel(props: { projectId: string }) {
   // recreated only when the cadence (or the should-poll gate) flips, not on
   // every poll.
   const shouldPoll = createMemo(() => busy() || !!data()?.hasConfig);
-  const anySectionTransient = () => {
+  const anySectionTransient = createMemo(() => {
     const secs = data()?.sections ?? [];
     const pend = sectionPending();
     return secs.some((s) => isTransient(pend[s.name] ?? s.status));
-  };
+  });
   const fast = createMemo(() => busy() || isTransient(displayStatus()) || anySectionTransient());
   createEffect(() => {
     if (!shouldPoll()) return;
@@ -152,28 +152,28 @@ export default function LifecyclePanel(props: { projectId: string }) {
 
               <Show when={d().enabled && d().sections && d().sections!.length > 0}>
                 <div class="lifecycle-sections">
-                  <For each={d().sections!}>
+                  <Index each={d().sections!}>
                     {(sec) => {
-                      const secStatus = (): LifecycleStatus => sectionPending()[sec.name] ?? sec.status;
-                      const up = () => sec.config.health ? isLifecycleUp(secStatus()) : true;
+                      const secStatus = (): LifecycleStatus => sectionPending()[sec().name] ?? sec().status;
+                      const up = () => sec().config.health ? isLifecycleUp(secStatus()) : true;
                       return (
                         <div class="lifecycle-section">
-                          <span class="lifecycle-section-name">{sec.name}</span>
+                          <span class="lifecycle-section-name">{sec().name}</span>
                           <Show when={secStatus() !== "none"}>
-                            <span class={`chip chip-${lifecycleTone(secStatus())}`} title={`${sec.name} lifecycle`}>{secStatus()}</span>
+                            <span class={`chip chip-${lifecycleTone(secStatus())}`} title={`${sec().name} lifecycle`}>{secStatus()}</span>
                           </Show>
-                          <Show when={sec.config.url && up()}>
-                            <a class="lifecycle-link" href={sec.config.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
+                          <Show when={sec().config.url && up()}>
+                            <a class="lifecycle-link" href={sec().config.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
                           </Show>
-                          <Show when={sec.config.start}>
-                            <button class="lifecycle-btn" disabled={busy()} onclick={() => runSection(sec.name, "start", startSection)}>Start</button>
+                          <Show when={sec().config.start}>
+                            <button class="lifecycle-btn" disabled={busy()} aria-label={`Start ${sec().name}`} onclick={() => runSection(sec().name, "start", startSection)}>Start</button>
                           </Show>
-                          <Show when={sec.config.stop}>
-                            <button class="lifecycle-btn" disabled={busy()} onclick={() => runSection(sec.name, "stop", stopSection)}>Stop</button>
+                          <Show when={sec().config.stop}>
+                            <button class="lifecycle-btn" disabled={busy()} aria-label={`Stop ${sec().name}`} onclick={() => runSection(sec().name, "stop", stopSection)}>Stop</button>
                           </Show>
-                          <Show when={sec.lastRun?.output}>
+                          <Show when={sec().lastRun?.output}>
                             {(out) => (
-                              <details open={sec.lastRun?.failed ?? false} class="lifecycle-output">
+                              <details open={sec().lastRun?.failed ?? false} class="lifecycle-output">
                                 <summary>last run</summary>
                                 <pre>{out()}</pre>
                               </details>
@@ -182,7 +182,7 @@ export default function LifecyclePanel(props: { projectId: string }) {
                         </div>
                       );
                     }}
-                  </For>
+                  </Index>
                 </div>
               </Show>
             </>

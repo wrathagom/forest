@@ -110,7 +110,7 @@ describe("LifecyclePanel", () => {
     await waitFor(() => expect(screen.queryByText(/boom/i)).toBeNull());
   });
 
-  test("renders a section row with a status chip and Start/Stop", async () => {
+  test("renders a section row with a status chip, Start, and Stop", async () => {
     vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
       hasConfig: true, enabled: true, config: { start: "make up" }, status: "running", lastRun: null,
       sections: [
@@ -120,7 +120,8 @@ describe("LifecyclePanel", () => {
     render(() => <LifecyclePanel projectId="p" />);
     expect(await screen.findByText("game")).toBeTruthy();
     expect(await screen.findByText("healthy")).toBeTruthy();
-    expect((await screen.findAllByRole("button", { name: /^start$/i })).length).toBeGreaterThanOrEqual(2);
+    expect(await screen.findByRole("button", { name: /start game/i })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /stop game/i })).toBeTruthy();
   });
 
   test("hides the chip for a launcher section with status none", async () => {
@@ -144,9 +145,31 @@ describe("LifecyclePanel", () => {
     });
     const startSection = vi.spyOn(api, "startSection").mockResolvedValue({ exitCode: 0, output: "ok", timedOut: false, failed: false });
     render(() => <LifecyclePanel projectId="p" />);
-    const buttons = await screen.findAllByRole("button", { name: /^start$/i });
-    fireEvent.click(buttons[buttons.length - 1]!); // the section's Start (rendered after the top-level block)
+    fireEvent.click(await screen.findByRole("button", { name: /start game/i }));
     await waitFor(() => expect(startSection).toHaveBeenCalledWith("p", "game"));
+  });
+
+  test("optimistically shows a section's 'starting' immediately on click", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "running", lastRun: null,
+      sections: [ { name: "game", config: { start: "godot ." }, status: "none", lastRun: null } ],
+    });
+    let resolveStart!: (v: api.LifecycleRunResult) => void;
+    vi.spyOn(api, "startSection").mockReturnValue(new Promise((r) => { resolveStart = r; }));
+    render(() => <LifecyclePanel projectId="p" />);
+    fireEvent.click(await screen.findByRole("button", { name: /start game/i }));
+    expect(await screen.findByText("starting")).toBeTruthy();
+    resolveStart({ exitCode: 0, output: "ok", timedOut: false, failed: false });
+  });
+
+  test("shows a launcher section's Open link even without a health command", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "running", lastRun: null,
+      sections: [ { name: "game", config: { start: "godot .", url: "http://localhost:8060" }, status: "none", lastRun: null } ],
+    });
+    render(() => <LifecyclePanel projectId="p" />);
+    const links = await screen.findAllByRole("link", { name: /open/i });
+    expect(links.some((l) => (l as HTMLAnchorElement).href.includes("localhost:8060"))).toBe(true);
   });
 
   test("shows a section Open link for a healthy section with a url", async () => {
