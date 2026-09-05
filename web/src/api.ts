@@ -44,12 +44,20 @@ export type Snapshot = {
 export type LifecycleStatus =
   | "none" | "stopped" | "running" | "healthy" | "errors" | "starting" | "stopping";
 
+export type LifecycleSectionView = {
+  name: string;
+  config: { start?: string; stop?: string; health?: string; url?: string };
+  status: LifecycleStatus;
+  lastRun: { kind: "start" | "stop"; exitCode: number; output: string; at: number; failed: boolean } | null;
+};
+
 export type LifecycleView = {
   hasConfig: boolean;
   enabled: boolean;
-  config: { start?: string; stop?: string; health?: string; url?: string } | null;
+  config: { start?: string; stop?: string; health?: string; url?: string; sections?: Record<string, { start?: string; stop?: string; health?: string; url?: string }> } | null;
   status: LifecycleStatus;
   lastRun: { kind: "start" | "stop"; exitCode: number; output: string; at: number; failed: boolean } | null;
+  sections?: LifecycleSectionView[];
 };
 
 export type LifecycleRunResult = { exitCode: number; output: string; timedOut: boolean; failed: boolean };
@@ -75,6 +83,20 @@ export async function startLifecycle(id: string): Promise<LifecycleRunResult> {
 
 export async function stopLifecycle(id: string): Promise<LifecycleRunResult> {
   return unwrap(await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle/stop`, { method: "POST" }), "stop lifecycle");
+}
+
+export async function startSection(id: string, section: string): Promise<LifecycleRunResult> {
+  return unwrap(
+    await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle/sections/${encodeURIComponent(section)}/start`, { method: "POST" }),
+    "start section",
+  );
+}
+
+export async function stopSection(id: string, section: string): Promise<LifecycleRunResult> {
+  return unwrap(
+    await fetch(`/api/projects/${encodeURIComponent(id)}/lifecycle/sections/${encodeURIComponent(section)}/stop`, { method: "POST" }),
+    "stop section",
+  );
 }
 
 async function unwrap<T>(r: Response, label: string): Promise<T> {
