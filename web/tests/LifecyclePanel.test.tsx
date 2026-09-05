@@ -196,4 +196,17 @@ describe("LifecyclePanel", () => {
     await screen.findByRole("button", { name: /enable lifecycle/i });
     expect(screen.queryByText("game")).toBeNull();
   });
+
+  test("a section run does not populate the top-level last-run output", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "running", lastRun: null,
+      sections: [ { name: "game", config: { start: "godot ." }, status: "none", lastRun: null } ],
+    });
+    const startSection = vi.spyOn(api, "startSection").mockResolvedValue({ exitCode: 0, output: "GAME-OUTPUT", timedOut: false, failed: false });
+    render(() => <LifecyclePanel projectId="p" />);
+    fireEvent.click(await screen.findByRole("button", { name: /start game/i }));
+    await waitFor(() => expect(startSection).toHaveBeenCalled());
+    // The section's output must NOT surface in the shared top-level last-run panel.
+    await waitFor(() => expect(screen.queryByText("GAME-OUTPUT")).toBeNull());
+  });
 });

@@ -89,8 +89,7 @@ export default function LifecyclePanel(props: { projectId: string }) {
     setError(null);
     setSectionPending((p) => ({ ...p, [name]: kind === "start" ? "starting" : "stopping" }));
     try {
-      const r = await fn(props.projectId, name);
-      setOutput(r.output || "(no output)");
+      await fn(props.projectId, name);
       await refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
