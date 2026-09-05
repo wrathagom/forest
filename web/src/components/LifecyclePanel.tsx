@@ -1,5 +1,5 @@
-import { Show, createResource, createSignal, createMemo, createEffect, onCleanup } from "solid-js";
-import { fetchLifecycle, setLifecycleEnabled, startLifecycle, stopLifecycle } from "../api";
+import { Show, For, createResource, createSignal, createMemo, createEffect, onCleanup } from "solid-js";
+import { fetchLifecycle, setLifecycleEnabled, startLifecycle, stopLifecycle, startSection, stopSection } from "../api";
 import type { LifecycleStatus, LifecycleRunResult } from "../api";
 import { lifecycleTone, isLifecycleUp } from "../lib/dashboard-view";
 
@@ -14,6 +14,8 @@ export default function LifecyclePanel(props: { projectId: string }) {
   // Optimistic status shown the instant a command is clicked, before the first
   // poll observes the server's transient state. Cleared when the command ends.
   const [pending, setPending] = createSignal<LifecycleStatus | null>(null);
+  // Per-section optimistic status, keyed by section name.
+  const [sectionPending, setSectionPending] = createSignal<Record<string, LifecycleStatus>>({});
 
   // Reset per-project local state when navigating between projects so a banner
   // or last-run output from one project can't bleed into the next.
@@ -23,6 +25,7 @@ export default function LifecyclePanel(props: { projectId: string }) {
       setError(null);
       setOutput(null);
       setPending(null);
+      setSectionPending({});
     }
     return id;
   });
@@ -39,7 +42,12 @@ export default function LifecyclePanel(props: { projectId: string }) {
   // recreated only when the cadence (or the should-poll gate) flips, not on
   // every poll.
   const shouldPoll = createMemo(() => busy() || !!data()?.hasConfig);
-  const fast = createMemo(() => busy() || isTransient(displayStatus()));
+  const anySectionTransient = () => {
+    const secs = data()?.sections ?? [];
+    const pend = sectionPending();
+    return secs.some((s) => isTransient(pend[s.name] ?? s.status));
+  };
+  const fast = createMemo(() => busy() || isTransient(displayStatus()) || anySectionTransient());
   createEffect(() => {
     if (!shouldPoll()) return;
     const ms = fast() ? POLL_FAST_MS : POLL_SLOW_MS;
@@ -72,6 +80,22 @@ export default function LifecyclePanel(props: { projectId: string }) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPending(null);
+      setBusy(false);
+    }
+  };
+
+  const runSection = async (name: string, kind: "start" | "stop", fn: (id: string, section: string) => Promise<LifecycleRunResult>) => {
+    setBusy(true);
+    setError(null);
+    setSectionPending((p) => ({ ...p, [name]: kind === "start" ? "starting" : "stopping" }));
+    try {
+      const r = await fn(props.projectId, name);
+      setOutput(r.output || "(no output)");
+      await refetch();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSectionPending((p) => { const { [name]: _drop, ...rest } = p; return rest; });
       setBusy(false);
     }
   };
@@ -124,6 +148,42 @@ export default function LifecyclePanel(props: { projectId: string }) {
                     <pre>{out()}</pre>
                   </details>
                 )}
+              </Show>
+
+              <Show when={d().enabled && d().sections && d().sections!.length > 0}>
+                <div class="lifecycle-sections">
+                  <For each={d().sections!}>
+                    {(sec) => {
+                      const secStatus = (): LifecycleStatus => sectionPending()[sec.name] ?? sec.status;
+                      const up = () => sec.config.health ? isLifecycleUp(secStatus()) : true;
+                      return (
+                        <div class="lifecycle-section">
+                          <span class="lifecycle-section-name">{sec.name}</span>
+                          <Show when={secStatus() !== "none"}>
+                            <span class={`chip chip-${lifecycleTone(secStatus())}`} title={`${sec.name} lifecycle`}>{secStatus()}</span>
+                          </Show>
+                          <Show when={sec.config.url && up()}>
+                            <a class="lifecycle-link" href={sec.config.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
+                          </Show>
+                          <Show when={sec.config.start}>
+                            <button class="lifecycle-btn" disabled={busy()} onclick={() => runSection(sec.name, "start", startSection)}>Start</button>
+                          </Show>
+                          <Show when={sec.config.stop}>
+                            <button class="lifecycle-btn" disabled={busy()} onclick={() => runSection(sec.name, "stop", stopSection)}>Stop</button>
+                          </Show>
+                          <Show when={sec.lastRun?.output}>
+                            {(out) => (
+                              <details open={sec.lastRun?.failed ?? false} class="lifecycle-output">
+                                <summary>last run</summary>
+                                <pre>{out()}</pre>
+                              </details>
+                            )}
+                          </Show>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </div>
               </Show>
             </>
           );
