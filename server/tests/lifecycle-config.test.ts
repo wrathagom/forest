@@ -62,4 +62,47 @@ describe("readConfig", () => {
     const dir = tmpProject('url: "javascript:alert(1)"\n');
     expect(readConfig(dir)).toBeNull();
   });
+
+  test("parses a sections map with per-section keys", () => {
+    const dir = tmpProject(
+      "start: godot --editor .\n" +
+      "sections:\n" +
+      "  game:\n" +
+      "    start: godot .\n" +
+      "    stop: pkill -f godot\n" +
+      "    url: http://localhost:8060\n" +
+      "    health: pgrep -f godot\n",
+    );
+    expect(readConfig(dir)).toEqual({
+      start: "godot --editor .",
+      sections: {
+        game: { start: "godot .", stop: "pkill -f godot", url: "http://localhost:8060", health: "pgrep -f godot" },
+      },
+    });
+  });
+
+  test("a sections-only forest.yaml is a valid config", () => {
+    const dir = tmpProject("sections:\n  game:\n    start: godot .\n");
+    expect(readConfig(dir)).toEqual({ sections: { game: { start: "godot ." } } });
+  });
+
+  test("drops a section with no usable keys", () => {
+    const dir = tmpProject("start: make up\nsections:\n  empty:\n    name: nope\n");
+    expect(readConfig(dir)).toEqual({ start: "make up" });
+  });
+
+  test("drops a section's non-http(s) url but keeps its commands", () => {
+    const dir = tmpProject('sections:\n  game:\n    start: godot .\n    url: "javascript:alert(1)"\n');
+    expect(readConfig(dir)).toEqual({ sections: { game: { start: "godot ." } } });
+  });
+
+  test("ignores a non-object sections value", () => {
+    const dir = tmpProject("start: make up\nsections: nope\n");
+    expect(readConfig(dir)).toEqual({ start: "make up" });
+  });
+
+  test("normalizes an all-dropped sections map to no sections key", () => {
+    const dir = tmpProject("start: make up\nsections:\n  empty:\n    name: nope\n");
+    expect(readConfig(dir)).not.toHaveProperty("sections");
+  });
 });
