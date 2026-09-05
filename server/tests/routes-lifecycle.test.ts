@@ -144,12 +144,14 @@ describe("lifecycle routes", () => {
     const id = upsertProject(db, { path: "/tmp/p", name: "p" });
     const runCommand = async (cmd: string) => ({ exitCode: cmd.includes("pgrep") ? 0 : 0, output: "", timedOut: false });
     const routes = lifecycleRoutes(deps({ readConfig: sectionedConfig, runCommand }));
+    await enable(routes, db, id);
     const get = route(routes, "GET", /lifecycle$/);
     const res = await get.handler(ctx(db, new Request(`http://x/api/projects/${id}/lifecycle`), { id }) as never);
     const body = await res.json();
     const byName = Object.fromEntries(body.sections.map((s: { name: string }) => [s.name, s]));
     expect(byName.game.status).toBe("healthy");
     expect(byName.game.config.url).toBe("http://localhost:8060");
+    expect(byName.game.lastRun).toBeNull();
     expect(byName.editor.status).toBe("none");
   });
 
@@ -158,6 +160,7 @@ describe("lifecycle routes", () => {
     const id = upsertProject(db, { path: "/tmp/p", name: "p" });
     const runCommand = async () => ({ exitCode: 1, output: "", timedOut: false });
     const routes = lifecycleRoutes(deps({ readConfig: sectionedConfig, runCommand }));
+    await enable(routes, db, id);
     const get = route(routes, "GET", /lifecycle$/);
     const res = await get.handler(ctx(db, new Request(`http://x/g`), { id }) as never);
     const body = await res.json();
@@ -187,7 +190,7 @@ describe("lifecycle routes", () => {
     expect(res.status).toBe(404);
   });
 
-  test("section start 400s when the section lacks a start command", async () => {
+  test("section stop 400s when the section lacks a stop command", async () => {
     const db = openDb(":memory:");
     const id = upsertProject(db, { path: "/tmp/p", name: "p" });
     const routes = lifecycleRoutes(deps({ readConfig: sectionedConfig }));
@@ -218,5 +221,50 @@ describe("lifecycle routes", () => {
     expect(busy.status).toBe(409);
     const other = await start.handler(ctx(db, new Request("http://x/s", { method: "POST" }), { id, section: "editor" }) as never);
     expect(other.status).toBe(200);
+  });
+
+  test("does not run section health when lifecycle is disabled", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    let calls = 0;
+    const runCommand = async () => { calls++; return { exitCode: 0, output: "", timedOut: false }; };
+    const routes = lifecycleRoutes(deps({ readConfig: sectionedConfig, runCommand }));
+    const get = route(routes, "GET", /lifecycle$/);
+    const res = await get.handler(ctx(db, new Request(`http://x/g`), { id }) as never);
+    const body = await res.json();
+    const game = body.sections.find((s: { name: string }) => s.name === "game");
+    expect(game.status).toBe("none");
+    expect(calls).toBe(0); // no shell execution for a not-enabled project
+  });
+
+  test("GET uses the section transient and skips its health while in flight", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    let calls = 0;
+    const runCommand = async () => { calls++; return { exitCode: 0, output: "", timedOut: false }; };
+    const d = deps({ readConfig: sectionedConfig, runCommand });
+    const routes = lifecycleRoutes(d);
+    await enable(routes, db, id);
+    calls = 0; // ignore the health probe triggered by enable()'s own view()
+    d.registry.setTransient(id, "starting", "game");
+    const get = route(routes, "GET", /lifecycle$/);
+    const res = await get.handler(ctx(db, new Request(`http://x/g`), { id }) as never);
+    const body = await res.json();
+    const game = body.sections.find((s: { name: string }) => s.name === "game");
+    expect(game.status).toBe("starting");
+    expect(calls).toBe(0); // health not probed for the in-flight section
+  });
+
+  test("a throwing section health command yields stopped, not a crash", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const runCommand = async () => { throw new Error("boom"); };
+    const routes = lifecycleRoutes(deps({ readConfig: sectionedConfig, runCommand }));
+    await enable(routes, db, id);
+    const get = route(routes, "GET", /lifecycle$/);
+    const res = await get.handler(ctx(db, new Request(`http://x/g`), { id }) as never);
+    const body = await res.json();
+    const game = body.sections.find((s: { name: string }) => s.name === "game");
+    expect(game.status).toBe("stopped");
   });
 });

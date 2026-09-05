@@ -76,9 +76,19 @@ async function view(
     });
 
   const sectionEntries = Object.entries(config?.sections ?? {}).sort(([a], [b]) => a.localeCompare(b));
-  const sections = await Promise.all(
-    sectionEntries.map(([name, sec]) => sectionView(deps, project.id, project.path, name, sec)),
-  );
+  // Never execute a section's health command for a project the user hasn't
+  // enabled — mirrors augmentWithLifecycle's invariant that a discovered-but-
+  // not-enabled repo runs nothing. Disabled sections report `none`.
+  const sections: SectionView[] = project.lifecycleEnabled
+    ? await Promise.all(
+        sectionEntries.map(([name, sec]) => sectionView(deps, project.id, project.path, name, sec)),
+      )
+    : sectionEntries.map(([name, sec]) => ({
+        name,
+        config: sec,
+        status: "none" as const,
+        lastRun: deps.registry.lastRun(project.id, name),
+      }));
 
   return {
     hasConfig: config !== null,
