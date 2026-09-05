@@ -35,7 +35,7 @@ function readSection(obj: Record<string, unknown>): LifecycleSection {
 }
 
 function hasAnyKey(sec: LifecycleSection): boolean {
-  return sec.start !== undefined || sec.stop !== undefined || sec.health !== undefined || sec.url !== undefined;
+  return COMMAND_KEYS.some((k) => sec[k] !== undefined);
 }
 
 /**
@@ -66,7 +66,7 @@ export function readConfig(projectPath: string): ForestConfig | null {
   if (rawSections && typeof rawSections === "object" && !Array.isArray(rawSections)) {
     const sections: Record<string, LifecycleSection> = {};
     for (const [name, value] of Object.entries(rawSections as Record<string, unknown>)) {
-      if (typeof name !== "string" || name.trim() === "") continue;
+      if (name.trim() === "") continue;
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
       const sec = readSection(value as Record<string, unknown>);
       if (hasAnyKey(sec)) sections[name] = sec;

@@ -101,8 +101,24 @@ describe("readConfig", () => {
     expect(readConfig(dir)).toEqual({ start: "make up" });
   });
 
-  test("normalizes an all-dropped sections map to no sections key", () => {
-    const dir = tmpProject("start: make up\nsections:\n  empty:\n    name: nope\n");
-    expect(readConfig(dir)).not.toHaveProperty("sections");
+  test("parses multiple named sections", () => {
+    const dir = tmpProject(
+      "sections:\n" +
+      "  game:\n    start: godot .\n" +
+      "  editor:\n    start: godot --editor .\n",
+    );
+    expect(readConfig(dir)).toEqual({
+      sections: { game: { start: "godot ." }, editor: { start: "godot --editor ." } },
+    });
+  });
+
+  test("ignores an array sections value", () => {
+    const dir = tmpProject("start: make up\nsections:\n  - 1\n  - 2\n");
+    expect(readConfig(dir)).toEqual({ start: "make up" });
+  });
+
+  test("drops a section whose value is an array", () => {
+    const dir = tmpProject("start: make up\nsections:\n  game:\n    - 1\n    - 2\n");
+    expect(readConfig(dir)).toEqual({ start: "make up" });
   });
 });
