@@ -1,6 +1,6 @@
 // server/tests/lifecycle-status.test.ts
 import { describe, expect, test } from "bun:test";
-import { computeLifecycle } from "../src/lifecycle/status";
+import { computeLifecycle, computeSectionStatus } from "../src/lifecycle/status";
 
 describe("computeLifecycle", () => {
   test("not enabled -> none (even with a config and services up)", () => {
@@ -25,5 +25,20 @@ describe("computeLifecycle", () => {
 
   test("enabled, up, health nonzero -> errors", () => {
     expect(computeLifecycle({ enabled: true, hasConfig: true, servicesUp: true, health: { exitCode: 1 } })).toBe("errors");
+  });
+});
+
+describe("computeSectionStatus", () => {
+  test("no health command → none (a launcher has no steady-state chip)", () => {
+    expect(computeSectionStatus({ hasHealth: false, health: null })).toBe("none");
+  });
+  test("health defined but not run → none", () => {
+    expect(computeSectionStatus({ hasHealth: true, health: null })).toBe("none");
+  });
+  test("health exit 0 → healthy", () => {
+    expect(computeSectionStatus({ hasHealth: true, health: { exitCode: 0 } })).toBe("healthy");
+  });
+  test("health nonzero → stopped (health is the up-probe for a section)", () => {
+    expect(computeSectionStatus({ hasHealth: true, health: { exitCode: 1 } })).toBe("stopped");
   });
 });

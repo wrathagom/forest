@@ -37,6 +37,34 @@ url:    http://localhost:3000         # optional; quick-link shown while the app
 Emit only the keys that actually apply to this project. A file with just
 `start` + `stop` is fine; so is one with all four.
 
+## Named sections (independent start/stop/link)
+
+A project can have several things worth starting, stopping, or linking to
+independently. Add a `sections:` map — each entry takes the **same** four keys as
+the top level (`start`, `stop`, `health`, `url`) and runs on its own:
+
+```yaml
+# forest.yaml
+start:  godot --editor .          # top-level = the editor
+stop:   pkill -f "godot --editor"
+
+sections:
+  game:
+    start:  godot .
+    stop:   pkill -f "godot ."
+    url:    http://localhost:8060
+    health: pgrep -f "godot ."     # gives this section a status chip
+```
+
+- Each section gets its own Start / Stop / Open buttons in the project panel.
+- A section shows a live **status chip** (`healthy`/`stopped`) only if it has a
+  `health` command — that's the only way Forest can tell a section is up, since a
+  running process can't be attributed to a specific section. A section without
+  `health` is a launcher: it still runs and shows its last output, just no chip.
+- The single **Enable lifecycle** toggle covers the whole file, sections
+  included. Emit `sections` only when a project really has separate lifecycles;
+  a plain top-level `start`/`stop` is still the common case.
+
 ## Security: the file is inert until enabled
 
 Forest scans **every** repo under the user's scan root, so a discovered
