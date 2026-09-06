@@ -1082,6 +1082,15 @@ a.chip:hover { text-decoration: underline; }
 .session-chip-dot-waiting { background: var(--warn); }
 .session-chip-dot-stale { background: var(--fg-dim); opacity: 0.5; }
 .session-chip-dot-closed { background: var(--fg); }
+.session-chip-wrap { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; }
+/* × sits over the dot (chip padding-left is 0.4rem, dot is 7px); revealed on hover of a closed chip. */
+.session-chip-remove { position: absolute; left: 0.32rem; top: 50%; transform: translateY(-50%); display: none; align-items: center; justify-content: center; width: 13px; height: 13px; padding: 0; border: 0; background: none; color: var(--fg-dim); font: inherit; font-size: 0.8rem; line-height: 1; cursor: pointer; }
+.session-chip-wrap:hover .session-chip-remove,
+.session-chip-wrap:focus-within .session-chip-remove { display: inline-flex; }
+.session-chip-wrap:hover .session-chip-dot-closed,
+.session-chip-wrap:focus-within .session-chip-dot-closed { visibility: hidden; }
+.session-chip-remove:hover { color: var(--error); }
+.session-chip-remove:focus-visible { outline: 1px solid var(--fg-dim); outline-offset: 1px; border-radius: 3px; }
 .session-chip-stale .session-chip-project { color: var(--fg-dim); font-weight: 400; }
 .session-profile-badge { font-size: 0.7em; padding: 0 0.3em; border-radius: 3px; background: color-mix(in srgb, var(--fg-faint) 20%, transparent); text-transform: uppercase; letter-spacing: 0.03em; }
 @keyframes session-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }

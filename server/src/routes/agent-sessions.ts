@@ -96,8 +96,17 @@ export function agentSessionsRoutes(deps: RouteDeps): Route[] {
       // below — `live` would otherwise match `([^/]+)`.
       method: "GET",
       pattern: /^\/api\/agent-sessions\/live$/,
-      // the session bar surfaces at most ~10 live sessions
-      handler: () => json({ sessions: deps.liveSessions?.list(10) ?? [] }),
+      // the session bar surfaces at most ~10 live sessions. Filter dismissed ones
+      // out (the user removed them from the bar) — mirrors the mobile list route,
+      // which is the only other place dismissals were honored. Over-fetch then slice
+      // so a dismissed entry doesn't cost a visible slot.
+      handler: () => {
+        const live = deps.liveSessions;
+        if (!live) return json({ sessions: [] });
+        return json({
+          sessions: live.list(20).filter((e) => !live.isDismissed(e.agentSessionId)).slice(0, 10),
+        });
+      },
     },
     {
       // Make a session resumable from `cwd`. Claude scopes `--resume <id>` to the
