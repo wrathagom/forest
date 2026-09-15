@@ -1,7 +1,7 @@
 import { For, Show, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { ProjectRow } from "../api";
-import { refreshProject, patchProject } from "../api";
+import { refreshProject, patchProject, relocateProject } from "../api";
 import CardMenu from "./CardMenu";
 import { bandColor, type ColorByDimension } from "../lib/colorBy";
 import {
@@ -41,6 +41,17 @@ export default function ProjectCard(props: {
   const onCopyPath = () => {
     void navigator.clipboard?.writeText(props.project.path);
   };
+  const onRelocate = async () => {
+    const next = window.prompt("New absolute path for this project:", props.project.path);
+    const trimmed = next?.trim();
+    if (!trimmed || trimmed === props.project.path) return;
+    try {
+      await relocateProject(props.project.id, trimmed);
+      props.onChange();
+    } catch (err) {
+      window.alert((err as Error).message);
+    }
+  };
 
   const onCardClick = (e: MouseEvent) => {
     // CardMenu stops its own clicks, so anything arriving here is the body.
@@ -70,6 +81,7 @@ export default function ProjectCard(props: {
             onOpen={open}
             onRefresh={onRefresh}
             onCopyPath={onCopyPath}
+            onRelocate={onRelocate}
             onTogglePin={onTogglePin}
             onToggleArchive={onToggleArchive}
           />

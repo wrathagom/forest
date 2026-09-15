@@ -4,14 +4,14 @@ import CardMenu from "../src/components/CardMenu";
 
 type Props = {
   pinned: boolean; hidden: boolean;
-  onOpen: () => void; onRefresh: () => void; onCopyPath: () => void;
+  onOpen: () => void; onRefresh: () => void; onCopyPath: () => void; onRelocate: () => void;
   onTogglePin: () => void; onToggleArchive: () => void;
 };
 
 function setup(over: Partial<Props> = {}) {
   const props: Props = {
     pinned: false, hidden: false,
-    onOpen: vi.fn(), onRefresh: vi.fn(), onCopyPath: vi.fn(),
+    onOpen: vi.fn(), onRefresh: vi.fn(), onCopyPath: vi.fn(), onRelocate: vi.fn(),
     onTogglePin: vi.fn(), onToggleArchive: vi.fn(),
     ...over,
   };
@@ -122,6 +122,13 @@ describe("CardMenu", () => {
     expect(props.onCopyPath).toHaveBeenCalledTimes(1);
   });
 
+  test("relocate… fires onRelocate", () => {
+    const { props, open, getByText } = setup();
+    open();
+    fireEvent.click(getByText("relocate…"));
+    expect(props.onRelocate).toHaveBeenCalledTimes(1);
+  });
+
   test("clicking outside closes the menu", () => {
     const { open, queryByText } = setup();
     open();
@@ -136,7 +143,7 @@ describe("CardMenu", () => {
       <div onclick={onParent}>
         <CardMenu
           pinned={false} hidden={false}
-          onOpen={() => {}} onRefresh={() => {}} onCopyPath={() => {}}
+          onOpen={() => {}} onRefresh={() => {}} onCopyPath={() => {}} onRelocate={() => {}}
           onTogglePin={() => {}} onToggleArchive={() => {}}
         />
       </div>
@@ -145,14 +152,14 @@ describe("CardMenu", () => {
     expect(onParent).not.toHaveBeenCalled();
   });
 
-  test("orders items open, refresh, copy path, a rule, pin, then archive last", () => {
+  test("orders items open, refresh, copy path, relocate, a rule, pin, then archive last", () => {
     // "archive is last and separated by a rule" is a deliberate design
     // decision (a semi-destructive action earns a second step). This fails
     // if archive moves above the rule, or anywhere but last.
     const { open, container } = setup();
     open();
     expect(popoverStructure(container)).toEqual([
-      "open", "refresh", "copy path", "—", "pin", "archive",
+      "open", "refresh", "copy path", "relocate…", "—", "pin", "archive",
     ]);
   });
 
@@ -160,7 +167,7 @@ describe("CardMenu", () => {
     const { open, container } = setup({ hidden: true });
     open();
     expect(popoverStructure(container)).toEqual([
-      "open", "refresh", "copy path", "—", "restore",
+      "open", "refresh", "copy path", "relocate…", "—", "restore",
     ]);
   });
 
