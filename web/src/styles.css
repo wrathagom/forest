@@ -332,19 +332,15 @@ a.chip:hover { text-decoration: underline; }
    .project-detail, matching the one-child loading fallback. That keeps the
    grid's row auto-placement stable across the loading/loaded transition. */
 .detail-topbar { display: block; }
-.lifecycle-panel {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-  padding: 0.5rem 1.2rem; border-bottom: 1px solid var(--border);
-}
+.lifecycle-panel { padding: 0.5rem 1.2rem; border-bottom: 1px solid var(--border); }
+/* Transient error banners sit above the single control line, edge to edge. */
+.lifecycle-panel > .banner { margin: -0.5rem -1.2rem 0.5rem; }
 .lifecycle-btn {
   font: inherit; font-size: 0.8rem; cursor: pointer; border-radius: 3px;
   padding: 0.25rem 0.7rem; background: var(--bg-2); border: 1px solid var(--border); color: var(--fg);
 }
 .lifecycle-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .lifecycle-btn:disabled { opacity: 0.5; cursor: default; }
-.lifecycle-output { width: auto; }
-.lifecycle-output[open] { width: 100%; }
-.lifecycle-output summary { cursor: pointer; font-size: 0.8rem; color: var(--fg-dim); }
 .lifecycle-link {
   font-size: 0.8rem; text-decoration: none; border-radius: 3px; padding: 0.25rem 0.7rem;
   color: var(--ok);
@@ -352,18 +348,24 @@ a.chip:hover { text-decoration: underline; }
   background: color-mix(in srgb, var(--ok) 8%, transparent);
 }
 .lifecycle-link:hover { text-decoration: underline; }
-.lifecycle-output pre {
-  margin: 0.3rem 0 0; padding: 0.5rem; max-height: 12rem; overflow: auto;
+.lifecycle-group { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.lifecycle-group.menu { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.lifecycle-group-controls { display: inline-flex; align-items: center; gap: 0.4rem; }
+.lifecycle-section-name { font-weight: 600; font-size: 0.85em; color: var(--fg); }
+.lifecycle-sep { width: 1px; height: 1.1rem; background: var(--border); }
+.lifecycle-lastrun {
+  font: inherit; font-size: 0.8rem; color: var(--fg-dim); cursor: pointer;
+  background: none; border: 0; border-bottom: 1px dotted currentColor;
+  padding: 0.25rem 0.2rem; line-height: 1;
+}
+.lifecycle-lastrun:hover { color: var(--fg); }
+.lifecycle-lastrun.failed { color: var(--error); }
+.lifecycle-lastrun-panel { min-width: 20rem; max-width: min(40rem, 90vw); padding: 0.4rem; }
+.lifecycle-lastrun-panel pre {
+  margin: 0; padding: 0.5rem; max-height: 12rem; overflow: auto;
   background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
   font-size: 0.75rem; white-space: pre-wrap; word-break: break-word;
 }
-.lifecycle-sections {
-  display: flex; flex-direction: column; gap: 0.35rem;
-  margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);
-  width: 100%;
-}
-.lifecycle-section { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.lifecycle-section-name { font-weight: 600; font-size: 0.85em; color: var(--fg); }
 .tab-strip { display: flex; gap: 0.3rem; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); align-items: center; background: var(--bg); }
 .tab { display: flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-2); color: var(--fg-dim); font-size: 0.8rem; cursor: pointer; }
 .tab:hover { color: var(--fg); }

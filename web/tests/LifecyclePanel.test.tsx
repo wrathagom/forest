@@ -1,8 +1,14 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@solidjs/testing-library";
+import { render, screen, waitFor, fireEvent, configure } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import LifecyclePanel from "../src/components/LifecyclePanel";
 import * as api from "../src/api";
+import { stubGeometry } from "./helpers/geometry";
+
+// The panel renders an inert, aria-hidden measuring copy of every group (see
+// OverflowRow). Role queries already skip it; make text queries skip it too so
+// findByText("game") matches the one visible element.
+configure({ defaultIgnore: "script, style, [aria-hidden='true'] *" });
 
 describe("LifecyclePanel", () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -208,5 +214,76 @@ describe("LifecyclePanel", () => {
     await waitFor(() => expect(startSection).toHaveBeenCalled());
     // The section's output must NOT surface in the shared top-level last-run panel.
     await waitFor(() => expect(screen.queryByText("GAME-OUTPUT")).toBeNull());
+  });
+
+  test("a group with a last run renders a 'last run' button that opens the output in a popover", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "running",
+      lastRun: { kind: "start", exitCode: 0, output: "TOP-OUTPUT", at: 1, failed: false },
+    });
+    render(() => <LifecyclePanel projectId="p" />);
+    const btn = await screen.findByRole("button", { name: /lifecycle last run/i });
+    expect(screen.queryByText("TOP-OUTPUT")).toBeNull();
+    fireEvent.click(btn);
+    expect(await screen.findByText("TOP-OUTPUT")).toBeTruthy();
+    expect(btn.classList.contains("failed")).toBe(false);
+  });
+
+  test("a failed run arriving after Start auto-opens the popover and tints the trigger", async () => {
+    const base = { hasConfig: true, enabled: true, config: { start: "make up" }, status: "stopped" as const };
+    vi.spyOn(api, "fetchLifecycle")
+      .mockResolvedValueOnce({ ...base, lastRun: null })
+      .mockResolvedValue({ ...base, lastRun: { kind: "start", exitCode: 1, output: "BOOM", at: 2, failed: true } });
+    vi.spyOn(api, "startLifecycle").mockResolvedValue({ exitCode: 1, output: "BOOM", timedOut: false, failed: true });
+    render(() => <LifecyclePanel projectId="p" />);
+    fireEvent.click(await screen.findByRole("button", { name: /^start$/i }));
+    expect(await screen.findByText("BOOM")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /lifecycle last run/i }).classList.contains("failed")).toBe(true);
+  });
+
+  test("a stale failed last run on first load tints the trigger but does not open the popover", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "stopped",
+      lastRun: { kind: "start", exitCode: 1, output: "OLD-BOOM", at: 5, failed: true },
+    });
+    render(() => <LifecyclePanel projectId="p" />);
+    const btn = await screen.findByRole("button", { name: /lifecycle last run/i });
+    expect(btn.classList.contains("failed")).toBe(true);
+    expect(screen.queryByText("OLD-BOOM")).toBeNull();
+  });
+
+  test("a section's last run opens its own popover with only that section's output", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: true, enabled: true, config: { start: "make up" }, status: "running", lastRun: null,
+      sections: [
+        { name: "game", config: { start: "godot ." }, status: "none", lastRun: { kind: "start", exitCode: 0, output: "GAME-OUTPUT", at: 3, failed: false } },
+      ],
+    });
+    render(() => <LifecyclePanel projectId="p" />);
+    fireEvent.click(await screen.findByRole("button", { name: /game last run/i }));
+    expect(await screen.findByText("GAME-OUTPUT")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /lifecycle last run/i })).toBeNull();
+  });
+
+  test("groups that do not fit go into the ☰ menu, which is tinted when a hidden run failed", async () => {
+    // Two 100px groups in a 150px row: only the top level stays inline.
+    const geo = stubGeometry({ rowWidth: 150, itemWidth: 100 });
+    try {
+      vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+        hasConfig: true, enabled: true, config: { start: "make up" }, status: "running", lastRun: null,
+        sections: [
+          { name: "game", config: { start: "godot ." }, status: "none", lastRun: { kind: "start", exitCode: 1, output: "BOOM", at: 3, failed: true } },
+        ],
+      });
+      render(() => <LifecyclePanel projectId="p" />);
+      const more = await screen.findByRole("button", { name: /more/i });
+      expect(more.classList.contains("alert")).toBe(true);
+      expect(screen.queryByRole("button", { name: /start game/i })).toBeNull();
+      fireEvent.click(more);
+      expect(await screen.findByRole("button", { name: /start game/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /game last run/i }).classList.contains("failed")).toBe(true);
+    } finally {
+      geo.restore();
+    }
   });
 });

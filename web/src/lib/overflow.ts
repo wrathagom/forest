@@ -9,10 +9,13 @@
  * can be 0 when even the first item is too wide.
  */
 export function visibleCount(rights: number[], width: number, reserve: number): number {
-  if (rights.length === 0) return 0;
-  if (rights[rights.length - 1] <= width) return rights.length;
+  const total = rights.length;
+  if (total === 0) return 0;
+  // Bounds are guaranteed by the length checks, so the indexed reads are safe
+  // under noUncheckedIndexedAccess.
+  if (rights[total - 1]! <= width) return total;
   const limit = width - reserve;
   let n = 0;
-  while (n < rights.length && rights[n] <= limit) n++;
+  while (n < total && rights[n]! <= limit) n++;
   return n;
 }

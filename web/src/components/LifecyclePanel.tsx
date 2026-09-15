@@ -1,15 +1,66 @@
-import { Show, Index, createResource, createSignal, createMemo, createEffect, onCleanup } from "solid-js";
+import { Show, createResource, createSignal, createMemo, createEffect, on, onCleanup } from "solid-js";
 import { fetchLifecycle, setLifecycleEnabled, startLifecycle, stopLifecycle, startSection, stopSection } from "../api";
-import type { LifecycleStatus, LifecycleRunResult } from "../api";
+import type { LifecycleStatus, LifecycleRunResult, LifecycleView } from "../api";
 import { lifecycleTone, isLifecycleUp } from "../lib/dashboard-view";
+import OverflowRow, { type OverflowPlace } from "./OverflowRow";
+import Popover from "./Popover";
 
 const POLL_FAST_MS = 1_000;
 const POLL_SLOW_MS = 10_000;
 
+export type LifecycleLastRun = {
+  output: string;
+  failed: boolean;
+  at: number;
+  /** True when this run was already present when the project's view first loaded. */
+  stale: boolean;
+};
+
+/** One unit on the lifecycle line: the top level (key "") or a named section. */
+export type LifecycleGroup = {
+  key: string;
+  name: string | null;
+  status: LifecycleStatus;
+  showChip: boolean;
+  url?: string;
+  showLink: boolean;
+  canStart: boolean;
+  canStop: boolean;
+  onStart: () => void;
+  onStop: () => void;
+  lastRun: LifecycleLastRun | null;
+  /** Top level only: what to show instead of controls when not enabled. */
+  gate?: "no-config" | "enable";
+  onEnable?: () => void;
+};
+
+/** Last-run timestamps per group key, used to tell a stale failure from a new one. */
+function runStamps(v: LifecycleView): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (v.lastRun) out[""] = v.lastRun.at;
+  for (const s of v.sections ?? []) if (s.lastRun) out[s.name] = s.lastRun.at;
+  return out;
+}
+
+function toLastRun(
+  run: { output: string; failed: boolean; at: number } | null,
+  baseline: number | undefined,
+): LifecycleLastRun | null {
+  if (!run || !run.output) return null;
+  return { output: run.output, failed: run.failed, at: run.at, stale: baseline === run.at };
+}
+
 export default function LifecyclePanel(props: { projectId: string }) {
-  const [data, { refetch }] = createResource(() => props.projectId, fetchLifecycle);
+  // Snapshot of each project's last-run timestamps from its first fetch. A
+  // failed run auto-opens its popover only when it is newer than this — a
+  // stale failure from an earlier visit just tints the trigger.
+  const baselines = new Map<string, Record<string, number>>();
+  const [data, { refetch }] = createResource(() => props.projectId, async (id) => {
+    const v = await fetchLifecycle(id);
+    if (!baselines.has(id)) baselines.set(id, runStamps(v));
+    return v;
+  });
   const [busy, setBusy] = createSignal(false);
-  const [output, setOutput] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   // Optimistic status shown the instant a command is clicked, before the first
   // poll observes the server's transient state. Cleared when the command ends.
@@ -18,20 +69,17 @@ export default function LifecyclePanel(props: { projectId: string }) {
   const [sectionPending, setSectionPending] = createSignal<Record<string, LifecycleStatus>>({});
 
   // Reset per-project local state when navigating between projects so a banner
-  // or last-run output from one project can't bleed into the next.
+  // from one project can't bleed into the next.
   createEffect((prev: string | undefined) => {
     const id = props.projectId;
     if (prev !== undefined && prev !== id) {
       setError(null);
-      setOutput(null);
       setPending(null);
       setSectionPending({});
     }
     return id;
   });
 
-  // The status actually displayed: optimistic pending wins until the command
-  // resolves, then the polled backend status drives the display.
   const displayStatus = (): LifecycleStatus | undefined => pending() ?? data()?.status;
   const isTransient = (s: LifecycleStatus | undefined) => s === "starting" || s === "stopping";
 
@@ -68,13 +116,14 @@ export default function LifecyclePanel(props: { projectId: string }) {
     }
   };
 
+  // Last-run output is not kept locally: `refetch()` right after the run
+  // brings the server's record, which is the single source for every group.
   const run = async (kind: "start" | "stop", fn: (id: string) => Promise<LifecycleRunResult>) => {
     setBusy(true);
     setError(null);
     setPending(kind === "start" ? "starting" : "stopping");
     try {
-      const r = await fn(props.projectId);
-      setOutput(r.output || "(no output)");
+      await fn(props.projectId);
       await refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -99,6 +148,49 @@ export default function LifecyclePanel(props: { projectId: string }) {
     }
   };
 
+  const groups = createMemo<LifecycleGroup[]>(() => {
+    const d = data();
+    if (!d) return [];
+    const base = baselines.get(props.projectId) ?? {};
+    const topStatus = pending() ?? d.status;
+    const top: LifecycleGroup = {
+      key: "",
+      name: null,
+      status: topStatus,
+      showChip: true,
+      url: d.config?.url,
+      showLink: !!d.config?.url && isLifecycleUp(topStatus),
+      canStart: d.enabled && !!d.config?.start,
+      canStop: d.enabled && !!d.config?.stop,
+      onStart: () => void run("start", startLifecycle),
+      onStop: () => void run("stop", stopLifecycle),
+      lastRun: toLastRun(d.lastRun, base[""]),
+      gate: !d.hasConfig ? "no-config" : !d.enabled ? "enable" : undefined,
+      onEnable: () => void enable(),
+    };
+    if (!d.enabled) return [top];
+    const pend = sectionPending();
+    const sections = (d.sections ?? []).map((s): LifecycleGroup => {
+      const status = pend[s.name] ?? s.status;
+      return {
+        key: s.name,
+        name: s.name,
+        status,
+        showChip: status !== "none",
+        url: s.config.url,
+        // A health section links only while up; a launcher (no health) has no
+        // up signal, so its link is a plain convenience whenever a url exists.
+        showLink: !!s.config.url && (s.config.health ? isLifecycleUp(status) : true),
+        canStart: !!s.config.start,
+        canStop: !!s.config.stop,
+        onStart: () => void runSection(s.name, "start", startSection),
+        onStop: () => void runSection(s.name, "stop", stopSection),
+        lastRun: toLastRun(s.lastRun, base[s.name]),
+      };
+    });
+    return [top, ...sections];
+  });
+
   return (
     <div class="lifecycle-panel">
       <Show when={error()}>
@@ -111,83 +203,107 @@ export default function LifecyclePanel(props: { projectId: string }) {
         <span class="muted">lifecycle…</span>
       </Show>
       <Show when={data()}>
-        {(d) => {
-          // Inside `Show when={data()}`, d().status === data().status, so the
-          // optimistic pending value is the only thing that can override it.
-          const status = () => pending() ?? d().status;
-          return (
-            <>
-              <span class={`chip chip-${lifecycleTone(status())}`} title="forest.yaml lifecycle">{status()}</span>
-
-              <Show when={d().config?.url && isLifecycleUp(status())}>
-                <a class="lifecycle-link" href={d().config!.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
-              </Show>
-
-              <Show when={!d().hasConfig}>
-                <span class="muted">No <code>forest.yaml</code> — add one with <code>start</code>/<code>stop</code>/<code>health</code> to enable lifecycle controls.</span>
-              </Show>
-
-              <Show when={d().hasConfig && !d().enabled}>
-                <button class="lifecycle-btn" disabled={busy()} onclick={enable}>Enable lifecycle</button>
-              </Show>
-
-              <Show when={d().enabled}>
-                <Show when={d().config?.start}>
-                  <button class="lifecycle-btn" disabled={busy()} onclick={() => run("start", startLifecycle)}>Start</button>
-                </Show>
-                <Show when={d().config?.stop}>
-                  <button class="lifecycle-btn" disabled={busy()} onclick={() => run("stop", stopLifecycle)}>Stop</button>
-                </Show>
-              </Show>
-
-              <Show when={output() ?? d().lastRun?.output}>
-                {(out) => (
-                  <details open={d().lastRun?.failed ?? false} class="lifecycle-output">
-                    <summary>last run</summary>
-                    <pre>{out()}</pre>
-                  </details>
-                )}
-              </Show>
-
-              <Show when={d().enabled && d().sections && d().sections!.length > 0}>
-                <div class="lifecycle-sections">
-                  <Index each={d().sections!}>
-                    {(sec) => {
-                      const secStatus = (): LifecycleStatus => sectionPending()[sec().name] ?? sec().status;
-                      const up = () => sec().config.health ? isLifecycleUp(secStatus()) : true;
-                      return (
-                        <div class="lifecycle-section">
-                          <span class="lifecycle-section-name">{sec().name}</span>
-                          <Show when={secStatus() !== "none"}>
-                            <span class={`chip chip-${lifecycleTone(secStatus())}`} title={`${sec().name} lifecycle`}>{secStatus()}</span>
-                          </Show>
-                          <Show when={sec().config.url && up()}>
-                            <a class="lifecycle-link" href={sec().config.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
-                          </Show>
-                          <Show when={sec().config.start}>
-                            <button class="lifecycle-btn" disabled={busy()} aria-label={`Start ${sec().name}`} onclick={() => runSection(sec().name, "start", startSection)}>Start</button>
-                          </Show>
-                          <Show when={sec().config.stop}>
-                            <button class="lifecycle-btn" disabled={busy()} aria-label={`Stop ${sec().name}`} onclick={() => runSection(sec().name, "stop", stopSection)}>Stop</button>
-                          </Show>
-                          <Show when={sec().lastRun?.output}>
-                            {(out) => (
-                              <details open={sec().lastRun?.failed ?? false} class="lifecycle-output">
-                                <summary>last run</summary>
-                                <pre>{out()}</pre>
-                              </details>
-                            )}
-                          </Show>
-                        </div>
-                      );
-                    }}
-                  </Index>
-                </div>
-              </Show>
-            </>
-          );
-        }}
+        {/* Keyed on the project id so per-group UI state (open popovers) resets
+            on navigation, while polls of the same project keep it. */}
+        <Show when={props.projectId} keyed>
+          {(_id) => (
+            <OverflowRow
+              items={groups()}
+              separator={() => <span class="lifecycle-sep" />}
+              menuLabel="more lifecycle controls"
+              menuAlert={(hidden) => hidden.some((g) => g.lastRun?.failed === true)}
+            >
+              {(group, place) => <LifecycleGroupView group={group()} place={place} busy={busy()} />}
+            </OverflowRow>
+          )}
+        </Show>
       </Show>
     </div>
+  );
+}
+
+function LifecycleGroupView(props: { group: LifecycleGroup; place: OverflowPlace; busy: boolean }) {
+  const g = () => props.group;
+  const label = () => g().name ?? "lifecycle";
+  const chipTitle = () => (g().name ? `${g().name} lifecycle` : "forest.yaml lifecycle");
+  const controls = (
+    <>
+      <Show when={g().showChip}>
+        <span class={`chip chip-${lifecycleTone(g().status)}`} title={chipTitle()}>{g().status}</span>
+      </Show>
+      <Show when={g().gate === "no-config"}>
+        <span class="muted">No <code>forest.yaml</code> — add one with <code>start</code>/<code>stop</code>/<code>health</code> to enable lifecycle controls.</span>
+      </Show>
+      <Show when={g().gate === "enable"}>
+        <button class="lifecycle-btn" disabled={props.busy} onclick={() => g().onEnable?.()}>Enable lifecycle</button>
+      </Show>
+      <Show when={g().showLink}>
+        <a class="lifecycle-link" href={g().url} target="_blank" rel="noopener noreferrer">Open ↗</a>
+      </Show>
+      <Show when={g().canStart}>
+        <button class="lifecycle-btn" disabled={props.busy} aria-label={g().name ? `Start ${g().name}` : undefined} onclick={() => g().onStart()}>Start</button>
+      </Show>
+      <Show when={g().canStop}>
+        <button class="lifecycle-btn" disabled={props.busy} aria-label={g().name ? `Stop ${g().name}` : undefined} onclick={() => g().onStop()}>Stop</button>
+      </Show>
+      <Show when={g().lastRun}>
+        {(lr) => <LastRunButton lastRun={lr()} label={label()} interactive={props.place !== "measure"} />}
+      </Show>
+    </>
+  );
+  const name = (
+    <Show when={g().name}>
+      <span class="lifecycle-section-name">{g().name}</span>
+    </Show>
+  );
+  // `place` is fixed for the life of an instance, so a plain ternary (not a
+  // reactive <Show>) picks the layout once.
+  return props.place === "menu" ? (
+    <div class="lifecycle-group menu">
+      {name}
+      <div class="lifecycle-group-controls">{controls}</div>
+    </div>
+  ) : (
+    <div class="lifecycle-group">
+      {name}
+      {controls}
+    </div>
+  );
+}
+
+function LastRunButton(props: { lastRun: LifecycleLastRun; label: string; interactive: boolean }) {
+  const cls = () => `lifecycle-lastrun${props.lastRun.failed ? " failed" : ""}`;
+  // The measuring copy only needs the trigger's size — no popover, no effects.
+  if (!props.interactive) {
+    return <button type="button" class={cls()} tabindex="-1">last run</button>;
+  }
+  const [open, setOpen] = createSignal(false);
+  // Auto-open when a new failed run lands. `on` fires on every poll (the
+  // resource is a fresh object each time), so compare the timestamp to avoid
+  // re-opening a popover the user already dismissed. A run that was already
+  // there when the project loaded (`stale`) only tints the trigger.
+  createEffect(on(() => props.lastRun.at, (at, prev) => {
+    if (at !== prev && props.lastRun.failed && !props.lastRun.stale) setOpen(true);
+  }));
+  return (
+    <Popover
+      open={open()}
+      onOpenChange={setOpen}
+      panelClass="lifecycle-lastrun-panel"
+      trigger={(t) => (
+        <button
+          type="button"
+          class={cls()}
+          ref={t.ref}
+          aria-label={`${props.label} last run`}
+          aria-expanded={t.expanded()}
+          onclick={t.toggle}
+        >
+          last run
+        </button>
+      )}
+    >
+      <pre>{props.lastRun.output}</pre>
+    </Popover>
   );
 }
