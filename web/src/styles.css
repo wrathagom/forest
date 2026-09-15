@@ -380,7 +380,11 @@ a.chip:hover { text-decoration: underline; }
 .tab-add:hover { color: var(--fg); border-color: var(--fg-dim); }
 .terminal-host { width: 100%; height: 100%; padding: 0.4rem; box-sizing: border-box; background: var(--bg); }
 .terminal-host .xterm-viewport { background: var(--bg) !important; }
-.project-detail { display: grid; grid-template-rows: auto auto 1fr; height: 100%; }
+/* The single column is minmax(0, 1fr), not the implicit `auto`, so a
+   non-wrapping child (the single-line lifecycle row) can't stretch the track to
+   its max-content width and push the panel wider than the viewport; the row
+   then measures the real available width and collapses into its ☰ menu. */
+.project-detail { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; height: 100%; }
 .terminal-area { display: grid; grid-template-columns: 1fr; min-height: 0; min-width: 0; }
 .terminal-area.split { grid-template-columns: var(--split-left, 50%) 6px 1fr; }
 .pane { position: relative; min-height: 0; min-width: 0; }
@@ -404,7 +408,7 @@ a.chip:hover { text-decoration: underline; }
 /* info pane layout */
 :root { --info-pane-width: 360px; }
 
-.project-detail.with-info { grid-template-columns: 1fr var(--info-pane-width); }
+.project-detail.with-info { grid-template-columns: minmax(0, 1fr) var(--info-pane-width); }
 .project-detail.with-info .detail-topbar,
 .project-detail.with-info .tab-strip,
 .project-detail.with-info .banner { grid-column: 1 / -1; }
