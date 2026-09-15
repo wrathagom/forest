@@ -183,6 +183,16 @@ a.chip:hover { text-decoration: underline; }
 .card-menu-item:hover { background: var(--bg-3); color: var(--fg); }
 .card-menu-item.danger:hover { color: var(--error); }
 .card-menu-rule { border-top: 1px solid var(--border); margin: 0.18rem 0.1rem; }
+
+/* --- popover (shared disclosure: ☰ overflow menu, last-run panel) --- */
+.popover-root { position: relative; display: inline-flex; }
+.popover-panel {
+  position: absolute; top: calc(100% + 5px); z-index: 20;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 5px;
+  box-shadow: 0 8px 22px #000a;
+}
+.popover-panel.align-left { left: 0; }
+.popover-panel.align-right { right: 0; }
 .branch { color: var(--fg); font-weight: 500; }
 .git-stat { font-size: 0.75rem; padding: 0.05rem 0.4rem; border-radius: 3px; border: 1px solid transparent; line-height: 1.4; }
 .git-clean { color: var(--fg-dim); }
