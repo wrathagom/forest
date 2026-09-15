@@ -6,6 +6,7 @@ export type CardMenuProps = {
   onOpen: () => void;
   onRefresh: () => void;
   onCopyPath: () => void;
+  onRelocate: () => void;
   onTogglePin: () => void;
   onToggleArchive: () => void;
 };
@@ -92,6 +93,7 @@ export default function CardMenu(props: CardMenuProps) {
           {item("open", props.onOpen)}
           {item("refresh", props.onRefresh)}
           {item("copy path", props.onCopyPath)}
+          {item("relocate…", props.onRelocate)}
           <span class="card-menu-rule" />
           {/* No pin option for an archived project: archived projects are
               excluded from the default view, so pinning one does nothing.

@@ -1,11 +1,16 @@
+import { existsSync, statSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { json, notFound, badRequest } from "../server";
 import type { Route, RouteCtx } from "../server";
 import {
   listProjects,
   getProjectById,
   updateProject,
+  relocateProject,
+  ProjectPathConflictError,
   type ProjectListView,
 } from "../store/projects";
+import { expandHome } from "../paths";
 import { getSnapshotByProjectId } from "../store/snapshots";
 import { getScanRoot, getPollIntervalMs } from "../store/config";
 import type { SessionRegistry } from "../sessions/registry";
@@ -108,6 +113,33 @@ export function projectRoutes(sessions?: SessionRegistry, detector?: AgentDetect
         if (!body) return badRequest("invalid JSON");
         updateProject(ctx.db, project.id, body);
         return json({ ok: true });
+      },
+    },
+    {
+      method: "POST",
+      pattern: /^\/api\/projects\/([^/]+)\/relocate$/,
+      paramNames: ["id"],
+      handler: async (ctx) => {
+        const project = getProjectById(ctx.db, ctx.params.id!);
+        if (!project) return notFound();
+        const body = (await ctx.request.json().catch(() => null)) as { path?: string } | null;
+        if (!body || typeof body.path !== "string" || body.path.trim() === "") {
+          return badRequest("path is required");
+        }
+        const expanded = expandHome(body.path.trim());
+        if (!isAbsolute(expanded)) return badRequest(`path must be absolute: ${expanded}`);
+        if (!existsSync(expanded) || !statSync(expanded).isDirectory()) {
+          return badRequest(`path does not exist or is not a directory: ${expanded}`);
+        }
+        try {
+          const id = relocateProject(ctx.db, project.id, expanded);
+          return json({ ok: true, id });
+        } catch (err) {
+          if (err instanceof ProjectPathConflictError) {
+            return json({ ok: false, error: err.message }, { status: 409 });
+          }
+          throw err;
+        }
       },
     },
   ];

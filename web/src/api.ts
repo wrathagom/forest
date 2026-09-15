@@ -137,6 +137,17 @@ export async function patchProject(id: string, patch: { pinned?: boolean; hidden
   );
 }
 
+export async function relocateProject(id: string, path: string): Promise<{ ok: boolean; id: string }> {
+  return unwrap(
+    await fetch(`/api/projects/${encodeURIComponent(id)}/relocate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path }),
+    }),
+    "relocate project",
+  );
+}
+
 export async function fetchConfig() {
   return unwrap<{
     scanRoot: string | null;

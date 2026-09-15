@@ -132,3 +132,47 @@ export function updateProject(db: Database, id: string, patch: ProjectPatch): vo
 export function deleteProjectById(db: Database, id: string): void {
   db.query("DELETE FROM projects WHERE id = ?").run(id);
 }
+
+export class ProjectPathConflictError extends Error {
+  constructor(public readonly path: string) {
+    super(`a project already exists at ${path}`);
+    this.name = "ProjectPathConflictError";
+  }
+}
+
+// Re-key a project to a new path. Because a project's id is a hash of its path
+// (see hashPath) and foreign keys are enforced, we insert the new row, repoint
+// every child table, then delete the old row — all in one transaction. Ordered
+// this way the new parent always exists before a child points at it, and the
+// old parent has no children when it is deleted, so neither CASCADE nor
+// SET NULL fires.
+export function relocateProject(db: Database, oldId: string, newPath: string): string {
+  const newId = hashPath(newPath);
+  if (newId === oldId) return oldId; // path hash unchanged — nothing to move
+  if (getProjectById(db, newId)) throw new ProjectPathConflictError(newPath);
+  const project = getProjectById(db, oldId);
+  if (!project) throw new Error(`no project with id ${oldId}`);
+  const now = Date.now();
+  db.transaction(() => {
+    db.query(
+      `INSERT INTO projects
+         (id, path, name, pinned, hidden, group_name, lifecycle_enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      newId,
+      newPath,
+      project.name,
+      project.pinned ? 1 : 0,
+      project.hidden ? 1 : 0,
+      project.group,
+      project.lifecycleEnabled ? 1 : 0,
+      project.createdAt,
+      now,
+    );
+    db.query(`UPDATE snapshots SET project_id = ? WHERE project_id = ?`).run(newId, oldId);
+    db.query(`UPDATE agent_sessions SET project_id = ? WHERE project_id = ?`).run(newId, oldId);
+    db.query(`UPDATE tasks SET project_id = ? WHERE project_id = ?`).run(newId, oldId);
+    db.query(`DELETE FROM projects WHERE id = ?`).run(oldId);
+  })();
+  return newId;
+}
