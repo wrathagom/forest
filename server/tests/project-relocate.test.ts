@@ -49,6 +49,7 @@ describe("relocateProject", () => {
   test("preserves pinned, group, and lifecycleEnabled; keeps created_at", () => {
     const db = openDb(":memory:");
     const oldId = seedProject(db, "/repos/Sirdar");
+    updateProject(db, oldId, { hidden: true });
     const before = getProjectById(db, oldId)!;
 
     const newId = relocateProject(db, oldId, "/repos/sirdar");
@@ -57,6 +58,7 @@ describe("relocateProject", () => {
     expect(after.pinned).toBe(true);
     expect(after.group).toBe("Personal");
     expect(after.lifecycleEnabled).toBe(true);
+    expect(after.hidden).toBe(true);
     expect(after.createdAt).toBe(before.createdAt);
   });
 
