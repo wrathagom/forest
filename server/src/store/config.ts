@@ -118,11 +118,16 @@ export type LauncherEntry = {
   agent?: string;
 };
 
+// Adding a coding agent touches 3 uncoupled spots: this default, the icon map
+// (web/src/lib/agents.ts AGENT_ICON), and process detection (index.ts
+// agentNames). See docs/coding-agent-launchers.md for the deferred
+// single-source-of-truth refactor.
 const DEFAULT_LAUNCHERS: LauncherEntry[] = [
   { id: "shell",         label: "shell",          command: null,     args: [] },
   { id: "claude",        label: "claude",         command: "claude", args: [],          agent: "claude" },
   { id: "claude-resume", label: "claude --resume",command: "claude", args: ["--resume"],agent: "claude" },
   { id: "codex",         label: "codex",          command: "codex",  args: [],          agent: "codex"  },
+  { id: "opencode",      label: "opencode",       command: "opencode",args: [],         agent: "opencode" },
 ];
 
 export function getLaunchers(db: import("bun:sqlite").Database): LauncherEntry[] {

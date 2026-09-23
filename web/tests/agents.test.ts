@@ -5,6 +5,7 @@ describe("agentIcon", () => {
   it("maps known agents to distinct emoji", () => {
     expect(agentIcon("claude")).toBe("✳️");
     expect(agentIcon("codex")).toBe("⚡");
+    expect(agentIcon("opencode")).toBe("🦙");
     expect(agentIcon("claude")).not.toBe(agentIcon("codex"));
   });
   it("falls back to a generic robot for unknown/absent agents", () => {

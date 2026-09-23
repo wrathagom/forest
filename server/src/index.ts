@@ -119,7 +119,10 @@ const loop = createLoop({
 });
 
 const detector = new AgentDetector();
-const agentNames = ["claude", "codex", "aider"];
+// Process names the detector matches against a terminal's children (priority =
+// order). One of 3 spots to edit when adding an agent (launcher default + icon
+// map); see docs/coding-agent-launchers.md.
+const agentNames = ["claude", "codex", "opencode", "aider"];
 
 setInterval(() => {
   const allPids: number[] = [];
