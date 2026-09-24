@@ -53,6 +53,8 @@ export type LifecycleSectionView = {
 
 export type LifecycleView = {
   hasConfig: boolean;
+  /** Set when a forest.yaml exists but failed to parse — the panel prompts a fix instead of "add one". */
+  parseError?: string | null;
   enabled: boolean;
   config: { start?: string; stop?: string; health?: string; url?: string; sections?: Record<string, { start?: string; stop?: string; health?: string; url?: string }> } | null;
   status: LifecycleStatus;

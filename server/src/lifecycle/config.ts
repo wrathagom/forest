@@ -39,25 +39,43 @@ function hasAnyKey(sec: LifecycleSection): boolean {
 }
 
 /**
- * Read and parse `<projectPath>/forest.yaml`. Tolerant: a missing or malformed
- * file, or one with no recognised content, returns null. Reads top-level
- * `start`/`stop`/`health`/`url` (each a string) plus an optional `sections` map
- * of the same shape; everything else is ignored.
+ * The outcome of reading `forest.yaml`, distinguishing a file that failed to
+ * parse from one that is simply absent (or valid-but-empty). `parseError` is a
+ * human-readable YAML error, set *only* when the file exists but can't be
+ * parsed — so the UI can tell "no forest.yaml" apart from "forest.yaml is
+ * broken". A missing file, or valid YAML with no recognised keys, is
+ * `{ config: null, parseError: null }`.
  */
-export function readConfig(projectPath: string): ForestConfig | null {
+export type ConfigResult = {
+  config: ForestConfig | null;
+  parseError: string | null;
+};
+
+/**
+ * Read and parse `<projectPath>/forest.yaml`. Reads top-level
+ * `start`/`stop`/`health`/`url` (each a string) plus an optional `sections` map
+ * of the same shape; everything else is ignored. Missing file, malformed YAML,
+ * or no recognised content all yield a null `config` — see `parseError` to tell
+ * a broken file from an absent one.
+ */
+export function readConfigResult(projectPath: string): ConfigResult {
   let raw: string;
   try {
     raw = readFileSync(join(projectPath, "forest.yaml"), "utf8");
   } catch {
-    return null; // no file
+    return { config: null, parseError: null }; // no file
   }
   let parsed: unknown;
   try {
     parsed = Bun.YAML.parse(raw);
-  } catch {
-    return null; // malformed
+  } catch (err) {
+    // Present but malformed — surface the YAML error so the UI can prompt a fix
+    // (a common cause is an unquoted command value beginning with [, {, > …).
+    return { config: null, parseError: err instanceof Error ? err.message : String(err) };
   }
-  if (!parsed || typeof parsed !== "object") return null;
+  if (!parsed || typeof parsed !== "object") {
+    return { config: null, parseError: "forest.yaml is not a YAML mapping" };
+  }
   const obj = parsed as Record<string, unknown>;
 
   const cfg: ForestConfig = readSection(obj);
@@ -75,6 +93,15 @@ export function readConfig(projectPath: string): ForestConfig | null {
     if (Object.keys(sections).length > 0) cfg.sections = sections;
   }
 
-  if (!hasAnyKey(cfg) && cfg.sections === undefined) return null;
-  return cfg;
+  if (!hasAnyKey(cfg) && cfg.sections === undefined) return { config: null, parseError: null };
+  return { config: cfg, parseError: null };
+}
+
+/**
+ * Read `forest.yaml` and return just the config (null when absent, malformed,
+ * or empty). Callers that need to distinguish a broken file from an absent one
+ * should use {@link readConfigResult} instead.
+ */
+export function readConfig(projectPath: string): ForestConfig | null {
+  return readConfigResult(projectPath).config;
 }

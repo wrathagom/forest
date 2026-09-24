@@ -6,6 +6,8 @@ import { computeLifecycle } from "./status";
 export type AugmentInput = {
   enabled: boolean;
   config: ForestConfig | null;
+  /** A YAML parse error from a present-but-broken forest.yaml; carried onto the snapshot. */
+  parseError?: string | null;
   /** Runs the health command; only called when enabled + config.health + servicesUp. */
   runHealth: () => Promise<{ exitCode: number }>;
 };
@@ -40,5 +42,6 @@ export async function augmentWithLifecycle(snap: Snapshot, input: AugmentInput):
     health,
   };
   if (input.config?.url) snap.lifecycle.url = input.config.url;
+  if (input.parseError) snap.lifecycle.parseError = input.parseError;
   return snap;
 }
