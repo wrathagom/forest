@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readConfig } from "../src/lifecycle/config";
+import { readConfig, readConfigResult } from "../src/lifecycle/config";
 
 function tmpProject(yaml?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "forest-cfg-"));
@@ -125,5 +125,47 @@ describe("readConfig", () => {
   test("trims a section name", () => {
     const dir = tmpProject("sections:\n  ' game ':\n    start: godot .\n");
     expect(readConfig(dir)).toEqual({ sections: { game: { start: "godot ." } } });
+  });
+});
+
+describe("readConfigResult", () => {
+  test("valid config: returns the config with no parse error", () => {
+    const dir = tmpProject("start: make up\nstop: make down\n");
+    expect(readConfigResult(dir)).toEqual({
+      config: { start: "make up", stop: "make down" },
+      parseError: null,
+    });
+  });
+
+  test("absent file: no config, no parse error", () => {
+    expect(readConfigResult(tmpProject())).toEqual({ config: null, parseError: null });
+  });
+
+  test("valid YAML with no recognised keys: no config, no parse error", () => {
+    expect(readConfigResult(tmpProject("name: just-a-name\n"))).toEqual({
+      config: null,
+      parseError: null,
+    });
+  });
+
+  test("malformed YAML: no config, parse error present", () => {
+    const r = readConfigResult(tmpProject("start: [unterminated\n"));
+    expect(r.config).toBeNull();
+    expect(typeof r.parseError).toBe("string");
+    expect(r.parseError).not.toBe("");
+  });
+
+  test("unquoted flow-sequence value ([ … ]) is a parse error", () => {
+    // The canonical gotcha: a command value beginning with `[` is read as a
+    // YAML flow sequence, and the trailing shell text makes the file malformed.
+    const r = readConfigResult(tmpProject('stop: [ -f .forest/pid ] && kill "$(cat .forest/pid)"\n'));
+    expect(r.config).toBeNull();
+    expect(typeof r.parseError).toBe("string");
+  });
+
+  test("quoting the same value makes it valid", () => {
+    const r = readConfigResult(tmpProject(`stop: '[ -f .forest/pid ] && kill "$(cat .forest/pid)"'\n`));
+    expect(r.parseError).toBeNull();
+    expect(r.config).toEqual({ stop: '[ -f .forest/pid ] && kill "$(cat .forest/pid)"' });
   });
 });

@@ -353,6 +353,8 @@ a.chip:hover { text-decoration: underline; }
 .lifecycle-group-controls { display: inline-flex; align-items: center; gap: 0.4rem; }
 .lifecycle-section-name { font-weight: 600; font-size: 0.85em; color: var(--fg); }
 .lifecycle-sep { width: 1px; height: 1.1rem; background: var(--border); }
+.lifecycle-parse-error { color: var(--warn); font-size: 0.8rem; cursor: help; }
+.lifecycle-parse-error code { color: inherit; }
 .lifecycle-lastrun {
   font: inherit; font-size: 0.8rem; color: var(--fg-dim); cursor: pointer;
   background: none; border: 0; border-bottom: 1px dotted currentColor;

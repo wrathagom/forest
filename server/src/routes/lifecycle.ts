@@ -5,13 +5,19 @@ import { getProjectById, updateProject } from "../store/projects";
 import { getSnapshotByProjectId } from "../store/snapshots";
 import { computeLifecycle, computeSectionStatus } from "../lifecycle/status";
 import type { LifecycleStatus } from "../lifecycle/status";
-import type { ForestConfig, LifecycleSection } from "../lifecycle/config";
+import type { ForestConfig, LifecycleSection, ConfigResult } from "../lifecycle/config";
 import type { LifecycleRegistry, LastRun } from "../lifecycle/registry";
 import type { RunResult } from "../lifecycle/run";
 
 export type LifecycleRoutesDeps = {
   registry: LifecycleRegistry;
   readConfig: (path: string) => ForestConfig | null;
+  /**
+   * Richer read used only by the GET view, so it can report a present-but-broken
+   * forest.yaml. Optional: defaults to `readConfig` with a null parseError, which
+   * keeps the start/stop handlers (which only need the config) unchanged.
+   */
+  readConfigResult?: (path: string) => ConfigResult;
   runCommand: (cmd: string, cwd: string, opts: { timeoutMs: number }) => Promise<RunResult>;
 };
 
@@ -62,7 +68,9 @@ async function view(
   db: import("bun:sqlite").Database,
   project: { id: string; path: string; lifecycleEnabled: boolean },
 ) {
-  const config = deps.readConfig(project.path);
+  const { config, parseError } = deps.readConfigResult
+    ? deps.readConfigResult(project.path)
+    : { config: deps.readConfig(project.path), parseError: null };
   const transient = deps.registry.transient(project.id);
   const stored = getSnapshotByProjectId(db, project.id);
   const status =
@@ -92,6 +100,7 @@ async function view(
 
   return {
     hasConfig: config !== null,
+    parseError,
     enabled: project.lifecycleEnabled,
     config,
     status,

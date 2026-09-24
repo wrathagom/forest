@@ -21,6 +21,8 @@ export type Snapshot = {
     enabled: boolean;
     health: { exitCode: number } | null;
     url?: string;
+    /** Set when a forest.yaml exists but failed to parse; drives the UI's "broken config" state. */
+    parseError?: string;
   };
 };
 

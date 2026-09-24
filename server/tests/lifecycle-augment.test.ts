@@ -107,4 +107,24 @@ describe("augmentWithLifecycle", () => {
     });
     expect(s.lifecycle.url).toBeUndefined();
   });
+
+  test("carries a parseError into the snapshot", async () => {
+    const s = await augmentWithLifecycle(upSnap(), {
+      enabled: true,
+      config: null,
+      parseError: "YAML Parse error: Unexpected token",
+      runHealth: async () => ({ exitCode: 0 }),
+    });
+    expect(s.lifecycle.status).toBe("none");
+    expect(s.lifecycle.parseError).toBe("YAML Parse error: Unexpected token");
+  });
+
+  test("omits parseError when there is none", async () => {
+    const s = await augmentWithLifecycle(upSnap(), {
+      enabled: true,
+      config: { start: "make up" },
+      runHealth: async () => ({ exitCode: 0 }),
+    });
+    expect(s.lifecycle.parseError).toBeUndefined();
+  });
 });

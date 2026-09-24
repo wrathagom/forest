@@ -48,6 +48,19 @@ describe("lifecycle routes", () => {
     expect(body.config).toEqual({ start: "make up", stop: "make down", health: "true" });
   });
 
+  test("GET reports a parse error from a broken forest.yaml", async () => {
+    const db = openDb(":memory:");
+    const id = upsertProject(db, { path: "/tmp/p", name: "p" });
+    const routes = lifecycleRoutes(
+      deps({ readConfigResult: () => ({ config: null, parseError: "YAML Parse error: Unexpected token" }) }),
+    );
+    const get = route(routes, "GET", /lifecycle$/);
+    const res = await get.handler(ctx(db, new Request(`http://x/api/projects/${id}/lifecycle`), { id }) as never);
+    const body = await res.json();
+    expect(body.hasConfig).toBe(false);
+    expect(body.parseError).toBe("YAML Parse error: Unexpected token");
+  });
+
   test("enable toggles the flag", async () => {
     const db = openDb(":memory:");
     const id = upsertProject(db, { path: "/tmp/p", name: "p" });

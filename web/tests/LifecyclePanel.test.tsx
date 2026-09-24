@@ -38,6 +38,20 @@ describe("LifecyclePanel", () => {
     expect(await screen.findByText(/forest\.yaml/i)).toBeTruthy();
   });
 
+  test("shows a parse-error hint (not the 'add one' hint) when forest.yaml is broken", async () => {
+    vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
+      hasConfig: false, parseError: "YAML Parse error: Unexpected token",
+      enabled: false, config: null, status: "none", lastRun: null,
+    });
+    render(() => <LifecyclePanel projectId="p" />);
+    // The broken-config message mentions parsing/quoting…
+    expect(await screen.findByText(/couldn't be parsed/i)).toBeTruthy();
+    // …and the generic "add one" hint is not shown.
+    expect(screen.queryByText(/add one with/i)).toBeNull();
+    // No Enable button while the file can't be read.
+    expect(screen.queryByRole("button", { name: /enable lifecycle/i })).toBeNull();
+  });
+
   test("clicking Start calls the api", async () => {
     vi.spyOn(api, "fetchLifecycle").mockResolvedValue({
       hasConfig: true, enabled: true, config: { start: "make up" }, status: "stopped", lastRun: null,

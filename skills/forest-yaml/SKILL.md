@@ -37,6 +37,35 @@ url:    http://localhost:3000         # optional; quick-link shown while the app
 Emit only the keys that actually apply to this project. A file with just
 `start` + `stop` is fine; so is one with all four.
 
+## Quoting: this is a YAML file, not a shell script
+
+Each command is a YAML *string*. YAML gives special meaning to a value that
+**begins** with one of `[` `{` `>` `|` `&` `*` `!` `%` `@` `#` `?` `:` `-`, a
+backtick, or a quote — so a command starting with one of those breaks the parse,
+and a single broken value invalidates the **whole file**, so Forest sees no
+config and shows no controls. The classic trap is a `[ … ]` test:
+
+```yaml
+# ✗ BROKEN — YAML reads `[ -f .forest/pid ]` as a flow sequence, then chokes
+stop: [ -f .forest/pid ] && kill "$(cat .forest/pid)"
+
+# ✓ FIXED — single-quote the value
+stop: '[ -f .forest/pid ] && kill "$(cat .forest/pid)"'
+```
+
+Rules of thumb:
+
+- If a command **starts** with any special character above, wrap the whole value
+  in **single quotes**. Single quotes (not double) are safest because commands
+  routinely contain double quotes and `$( … )`, which single quotes pass through
+  literally.
+- A `>` or `|` **mid-value** (e.g. `… >/dev/null`) is fine unquoted; only a
+  *leading* special character is the problem — but quoting is never wrong, so
+  when in doubt, quote.
+- After writing the file, sanity-check that it parses:
+  `bun -e 'console.log(Bun.YAML.parse(require("fs").readFileSync("forest.yaml","utf8")))'`
+  — it should print an object with your keys, not throw.
+
 ## Named sections (independent start/stop/link)
 
 A project can have several things worth starting, stopping, or linking to
@@ -94,7 +123,9 @@ lifecycle* to activate it — don't imply it works the moment the file exists.
    - Nothing cheap to probe → omit `health` entirely.
 
 3. **Write `forest.yaml`** at the repo root with the keys you could fill in.
-   Keep each command to a single line.
+   Keep each command to a single line, and **single-quote any command that
+   begins with a YAML-special character** (see _Quoting_ above) — an unquoted one
+   breaks the whole file and Forest will show no controls.
 
 4. **Tell the user to click _Enable lifecycle_** on the project's Forest page to
    activate it.

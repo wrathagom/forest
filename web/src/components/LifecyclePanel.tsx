@@ -29,8 +29,10 @@ export type LifecycleGroup = {
   onStart: () => void;
   onStop: () => void;
   lastRun: LifecycleLastRun | null;
-  /** Top level only: what to show instead of controls when not enabled. */
-  gate?: "no-config" | "enable";
+  /** Top level only: what to show instead of controls. */
+  gate?: "no-config" | "parse-error" | "enable";
+  /** The YAML error message, present only when gate === "parse-error". */
+  parseError?: string;
   onEnable?: () => void;
 };
 
@@ -86,10 +88,11 @@ export default function LifecyclePanel(props: { projectId: string }) {
   // Poll the (cheap) lifecycle endpoint so status updates live without a manual
   // refresh: fast while a command is in flight or the status is transient, slow
   // otherwise. Skip entirely for a project with no forest.yaml — its lifecycle
-  // status can't change through Forest. Both gates are memos so the interval is
-  // recreated only when the cadence (or the should-poll gate) flips, not on
-  // every poll.
-  const shouldPoll = createMemo(() => busy() || !!data()?.hasConfig);
+  // status can't change through Forest. A broken forest.yaml keeps polling so the
+  // panel picks up the fix the moment the file parses. Both gates are memos so
+  // the interval is recreated only when the cadence (or the should-poll gate)
+  // flips, not on every poll.
+  const shouldPoll = createMemo(() => busy() || !!data()?.hasConfig || !!data()?.parseError);
   const anySectionTransient = createMemo(() => {
     const secs = data()?.sections ?? [];
     const pend = sectionPending();
@@ -165,7 +168,8 @@ export default function LifecyclePanel(props: { projectId: string }) {
       onStart: () => void run("start", startLifecycle),
       onStop: () => void run("stop", stopLifecycle),
       lastRun: toLastRun(d.lastRun, base[""]),
-      gate: !d.hasConfig ? "no-config" : !d.enabled ? "enable" : undefined,
+      gate: d.parseError ? "parse-error" : !d.hasConfig ? "no-config" : !d.enabled ? "enable" : undefined,
+      parseError: d.parseError ?? undefined,
       onEnable: () => void enable(),
     };
     if (!d.enabled) return [top];
@@ -233,6 +237,11 @@ function LifecycleGroupView(props: { group: LifecycleGroup; place: OverflowPlace
       </Show>
       <Show when={g().gate === "no-config"}>
         <span class="muted">No <code>forest.yaml</code> — add one with <code>start</code>/<code>stop</code>/<code>health</code> to enable lifecycle controls.</span>
+      </Show>
+      <Show when={g().gate === "parse-error"}>
+        <span class="lifecycle-parse-error" title={g().parseError}>
+          ⚠ <code>forest.yaml</code> couldn't be parsed — quote command values containing <code>[</code>, <code>{`{`}</code>, <code>&gt;</code> or <code>:</code>.
+        </span>
       </Show>
       <Show when={g().gate === "enable"}>
         <button class="lifecycle-btn" disabled={props.busy} onclick={() => g().onEnable?.()}>Enable lifecycle</button>

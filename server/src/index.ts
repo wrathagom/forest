@@ -60,7 +60,7 @@ import { PhraseStore } from "./phrases/store";
 import { PhraseIndexBuilder } from "./phrases/builder";
 import { phrasesRoutes } from "./routes/phrases";
 import { LifecycleRegistry } from "./lifecycle/registry";
-import { readConfig } from "./lifecycle/config";
+import { readConfig, readConfigResult } from "./lifecycle/config";
 import { runCommand } from "./lifecycle/run";
 import { augmentWithLifecycle } from "./lifecycle/augment";
 import { PER_PROJECT_TIMEOUT_MS } from "./scanner/types";
@@ -99,10 +99,11 @@ const lifecycleRegistry = new LifecycleRegistry();
 async function scanProjectWithLifecycle(path: string) {
   const snap = await scanProject(path, probes);
   const project = getProjectByPath(db, path);
-  const config = readConfig(path);
+  const { config, parseError } = readConfigResult(path);
   return augmentWithLifecycle(snap, {
     enabled: project?.lifecycleEnabled ?? false,
     config,
+    parseError,
     runHealth: async () => {
       const r = await runCommand(config!.health!, path, { timeoutMs: PER_PROJECT_TIMEOUT_MS });
       return { exitCode: r.exitCode };
@@ -289,7 +290,7 @@ startServer({
       processes: (path) => defaultProcessDetailProbe(path),
       containers: (path) => defaultContainerDetailProbe(path),
     }),
-    ...lifecycleRoutes({ registry: lifecycleRegistry, readConfig, runCommand }),
+    ...lifecycleRoutes({ registry: lifecycleRegistry, readConfig, readConfigResult, runCommand }),
     ...projectCreateRoutes(),
     ...projectFilesRoutes(),
     ...projectGitRoutes(),
