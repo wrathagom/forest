@@ -607,7 +607,21 @@ a.chip:hover { text-decoration: underline; }
 
 /* file tree */
 .file-tree { font-size: 0.78rem; color: var(--fg); }
-.tree-row { padding: 0.1rem 0.4rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-row { position: relative; padding: 0.1rem 0.4rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-row:hover { background: var(--bg-2); }
+/* Hover actions overlay the row's right edge so the name keeps its ellipsis. */
+.tree-actions {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  display: none; align-items: center; gap: 2px; padding: 0 0.3rem;
+  background: var(--bg-2);
+}
+.tree-row:hover .tree-actions { display: flex; }
+.tree-action {
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; padding: 2px; border-radius: 3px;
+  color: var(--fg-dim); cursor: pointer;
+}
+.tree-action:hover { color: var(--fg); background: var(--bg); }
 .tree-dir { color: var(--fg); }
 .tree-file { color: var(--fg-dim); }
 .tree-file:hover { color: var(--fg); }
@@ -642,7 +656,7 @@ a.chip:hover { text-decoration: underline; }
 .tree-lazy-error:hover { text-decoration: underline; }
 
 /* Dirty directory indicator: small dot trailing the dir name */
-.tree-dir-dirty::after {
+.tree-dir-dirty .tree-dir-name::after {
   content: "•";
   color: var(--warn);
   margin-left: 6px;

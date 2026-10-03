@@ -9,8 +9,21 @@ import { defaultRunGit, type RunGit } from "../git";
 import { resolveProjectPath } from "../files/path";
 import { parsePorcelainV1Z, type FileStatus } from "../git-status";
 
+// Reveals a path in Finder: a directory opens as its own window, a file is
+// shown selected in its parent. Injected so tests don't pop Finder windows.
+export type RevealInFinder = (abs: string, isDir: boolean) => Promise<boolean>;
+
+const defaultReveal: RevealInFinder = async (abs, isDir) => {
+  const proc = Bun.spawn(isDir ? ["open", abs] : ["open", "-R", abs], {
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  return (await proc.exited) === 0;
+};
+
 export type ProjectFilesDeps = {
   runGit?: RunGit;
+  reveal?: RevealInFinder;
 };
 
 type TreeEntry = {
@@ -282,6 +295,7 @@ async function buildTree(
 
 export function projectFilesRoutes(deps: ProjectFilesDeps = {}): Route[] {
   const run = deps.runGit ?? defaultRunGit;
+  const reveal = deps.reveal ?? defaultReveal;
   return [
     {
       method: "GET",
@@ -434,6 +448,28 @@ export function projectFilesRoutes(deps: ProjectFilesDeps = {}): Route[] {
         const st = await stat(abs);
         const sha = createHash("sha256").update(body.content).digest("hex");
         return json({ path: rel, mtimeMs: st.mtimeMs, sha });
+      },
+    },
+    {
+      method: "POST",
+      pattern: /^\/api\/projects\/([^/]+)\/reveal$/,
+      paramNames: ["id"],
+      handler: async (ctx) => {
+        const project = getProjectById(ctx.db, ctx.params.id!);
+        if (!project) return notFound();
+        const rel = ctx.url.searchParams.get("path") ?? "";
+        const abs = resolveProjectPath(project.path, rel);
+        if (!abs) return badRequest("invalid path");
+        let st;
+        try {
+          st = await stat(abs);
+        } catch {
+          return notFound();
+        }
+        if (!(await reveal(abs, st.isDirectory()))) {
+          return json({ error: "open failed" }, { status: 500 });
+        }
+        return json({ ok: true });
       },
     },
   ];

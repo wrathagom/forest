@@ -525,6 +525,7 @@ export default function ProjectDetail() {
       </div>
       <InfoPane
         projectId={params.id}
+        projectPath={() => project()?.path}
         expanded={infoExpanded}
         highlightedPaths={highlightedPaths}
         onOpenFile={openFile}

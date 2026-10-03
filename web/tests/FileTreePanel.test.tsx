@@ -3,17 +3,20 @@ import { describe, expect, test, vi, beforeEach } from "vitest";
 
 vi.mock("../src/api", () => ({
   fetchTreeChildren: vi.fn(),
+  revealInFinder: vi.fn(),
 }));
 
 import FileTreePanel from "../src/components/FileTreePanel";
-import { fetchTreeChildren } from "../src/api";
+import { fetchTreeChildren, revealInFinder } from "../src/api";
 import type { TreeEntry } from "../src/api";
 
 const mockChildren = vi.mocked(fetchTreeChildren);
+const mockReveal = vi.mocked(revealInFinder);
 
 beforeEach(() => {
   localStorage.clear();
   mockChildren.mockReset();
+  mockReveal.mockReset();
 });
 
 const sampleTree: TreeEntry[] = [
@@ -339,5 +342,60 @@ describe("FileTreePanel", () => {
     });
     fireEvent.click(retry);
     expect(await screen.findByText("ok.md")).toBeTruthy();
+  });
+});
+
+describe("FileTreePanel row actions", () => {
+  test("copy writes the absolute path without opening the file", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const onOpenFile = vi.fn();
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        projectPath="/Users/me/proj/"
+        entries={sampleTree}
+        highlightedPaths={[]}
+        onOpenFile={onOpenFile}
+        onOpenFileRight={() => {}}
+      />
+    ));
+    const row = screen.getByText("package.json").closest(".tree-row")!;
+    fireEvent.click(row.querySelector('[aria-label="Copy absolute path"]')!);
+    expect(writeText).toHaveBeenCalledWith("/Users/me/proj/package.json");
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+
+  test("open in Finder reveals a dir without toggling it", () => {
+    mockReveal.mockResolvedValue(undefined);
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        projectPath="/Users/me/proj"
+        entries={sampleTree}
+        highlightedPaths={[]}
+        onOpenFile={() => {}}
+        onOpenFileRight={() => {}}
+      />
+    ));
+    const row = screen.getByText(/^[▸▾]\s+src$/).closest(".tree-row")!;
+    fireEvent.click(row.querySelector('[aria-label="Open in Finder"]')!);
+    expect(mockReveal).toHaveBeenCalledWith("p1", "src");
+    expect(screen.queryByText("main.ts")).toBeNull();
+  });
+
+  test("copy is hidden until the project path is known", () => {
+    render(() => (
+      <FileTreePanel
+        projectId="p1"
+        entries={sampleTree}
+        highlightedPaths={[]}
+        onOpenFile={() => {}}
+        onOpenFileRight={() => {}}
+      />
+    ));
+    const row = screen.getByText("package.json").closest(".tree-row")!;
+    expect(row.querySelector('[aria-label="Copy absolute path"]')).toBeNull();
+    expect(row.querySelector('[aria-label="Open in Finder"]')).toBeTruthy();
   });
 });
