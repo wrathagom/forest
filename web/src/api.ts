@@ -323,6 +323,16 @@ export async function fetchFile(projectId: string, path: string): Promise<FileRe
   );
 }
 
+export async function revealInFinder(projectId: string, path: string): Promise<void> {
+  await unwrap(
+    await fetch(
+      `/api/projects/${encodeURIComponent(projectId)}/reveal?path=${encodeURIComponent(path)}`,
+      { method: "POST" },
+    ),
+    "reveal",
+  );
+}
+
 export function fileRawUrl(projectId: string, path: string, version: number): string {
   return `/api/projects/${encodeURIComponent(projectId)}/file/raw?path=${encodeURIComponent(path)}&v=${version}`;
 }

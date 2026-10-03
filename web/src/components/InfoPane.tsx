@@ -17,6 +17,7 @@ function migrate(value: unknown): Tab {
 
 export default function InfoPane(props: {
   projectId: string;
+  projectPath?: () => string | undefined;
   expanded: () => boolean;
   highlightedPaths: () => string[];
   onOpenFile: (path: string) => void;
@@ -69,6 +70,7 @@ export default function InfoPane(props: {
               {(t) => (
                 <FileTreePanel
                   projectId={props.projectId}
+                  projectPath={props.projectPath?.()}
                   entries={t().entries}
                   highlightedPaths={props.highlightedPaths()}
                   onOpenFile={props.onOpenFile}

@@ -1,5 +1,5 @@
 import { createSignal, createMemo, createEffect, For, Show, untrack } from "solid-js";
-import { fetchTreeChildren } from "../api";
+import { fetchTreeChildren, revealInFinder } from "../api";
 import type { TreeEntry, GitFileStatus } from "../api";
 import { loadExpandedDirs, saveExpandedDirs } from "../lib/tabs";
 
@@ -66,6 +66,7 @@ function buildDirtyDirs(entries: TreeEntry[]): Set<string> {
 
 export default function FileTreePanel(props: {
   projectId: string;
+  projectPath?: string;
   entries: TreeEntry[];
   highlightedPaths: string[];
   onOpenFile: (path: string) => void;
@@ -139,6 +140,58 @@ export default function FileTreePanel(props: {
     else props.onOpenFile(node.path);
   };
 
+  // Hover actions on every row. They stop propagation so a click doesn't also
+  // toggle the dir / open the file underneath.
+  function RowActions(p: { path: string }) {
+    const [copied, setCopied] = createSignal(false);
+    const onCopy = (e: MouseEvent) => {
+      e.stopPropagation();
+      const root = props.projectPath;
+      if (!root) return;
+      void navigator.clipboard?.writeText(`${root.replace(/\/+$/, "")}/${p.path}`).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      });
+    };
+    const onReveal = (e: MouseEvent) => {
+      e.stopPropagation();
+      revealInFinder(props.projectId, p.path).catch((err) => window.alert((err as Error).message));
+    };
+    return (
+      <span class="tree-actions">
+        <Show when={props.projectPath}>
+          <button
+            class="tree-action"
+            title={copied() ? "Copied" : "Copy absolute path"}
+            aria-label="Copy absolute path"
+            onclick={onCopy}
+          >
+            <Show
+              when={copied()}
+              fallback={
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              }
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </Show>
+          </button>
+        </Show>
+        <button class="tree-action" title="Open in Finder" aria-label="Open in Finder" onclick={onReveal}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h6v6" />
+            <path d="M10 14 21 3" />
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          </svg>
+        </button>
+      </span>
+    );
+  }
+
   function NodeRow(p: { node: Node; depth: number }): any {
     const indent = { "padding-left": `${p.node.path === "" ? 0 : p.depth * 12}px` };
     const childIndent = { "padding-left": `${(p.depth + 1) * 12}px` };
@@ -161,6 +214,7 @@ export default function FileTreePanel(props: {
                 {p.node.gitStatus ?? ""}
               </span>
               <span class="tree-file-name">{p.node.name}</span>
+              <RowActions path={p.node.path} />
             </div>
           }
         >
@@ -169,7 +223,10 @@ export default function FileTreePanel(props: {
             style={indent}
             onclick={() => toggle(p.node.path)}
           >
-            {expanded().has(p.node.path) ? "▾" : "▸"} {p.node.name}
+            <span class="tree-dir-name">
+              {expanded().has(p.node.path) ? "▾" : "▸"} {p.node.name}
+            </span>
+            <RowActions path={p.node.path} />
           </div>
           <Show when={expanded().has(p.node.path)}>
             <For each={p.node.children}>{(c) => <NodeRow node={c} depth={p.depth + 1} />}</For>

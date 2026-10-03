@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { mkdtempSync, writeFileSync, truncateSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, truncateSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDb } from "../src/store/db";
@@ -24,6 +24,7 @@ let projRoot: string;
 let pid: string;
 let server: ReturnType<typeof startServer>;
 let url: string;
+const revealed: Array<{ abs: string; isDir: boolean }> = [];
 
 const fileUrl = (path: string) =>
   `${url}/api/projects/${pid}/file?path=${encodeURIComponent(path)}`;
@@ -48,6 +49,8 @@ beforeAll(() => {
   writeFileSync(join(projRoot, "big.txt"), "");
   truncateSync(join(projRoot, "big.txt"), 3 * 1024 * 1024);
 
+  mkdirSync(join(projRoot, "sub"));
+
   pid = upsertProject(db, { path: projRoot, name: "filestest" });
   upsertSnapshot(db, pid, emptySnapshot());
 
@@ -56,7 +59,14 @@ beforeAll(() => {
     db,
     loop,
     log,
-    routes: [...projectFilesRoutes()],
+    routes: [
+      ...projectFilesRoutes({
+        reveal: async (abs, isDir) => {
+          revealed.push({ abs, isDir });
+          return true;
+        },
+      }),
+    ],
   });
   url = `http://${server.hostname}:${server.port}`;
 });
@@ -98,5 +108,36 @@ describe("GET /file/raw for PDFs", () => {
     expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("content-security-policy")).toContain("script-src 'none'");
+  });
+});
+
+describe("POST /reveal", () => {
+  const revealUrl = (path: string) =>
+    `${url}/api/projects/${pid}/reveal?path=${encodeURIComponent(path)}`;
+
+  test("reveals a file by its absolute path", async () => {
+    revealed.length = 0;
+    const res = await fetch(revealUrl("doc.pdf"), { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(revealed).toEqual([{ abs: join(projRoot, "doc.pdf"), isDir: false }]);
+  });
+
+  test("flags directories so they open rather than reveal", async () => {
+    revealed.length = 0;
+    const res = await fetch(revealUrl("sub"), { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(revealed).toEqual([{ abs: join(projRoot, "sub"), isDir: true }]);
+  });
+
+  test("rejects paths escaping the project", async () => {
+    revealed.length = 0;
+    const res = await fetch(revealUrl("../etc"), { method: "POST" });
+    expect(res.status).toBe(400);
+    expect(revealed).toEqual([]);
+  });
+
+  test("404s a missing path", async () => {
+    const res = await fetch(revealUrl("nope.txt"), { method: "POST" });
+    expect(res.status).toBe(404);
   });
 });
