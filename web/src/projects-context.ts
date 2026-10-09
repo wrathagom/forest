@@ -3,7 +3,7 @@ import type { ProjectListResponse } from "./api";
 
 type Ctx = {
   projects: Resource<ProjectListResponse>;
-  refetch: () => Promise<ProjectListResponse | undefined> | void;
+  refetch: () => unknown;
 };
 
 export const ProjectsContext = createContext<Ctx>();

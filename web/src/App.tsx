@@ -2,12 +2,13 @@ import { createResource, onCleanup, Show } from "solid-js";
 import { A, useLocation, type RouteSectionProps } from "@solidjs/router";
 import { fetchProjects } from "./api";
 import { ProjectsContext } from "./projects-context";
+import { reconciledStorage } from "./lib/reconciledStorage";
 import { autoRefresh } from "./lib/preferences";
 import SessionBar from "./components/SessionBar";
 import CaffeinateButton from "./components/CaffeinateButton";
 
 export default function App(props: RouteSectionProps) {
-  const [projects, { refetch }] = createResource(() => fetchProjects());
+  const [projects, { refetch }] = createResource(() => fetchProjects(), { storage: reconciledStorage });
   const loc = useLocation();
   const bare = () => loc.pathname === "/m" || loc.pathname.startsWith("/m/");
 
