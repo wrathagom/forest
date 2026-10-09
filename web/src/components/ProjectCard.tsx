@@ -1,4 +1,4 @@
-import { For, Show, createMemo } from "solid-js";
+import { For, Index, Show, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { ProjectRow } from "../api";
 import { refreshProject, patchProject, relocateProject } from "../api";
@@ -107,25 +107,28 @@ export default function ProjectCard(props: {
                   </ul>
                 </Show>
                 <div class="card-chips">
-                  <For each={statusChips(props.project, Date.now())}>
+                  {/* <Index>, not <For>: statusChips() builds fresh objects on
+                      every evaluation, and <For> would rebuild the link under
+                      the cursor each time, swallowing the click. */}
+                  <Index each={statusChips(props.project, Date.now())}>
                     {(c) => (
                       <Show
-                        when={c.href}
-                        fallback={<span class={`chip chip-${c.tone}`} title={c.title}>{c.label}</span>}
+                        when={c().href}
+                        fallback={<span class={`chip chip-${c().tone}`} title={c().title}>{c().label}</span>}
                       >
                         <a
-                          class={`chip chip-${c.tone}`}
-                          href={c.href}
+                          class={`chip chip-${c().tone}`}
+                          href={c().href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={c.title}
+                          title={c().title}
                           onclick={(e) => e.stopPropagation()}
                         >
-                          {c.label}
+                          {c().label}
                         </a>
                       </Show>
                     )}
-                  </For>
+                  </Index>
                 </div>
               </>
             )}
